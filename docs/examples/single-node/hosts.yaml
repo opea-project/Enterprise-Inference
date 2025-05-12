@@ -1,0 +1,22 @@
+all:
+  hosts:
+    master1:
+      ansible_connection: local
+      ansible_user: ubuntu
+      ansible_become: true
+  children:
+    kube_control_plane:
+      hosts:
+        master1:
+    kube_node:
+      hosts:
+        master1:
+    etcd:
+      hosts:
+        master1:
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}

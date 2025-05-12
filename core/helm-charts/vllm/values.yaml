@@ -1,0 +1,221 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Default values for vllm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+# Enabling HPA will:
+# - Ignore above replica count, as it will be controlled by HPA
+# - Add example HPA scaling rules with custom metrics thresholds
+# - Require custom metrics ConfigMap available in the main application chart
+autoscaling:
+  maxReplicas: 4
+  enabled: false
+
+# empty for CPU (longer latencies are tolerated before HPA scaling unaccelerated service)
+accelDevice: ""
+
+port: 2080
+shmSize: 1Gi
+image:
+  repository: opea/vllm
+  # Uncomment the following line to set desired image pull policy if needed, as one of Always, IfNotPresent, Never.
+  # pullPolicy: ""
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  seccompProfile:
+    type: RuntimeDefault
+#  readOnlyRootFilesystem: true
+#  allowPrivilegeEscalation: false
+#  runAsNonRoot: true
+#  runAsUser: 1000
+#  capabilities:
+#    drop:
+#    - ALL
+#  seccompProfile:
+#    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+
+pvc:
+  enabled: false
+
+apisix:
+  enabled: false
+
+ingress:
+  enabled: false  # Set to true to enable the Ingress resource
+  host: ""
+  namespace: default
+  secretname: ""
+
+
+
+oidc:
+  realm: master
+  client_id: ""
+  client_secret: ""
+  discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
+  introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+extraCmdArgs: []
+
+# livenessProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 4600  # Start liveness checks after 1 hour (safe buffer)
+#   periodSeconds: 60
+#   failureThreshold: 60  # Allows up to 30 minutes of failures before restart
+
+# readinessProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 4600  # Only mark ready after 1 hour
+#   periodSeconds: 60
+
+# startupProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 3600
+#   periodSeconds: 10
+#   failureThreshold: 7200  # Allows up to 2 hours (10s * 7200 = 72000s)
+
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  failureThreshold: 98
+# startupProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 120 
+#   periodSeconds: 30
+#   failureThreshold: 79
+
+
+nodeSelector: {}
+
+tolerations: []
+
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:      
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node-role.kubernetes.io/inference-xeon
+              operator: In
+              values:
+                - "true"
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node-role.kubernetes.io/inference-cpu
+              operator: In
+              values:
+                - "true"
+
+LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
+
+# Environment variables for vLLM (set in configmap):
+# https://docs.vllm.ai/en/latest/getting_started/gaudi-installation.html#environment-variables
+OMPI_MCA_btl_vader_single_copy_mechanism: ""
+PT_HPU_ENABLE_LAZY_COLLECTIVES: ""
+VLLM_CPU_KVCACHE_SPACE: "40"
+VLLM_CONFIGURE_LOGGING: 1
+VLLM_NO_USAGE_STATS: 1
+
+defaultModelConfigs:
+  configMapValues:    
+    OMPI_MCA_btl_vader_single_copy_mechanism: none
+    PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
+    VLLM_CPU_KVCACHE_SPACE: "40"
+  extraCmdArgs: ["--block-size", "128", "--dtype", "bfloat16", "--max-model-len","5196"]
+  tensor_parallel_size: "1"
+
+svcmonitor:
+  enabled: false  
+
+
+global:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""
+  HUGGINGFACEHUB_API_TOKEN: ""
+  # service account name to be shared with all parent/child charts.
+  # If set, it will overwrite serviceAccount.name.
+  # If set, and serviceAccount.create is false, it will assume this service account is already created by others.
+  sharedSAName: ""
+
+  # Choose where to save your downloaded models
+  # Set modelUseHostPath for local directory, this is good for one node test. Example:
+  # modelUseHostPath: /mnt/opea-models
+  # Set modelUsePVC for PersistentVolumeClaim(PVC), which is suitable for multinode deployment. Example:
+  # modelUsePVC: model-volume
+  # You can only set one of the following var, the behavior is not defined is both are set.
+  # By default, both var are set to empty, the model will be downloaded and saved to a tmp volume.
+  modelUseHostPath: ""
+  modelUsePVC: ""
+
+  # Install Prometheus serviceMonitor for service
+  monitoring: false
+
+  # Prometheus Helm install release name for serviceMonitor
+  prometheusRelease: observability
+

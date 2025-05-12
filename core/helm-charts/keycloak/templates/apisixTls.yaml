@@ -1,0 +1,13 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: {{ .Release.Name }}-token-route-tls
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - {{ .Values.tls.host }}
+  secret:
+    name: {{ .Values.tls.secretName }}
+    namespace: {{ .Values.tls.secretNamespace }}

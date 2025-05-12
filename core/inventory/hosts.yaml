@@ -1,0 +1,31 @@
+all:
+  hosts:
+    master:
+      ansible_host: "{{ private_ip_control_plane_node }}"
+      ansible_user: "username_of_user_running_automation"
+      ansible_ssh_private_key_file: "/home/ubuntu/.ssh/id_rsa"
+    worker1:
+      ansible_host: "{{ private_ip_workload_node_1 }}"
+      ansible_user: "username_of_user_running_automation"
+      ansible_ssh_private_key_file: "/home/ubuntu/.ssh/id_rsa"
+    worker2:
+      ansible_host: "{{ private_ip_workload_node_2 }}"
+      ansible_user: "username_of_user_running_automation"
+      ansible_ssh_private_key_file: "/home/ubuntu/.ssh/id_rsa"
+  children:
+    kube_control_plane:
+      hosts:
+        master:
+    kube_node:
+      hosts:
+        worker1:
+        worker2:
+    etcd:
+      hosts:
+        master:
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}

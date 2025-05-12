@@ -1,0 +1,23 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ .Release.Name }}-keycloak-token-route
+  namespace: {{ .Release.Namespace }}
+spec:
+  http:
+    - name: simplified-token-endpoint
+      match:
+        hosts:
+          - {{ .Values.keycloakTokenRoute.host }}
+        paths:
+          - {{ .Values.keycloakTokenRoute.path }}
+      backends:
+        - serviceName: {{ .Values.keycloakTokenRoute.serviceName }}
+          servicePort: {{ .Values.keycloakTokenRoute.servicePort }}
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            uri: {{ .Values.keycloakTokenRoute.rewritePath }}

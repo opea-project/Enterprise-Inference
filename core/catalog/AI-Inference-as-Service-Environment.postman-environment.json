@@ -1,0 +1,51 @@
+{
+	"id": "",
+	"name": "AI-Inference-as-Service-Environment",
+	"values": [
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "USER",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "PASSWORD",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "KEYCLOAK_ADDR",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "KEYCLOAK_REALM",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "KEYCLOAK_CLIENT_ID",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "KEYCLOAK_CLIENT_SECRET",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2025-03-24T04:46:15.910Z",
+	"_postman_exported_using": "Postman/11.37.1"
+}

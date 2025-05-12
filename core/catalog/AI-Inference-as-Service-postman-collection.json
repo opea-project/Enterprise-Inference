@@ -1,0 +1,1058 @@
+{
+	"info": {
+		"_postman_id": "",
+		"name": "AI Inference as Service LLM Model API's",
+		"description": "AI Inference as Service LLM Model API Postman Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": ""
+	},
+	"item": [
+		{
+			"name": "Keycloak and APISIX Enabled API's",
+			"item": [
+				{
+					"name": "Get Bearer Access Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Extract the access token from the response\r",
+									"const accessToken = pm.response.json().access_token;\r",
+									"// Set the access token as an environment variable\r",
+									"pm.environment.set(\"accessToken\", accessToken);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "password",
+									"type": "text"
+								},
+								{
+									"key": "client_id",
+									"value": "{{KEYCLOAK_CLIENT_ID}}",
+									"type": "text"
+								},
+								{
+									"key": "client_secret",
+									"value": "{{KEYCLOAK_CLIENT_SECRET}}",
+									"type": "text"
+								},
+								{
+									"key": "username",
+									"value": "{{USER}}",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "{{PASSWORD}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/realms/{{KEYCLOAK_REALM}}/protocol/openid-connect/token",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"realms",
+								"{{KEYCLOAK_REALM}}",
+								"protocol",
+								"openid-connect",
+								"token"
+							]
+						},
+						"description": "Get Access Token"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-Meta-Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 15, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-8B-Instruct-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-8B-Instruct-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-DeepSeek-R1-Distill-Llama-8B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Llama-8B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 15, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Llama-8B-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Llama-8B-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-DeepSeek-R1-Distill-Qwen-32B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Qwen-32B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 5, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Qwen-32B-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Qwen-32B-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 100, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-8B-Instruct/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-8B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-8B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-70B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-70B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 85, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-70B-Instruct/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-70B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-70B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-405B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Llama-3.1-405B-Instruct\", \"prompt\": \"Could you suggest a method for organizing API endpoints ?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/Llama-3.1-405B-Instruct/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"Llama-3.1-405B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Llama-3.1-405B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "DeepSeek-R1-Distill-Llama-8B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Llama-8B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 150, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Llama-8B/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Llama-8B",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Llama-8B Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "DeepSeek-R1-Distill-Qwen-32B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Qwen-32B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 80, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Qwen-32B/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Qwen-32B",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Qwen-32B Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Falcon3-7B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"tiiuae/Falcon3-7B-Instruct\", \"prompt\": \"Could you suggest a method for organizing API endpoints ?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/Falcon3-7B-Instruct/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"Falcon3-7B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Falcon3-7B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CodeLlama-34b-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"codellama/CodeLlama-34b-Instruct-hf\", \"prompt\": \"Could you please provide a one-liner Python function to check if a given string is a palindrome?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/CodeLlama-34b-Instruct-hf/v1/completions",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"CodeLlama-34b-Instruct-hf",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "CodeLlama-34b-Instruct-hf Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "TEI-Embedding-bge-base-en-v1.5",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"input\": \"Text for which embedding to be generated\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/bge-base-en-v1.5/v1/embeddings",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"bge-base-en-v1.5",
+								"v1",
+								"embeddings"
+							]
+						},
+						"description": "bge-base-en-v1.5 Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "TEI-Rerank-bge-reranker-base",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"query\":\"What is Deep Learning?\", \"texts\": [\"Deep Learning is not...\", \"Deep learning is...\"]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{KEYCLOAK_ADDR}}/bge-reranker-base/rerank",
+							"host": [
+								"{{KEYCLOAK_ADDR}}"
+							],
+							"path": [
+								"bge-reranker-base",
+								"rerank"
+							]
+						},
+						"description": "bge-reranker-base Model Endpoint"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Keycloak and APISIX Disabled API's",
+			"item": [
+				{
+					"name": "CPU-Meta-Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 15, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-8B-Instruct-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-8B-Instruct-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-DeepSeek-R1-Distill-Llama-8B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Llama-8B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 15, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Llama-8B-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Llama-8B-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-DeepSeek-R1-Distill-Qwen-32B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Qwen-32B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 5, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Qwen-32B-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Qwen-32B-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 100, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Meta-Llama-3.1-8B-Instruct/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-8B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-8B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-70B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-70B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 85, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Meta-Llama-3.1-70B-Instruct/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-70B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-70B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Meta-Llama-3.1-405B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Llama-3.1-405B-Instruct\", \"prompt\": \"Could you suggest a method for organizing API endpoints ?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Llama-3.1-405B-Instruct/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Llama-3.1-405B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Llama-3.1-405B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "DeepSeek-R1-Distill-Llama-8B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Llama-8B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 150, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/DeepSeek-R1-Distill-Llama-8B/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Llama-8B",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Llama-8B Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "DeepSeek-R1-Distill-Qwen-32B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"deepseek-ai/DeepSeek-R1-Distill-Qwen-32B\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 80, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/DeepSeek-R1-Distill-Qwen-32B/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"DeepSeek-R1-Distill-Qwen-32B",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "DeepSeek-R1-Distill-Qwen-32B Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Falcon3-7B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"tiiuae/Falcon3-7B-Instruct\", \"prompt\": \"Could you suggest a method for organizing API endpoints ?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Falcon3-7B-Instruct/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Falcon3-7B-Instruct",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Falcon3-7B-Instruct Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CodeLlama-34b-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"codellama/CodeLlama-34b-Instruct-hf\", \"prompt\": \"Could you please provide a one-liner Python function to check if a given string is a palindrome?\", \"max_tokens\": 120, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/CodeLlama-34b-Instruct-hf/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"CodeLlama-34b-Instruct-hf",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "CodeLlama-34b-Instruct-hf Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "TEI-Embedding-bge-base-en-v1.5",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"input\": \"Text for which embedding to be generated\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/bge-base-en-v1.5/v1/embeddings",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"bge-base-en-v1.5",
+								"v1",
+								"embeddings"
+							]
+						},
+						"description": "bge-base-en-v1.5 Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "TEI-Rerank-bge-reranker-base",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"query\":\"What is Deep Learning?\", \"texts\": [\"Deep Learning is not...\", \"Deep learning is...\"]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/bge-reranker-base/rerank",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"bge-reranker-base",
+								"rerank"
+							]
+						},
+						"description": "bge-reranker-base Model Endpoint"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "USER",
+			"value": ""
+		},
+		{
+			"key": "PASSWORD",
+			"value": ""
+		},
+		{
+			"key": "KEYCLOAK_ADDR",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "KEYCLOAK_REALM",
+			"value": "master",
+			"type": "string"
+		},
+		{
+			"key": "KEYCLOAK_CLIENT_ID",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "KEYCLOAK_CLIENT_SECRET",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "TOKEN",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

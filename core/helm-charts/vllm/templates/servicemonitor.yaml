@@ -1,0 +1,20 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.svcmonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "vllm.fullname" . }}-service
+  labels:
+    release: {{ .Values.global.prometheusRelease }}
+spec:
+spec:
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "vllm.fullname" . }}
+  endpoints:
+  - port: "vllm"
+{{- end }}

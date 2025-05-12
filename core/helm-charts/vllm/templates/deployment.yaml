@@ -1,0 +1,146 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vllm.fullname" . }}
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+spec:
+  {{- if ne (int .Values.replicaCount) 1 }}
+  # remove if replica count should not be reset on pod update (e.g. with HPA)
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "vllm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "vllm.selectorLabels" . | nindent 8 }}
+    spec:
+      # {{- with .Values.imagePullSecrets }}
+      # imagePullSecrets:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+      # serviceAccountName: {{ include "vllm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # runtimeClassName: habana
+      containers:
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "vllm.fullname" . }}-config
+            {{- if .Values.global.extraEnvConfig }}
+            - configMapRef:
+                name: {{ .Values.global.extraEnvConfig }}
+                optional: true
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
+          # command:
+          #   - /bin/bash
+          #   - -c
+          #   - |
+          #     python3 -m vllm.entrypoints.openai.api_server --dtype {{ .Values.d_type }}  --model {{ .Values.LLM_MODEL_ID }} --port {{ .Values.port }} --tensor-parallel-size {{ .Values.tensor_parallel_size }} --block-size {{ .Values.block_size }} --max-model-len {{ .Values.max_model_len }} --disable-log-requests
+          args:
+            {{- if .Values.accelDevice }}
+            {{- $modelConfig := (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict) }}
+            {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
+            {{- range $modelArgs }}
+            - {{ . | quote }}
+            {{- end }}
+            
+
+            # Ensure tensor_parallel_size is passed correctly as a number
+            - "--tensor-parallel-size"
+            - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            {{- end }}
+            - "--model"
+            - {{ .Values.LLM_MODEL_ID | quote }}
+            - "--port"
+            - {{ .Values.port | quote }}
+          volumeMounts:
+            - mountPath: /data
+              name: model-volume
+            # - mountPath: /dev/shm
+            #   name: shm
+            - mountPath: /tmp
+              name: tmp
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+              protocol: TCP
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- if not .Values.accelDevice }}
+            {{- toYaml .Values.resources | nindent 12 }}
+            {{- else }}
+            limits:
+              habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            {{- end }}
+            
+      volumes:
+        - name: model-volume
+          {{- if .Values.pvc.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "vllm.fullname" . }}-pvc
+          {{- else if .Values.global.modelUseHostPath }}
+          hostPath:
+            path: {{ .Values.global.modelUseHostPath }}
+            type: Directory
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        # - name: shm
+        #   emptyDir:
+        #     medium: Memory
+        #     sizeLimit: {{ .Values.shmSize }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "vllm.selectorLabels" . | nindent 14 }}
+      {{- end }}
+      {{- if not .Values.accelDevice }}
+      # extra time to finish processing buffered requests on CPU before pod is forcibly terminated
+      terminationGracePeriodSeconds: 120
+      {{- end }}
