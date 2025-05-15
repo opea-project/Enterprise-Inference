@@ -1,0 +1,51 @@
+# Copyright (C) 2024 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.apisix.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "teirerank.fullname" . }}-apisixroute
+  namespace: default
+spec:
+  http:
+  - name: {{ include "teirerank.fullname" . }}-apisixroute
+    match:
+      hosts:
+      - {{ .Values.ingress.host }}
+      paths:
+      # - /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/*
+      {{- if not .Values.accelDevice }}
+      - /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/*
+      {{- else }}
+      - /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/*
+      {{- end }}
+    backends:
+    - serviceName: {{ include "teirerank.fullname" . }}-service
+      servicePort: 80
+    plugins:
+    - name: openid-connect
+      enable: true
+      config:
+        client_id: {{ .Values.oidc.client_id }}
+        client_secret: {{ .Values.oidc.client_secret }}
+        discovery: {{ .Values.oidc.discovery }}
+        introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: openid profile email
+        bearer_only: true
+        realm: master
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          {{- if not .Values.accelDevice }}
+          - ^/{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/(.*)
+          {{- else }}
+          - ^/{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+          {{- end }}
+          - /$1
+          # - ^/{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+          # - /$1
+        headers:
+          Content-Type: application/json
+{{- end }}

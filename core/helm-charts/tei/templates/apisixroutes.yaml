@@ -1,0 +1,51 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.apisix.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "tei.fullname" . }}-apisixroute
+  namespace: default
+spec:
+  http:
+  - name: {{ include "tei.fullname" . }}-apisixroute
+    match:
+      hosts:
+      - {{ .Values.ingress.host }}
+      paths:
+      # - /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/*
+      {{- if not .Values.accelDevice }}
+      - /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}-teicpu/*
+      {{- else }}
+      - /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/*
+      {{- end }}
+    backends:
+    - serviceName: {{ include "tei.fullname" . }}-service
+      servicePort: 80
+    plugins:
+    - name: openid-connect
+      enable: true
+      config:
+        client_id: {{ .Values.oidc.client_id }}
+        client_secret: {{ .Values.oidc.client_secret }}
+        discovery: {{ .Values.oidc.discovery }}
+        introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: openid profile email
+        bearer_only: true
+        realm: master
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          {{- if not .Values.accelDevice }}
+          - ^/{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}-teicpu/(.*)
+          {{- else }}
+          - ^/{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/(.*)
+          {{- end }}
+          - /$1
+          # - ^/{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/(.*)
+          # - /$1
+        headers:
+          Content-Type: application/json
+{{- end }}

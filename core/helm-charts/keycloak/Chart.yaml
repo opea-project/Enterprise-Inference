@@ -1,0 +1,6 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v2
+name: keycloak-apisix
+description: A Helm chart for keycloak apisix used to generate token
+version: 0.1.0

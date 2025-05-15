@@ -1,0 +1,59 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy Keycloak controller
+  hosts: kube_control_plane
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    delete_pv_on_purge: 'no'
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default({}) }}"
+  tasks:
+    - name: Ensure Python pip module is installed
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+      become: true
+    - name: Install Kubernetes Python SDK
+      ansible.builtin.pip:
+        name: kubernetes
+        state: present
+        executable: /usr/bin/pip3
+      become: true
+    - name: Install Deployment Client
+      ansible.builtin.shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        executable: /bin/bash
+      become: true
+    - name: Add Ingress-Nginx repository
+      community.kubernetes.helm_repository:
+        name: ingress-nginx
+        repo_url: https://kubernetes.github.io/ingress-nginx
+        state: present
+      when: delete_pv_on_purge == "no"
+    - name: Verify repository availability
+      ansible.builtin.command: helm repo list
+      register: helm_repo_list    
+      failed_when: false
+      changed_when: false  
+    - name: Synchronize repositories
+      ansible.builtin.shell: helm repo update      
+      when: helm_repo_list.stdout != "" and delete_pv_on_purge == "no"                              
+    - name: Remove existing Keycloak PersistentVolume data directory
+      ansible.builtin.file:
+        path: /mnt/local-path-provisioner/
+        state: absent
+        force: yes
+      become: true
+      when: delete_pv_on_purge == "yes"
+    - name: Provision Storage data directory
+      ansible.builtin.file:
+        path: /mnt/local-path-provisioner/
+        state: directory
+        mode: '0777'
+      become: true
+      when: delete_pv_on_purge == "no" 
+    
+    

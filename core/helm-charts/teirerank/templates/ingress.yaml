@@ -1,0 +1,56 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+{{- if or .Values.ingress.enabled .Values.apisix.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/rewrite-target: /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/$1
+    nginx.ingress.kubernetes.io/rewrite-target: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+      /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/$1
+      {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
+      /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/$1
+      {{- else if not .Values.apisix.enabled }}
+      /$1
+      {{- end }}   
+  creationTimestamp: "2024-11-22T03:27:37Z"
+  generation: 1
+  labels:
+    {{- include "teirerank.labels" . | nindent 4 }}
+  name: {{ include "teirerank.fullname" . }}-ingress
+  namespace: {{- if .Values.apisix.enabled }}
+                auth-apisix
+              {{- else }}
+                default
+              {{- end }}
+  resourceVersion: "244487"
+  uid: df2b31a1-6653-4d71-9de0-4df33cb93ad1
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{- if .Values.apisix.enabled }}
+              auth-apisix-gateway
+            {{- else }}
+              {{ include "teirerank.fullname" . }}-service
+            {{- end }}
+            port:
+              number: 80
+        # path: /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+        path: {{- if not .Values.accelDevice }}
+          /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/(.*)
+          {{- else }}
+          /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+          {{- end }}
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.secretname }}
+{{- end }}

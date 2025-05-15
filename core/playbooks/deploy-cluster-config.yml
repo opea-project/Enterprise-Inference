@@ -1,0 +1,139 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy Cluster Configurations
+  hosts: kube_control_plane
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    remote_helm_charts_base: "/tmp/helm-charts"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default({}) }}"
+  tasks:
+    - name: Ensure Python pip module is installed
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+      become: true
+      tags: deploy_cluster_dashboard
+    - name: Install Kubernetes Python SDK
+      ansible.builtin.pip:
+        name: kubernetes
+        state: present
+        executable: /usr/bin/pip3
+      become: true
+      tags: deploy_cluster_dashboard
+    - name: Install Deployment Client
+      ansible.builtin.shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        executable: /bin/bash
+      become: true       
+      tags: deploy_cluster_dashboard
+    # - name: Label worker nodes with inference-workload
+    #   ansible.builtin.command: >
+    #     kubectl label nodes --selector='!node-role.kubernetes.io/control-plane'
+    #     node-role.kubernetes.io/inference-workload=true                      
+    - name: Create TLS cert for Admin dashboard
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ secret_name }}"
+            namespace: kube-system  # Change this to the desired namespace if not default
+          type: kubernetes.io/tls
+          data:
+            tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
+            tls.key: "{{ lookup('file', key_file) | b64encode }}"
+      register: kubectl_output 
+      tags: deploy_cluster_dashboard       
+    - name: Create Admin dashboard ingress    
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+              nginx.ingress.kubernetes.io/rewrite-target: /$2
+            name: kubernetes-dashboard-ingress
+            namespace: kube-system
+          spec:
+            ingressClassName: nginx
+            rules:
+            - host: "{{ secret_name }}"
+              http:
+                paths:
+                - backend:
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
+                  path: /dashboard(/|$)(.*) 
+                  pathType: ImplementationSpecific
+            tls:
+            - hosts:
+              - "{{ secret_name }}"
+              secretName: "{{ secret_name }}"
+      tags: deploy_cluster_dashboard
+    - name: Create ServiceAccount for Admin Dashboard
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: dashboard-user
+            namespace: kube-system
+      tags: deploy_cluster_dashboard
+    - name: Create ClusterRole for Kubernetes Dashboard
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: kubernetes-dashboard-role
+          rules:
+          - apiGroups: ["apps"]
+            resources: ["deployments"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: [""]
+            resources: ["pods", "services", "nodes"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: ["networking.k8s.io"]
+            resources: ["ingresses"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: ["metrics.k8s.io"]
+            resources: ["pods", "nodes"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: [""]
+            resources: ["services/proxy"]
+            resourceNames: ["https:kubernetes-dashboard:https"]
+            verbs: ["get", "create", "update"]
+      tags: deploy_cluster_dashboard
+    - name: Create ClusterRoleBinding for Admin Dashboard
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: kubernetes-dashboard-rolebinding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: kubernetes-dashboard-role
+          subjects:
+          - kind: ServiceAccount
+            name: dashboard-user
+            namespace: kube-system
+      tags: deploy_cluster_dashboard
+    - name: Remove any existing deployment directory
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}"
+        state: absent
+      tags: always

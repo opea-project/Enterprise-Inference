@@ -1,0 +1,15 @@
+{
+	"id": "",
+	"name": "AI-Inference-as-Service-withoutAuth-Environment",
+	"values": [
+		{
+			"key": "CLUSTER_URL",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2025-03-25T04:25:34.731Z",
+	"_postman_exported_using": "Postman/11.37.1"
+}

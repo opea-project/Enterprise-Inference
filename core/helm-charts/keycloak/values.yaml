@@ -1,0 +1,18 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+keycloakTokenRoute:
+  host: ""
+  path: /token
+  serviceName: keycloak
+  servicePort: 80
+  rewritePath: /realms/master/protocol/openid-connect/token
+# TLS configuration
+tls:
+  host: ""
+  secretName: ""
+  secretNamespace: default
+ingress:
+  host: ""
+  serviceName: auth-apisix-gateway
+  servicePort: 80
+  secretName: ""
