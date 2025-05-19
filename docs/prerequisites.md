@@ -11,15 +11,13 @@
 The first step is to get access to the hardware platforms. This guide assumes the user can log in to all nodes. 
 
 
-#### System Requirement:
+#### System Requirements:
 
 | Category            | Details                                                                                                           |
 |---------------------|-------------------------------------------------------------------------------------------------------------------|
 | Operating System    | Ubuntu 22.04                                                                                                |
 | Hardware Platforms  | 4th Gen Intel® Xeon® Scalable processors<br>5th Gen Intel® Xeon® Scalable processors<br>6th Gen Intel® Xeon® Scalable processors<br>3rd Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator<br>4th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator <br>6th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 3 AI Accelerator|
 | Gaudi Firmware Version | 1.20.0
-
-
 
 >**Note**: For Intel® Gaudi AI Accelerators, there are additional steps to ensure the node(s) meet the requirements. Follow the [Gaudi prerequisites guide](./gaudi_prerequisites.md) before proceeding. For Intel® Xeon® Scalable processors, no additional setup is needed.
 
@@ -111,4 +109,4 @@ Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
 
 
 ## Next Steps
-After completing the prerequisites, proceed to the [Deployment Configuration](./README.md#customizing-components-for-inference-deployment-with-inference-configcfg) section of the guide to set up Enterprise Inference.
+After completing the prerequisites, proceed to the [Deployment Options](./README.md#deployment-options) section of the guide to set up Enterprise Inference.

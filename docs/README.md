@@ -1,12 +1,10 @@
-# TLDR;
-# Getting Started
-To setup prerequisities and quickstart deployment of Intel® AI for Enterprise Inference on a single node follow steps here [**Quick Start Guide**](./single-node-deployment.md)
+# Quick Start
+To set up prerequisities and quickly deploy Intel® AI for Enterprise Inference on a single node, follow the steps in the [**Single Node Deployment Guide**](./single-node-deployment.md). Otherwise, proceed to the section below for all deployment options.
 
-
-# Intel® AI for Enterprise Inference Cluster Setup
+# Complete Intel® AI for Enterprise Inference Cluster Setup
 
 ## Prerequisites
-- Review [System Requirements](./prerequisites.md)
+Complete all [prerequisites](./prerequisites.md).
 ---
 ## Deployment Options
 
@@ -18,7 +16,7 @@ To setup prerequisities and quickstart deployment of Intel® AI for Enterprise I
 ---
 ## Supported Models
 - View the [Pre-validated Model List](./supported-models.md)
-- To deploy custom models from Hugging Face, follow the [Hugging Face Deployment Guide](./deploy-llm-model-from-hugging-face.md)
+- To deploy custom models from HuggingFace, follow the [Hugging Face Deployment Guide](./deploy-llm-model-from-hugging-face.md)
 
 > 💡 Both validated and custom models are supported to meet diverse enterprise needs.
 ---
