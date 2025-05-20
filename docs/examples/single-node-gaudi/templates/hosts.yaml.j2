@@ -1,0 +1,22 @@
+all:
+  hosts:
+    {{ ansible_hostname }}:
+      ansible_host: "{{ cluster_ip }}"
+      ansible_user: {{ ai_user }}
+      ansible_ssh_private_key_file: {{ ssh_key_file}}
+  children:
+    kube_control_plane:
+      hosts:
+        {{ ansible_hostname }}:
+    kube_node:
+      hosts:
+        {{ ansible_hostname }}:
+    etcd:
+      hosts:
+        {{ ansible_hostname }}:
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}

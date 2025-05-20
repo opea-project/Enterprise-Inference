@@ -1,0 +1,27 @@
+# OpenSSL configuration template for Ansible
+
+[ req ]
+default_bits = {{ key_size }}
+default_md = sha256
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+C = {{ cert_country }}
+ST = {{ cert_state }}
+L = {{ cert_locality }}
+O = {{ cert_organization }}
+OU = {{ cert_organizational_unit }}
+CN = {{ cert_common_name }}
+emailAddress = {{ cert_email }}
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[ alt_names ]
+{% for san in cert_sans %}
+{{ san }}
+{% endfor %}
