@@ -245,8 +245,6 @@
         clone: true
         update: true
         version: "single-node-gaudi-example"
-      become: true
-      become_user: "{{ ai_user }}"
 
     - name: Configure the Enterprise Inference Service
       block:
@@ -274,7 +272,7 @@
     - name: Run the Enterprise Inference Service installation script
       shell: |
         cd {{ einf_path }}/core
-        sudo ./inference-as-auto-deploy.sh << EOF
+        sudo bash inference-stack-deploy.sh << EOF
         1
         yes
         EOF
