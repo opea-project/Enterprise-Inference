@@ -114,7 +114,7 @@
         chart_ref: prometheus-community/kube-prometheus-stack
         release_namespace: observability
         create_namespace: true
-        chart_version: "72.5.1"
+        chart_version: "72.5.2"
         values:
           prometheus:
             prometheusSpec:
