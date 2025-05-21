@@ -252,22 +252,22 @@
           template:
             src: templates/inference-config.cfg.j2
             dest: "{{ einf_path }}/core/inference-config.cfg"
-            owner: "{{ ai_user }}"
-            group: "{{ ai_user }}"
+            # owner: "{{ ai_user }}"
+            # group: "{{ ai_user }}"
             mode: '0644'
         - name: Deploy the hosts.yaml file
           template:
             src: templates/hosts.yaml.j2
             dest: "{{ einf_path }}/core/inventory/hosts.yaml"
-            owner: "{{ ai_user }}"
-            group: "{{ ai_user }}"
+            # owner: "{{ ai_user }}"
+            # group: "{{ ai_user }}"
             mode: '0644'
         - name: Copy modified gaudi-values.yaml to correct location
           copy:
             src: templates/gaudi-values.yaml
             dest: "{{ einf_path }}/core/helm-charts/vllm/gaudi-values.yaml"
-            owner: "{{ ai_user }}"
-            group: "{{ ai_user }}"
+            # owner: "{{ ai_user }}"
+            # group: "{{ ai_user }}"
             mode: '0644'
     - name: Run the Enterprise Inference Service installation script
       shell: |
