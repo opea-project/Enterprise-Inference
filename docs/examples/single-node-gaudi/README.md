@@ -6,12 +6,14 @@ Many of the defaults are setup to work out of the box, but you will need to upda
 
 There is also a template directory that contains a set of templates for the various configuration files that are used by the AI Inference Service. These templates are used to generate the final configuration files based on the variables defined in the playbook. Do not modify these files directly.
 
+The playbook will run for at least 25 minutes, at the end of the playbook running it will output the results of the installation script. The models will be available sometime after the playbook is done, the models selected by default can take up to an hour for all four of them to be available. If you change the models that will be used, the start up time may be different.
+
 ## Variables to Update in `einf-singlenode-gaudi.yml`
 
 Before running the playbook, review and update the following variables in the `einf-singlenode-gaudi.yml` file to match your environment:
 
 ### General Configuration
-- **`cluster_url`**: The DNS name for the cluster. Update this to the desired hostname (e.g., `api.example.com`).
+- **`cluster_url`**: The DNS name for the cluster. Update this to the desired domain name (e.g., `api.example.com`).
 - **`cluster_ip`**: The IP address of the node where the playbook will run.
 - **`ai_user`**: The username for the Enterprise Inference Service. Change this if you want to use a different user.
 

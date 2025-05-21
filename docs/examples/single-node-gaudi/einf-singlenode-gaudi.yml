@@ -27,7 +27,7 @@
     deploy_observability: "on"
     deploy_llm_models: "on"
     einf_path: "/opt/Enterprise-Inference"                                     # Repo location on disk
-    einf_repo: "https://github.com/wsfowler/Enterprise-Inference.git"      # Repo to clone
+    einf_repo: "https://github.com/Enterprise-Inference.git"      # Repo to clone
 
     # Certificate settings - customize these
     cert_dir: "/etc/ssl/private"
