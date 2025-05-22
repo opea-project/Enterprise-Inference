@@ -85,6 +85,8 @@
               ports:
                 http: 80
                 https: 443
+            progressDeadlineSeconds: 300
+            minReadySeconds: 0
             tolerations:
               - key: "node-role.kubernetes.io/control-plane"
                 operator: "Exists"
