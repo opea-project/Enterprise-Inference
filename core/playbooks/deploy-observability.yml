@@ -116,6 +116,8 @@
         create_namespace: true
         chart_version: "69.7.3"
         values:
+          kubeEtcd:
+            enabled: false
           prometheus:
             prometheusSpec:
               retention: 15d
