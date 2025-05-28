@@ -6,7 +6,7 @@
    - [DNS and SSL/TLS Setup](#dns-and-ssltls-setup)
      - [Production Environment](#production-environment)
      - [Development Environment](#development-environment)
-  - [HuggingFace Token Generation](#hugging-face-token-generation)
+  - [Hugging Face Token Generation](#hugging-face-token-generation)
 
 The first step is to get access to the hardware platforms. This guide assumes the user can log in to all nodes. 
 
@@ -24,7 +24,7 @@ The first step is to get access to the hardware platforms. This guide assumes th
 All steps need to be completed before deploying Enterprise Inference. By the end of the prerequisites, the following artifacts should be ready:
 1. SSH key pair
 2. SSL/TLS certificate files
-3. HuggingFace token 
+3. Hugging Face token 
 
 ## SSH Key Setup
 
@@ -103,9 +103,9 @@ Otherwise, follow the instructions below for a [Production](#production-environm
 Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
 
    
-## HuggingFace Token Generation
-1. Go to the [HuggingFace website](https://huggingface.co/) and sign in or create a new account.
-2. Generate a [user access token](https://huggingface.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
+## Hugging Face Token Generation
+1. Go to the [Hugging Face website](https://Hugging Face.co/) and sign in or create a new account.
+2. Generate a [user access token](https://Hugging Face.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
 
 
 ## Next Steps

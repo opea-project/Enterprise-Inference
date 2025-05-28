@@ -16,7 +16,7 @@ Complete all [prerequisites](./prerequisites.md).
 ---
 ## Supported Models
 - View the [Pre-validated Model List](./supported-models.md)
-- To deploy custom models from HuggingFace, follow the [HuggingFace Deployment Guide](./deploy-llm-model-from-hugging-face.md)
+- To deploy custom models from Hugging Face, follow the [Hugging Face Deployment Guide](./deploy-llm-model-from-hugging-face.md)
 
 > 💡 Both validated and custom models are supported to meet diverse enterprise needs.
 ---
