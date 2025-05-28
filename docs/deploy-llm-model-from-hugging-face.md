@@ -1,6 +1,6 @@
-### Deploy LLM Model from Hugging Face
+### Deploy LLM Model from HuggingFace
 
-This option allows you to deploy any Hugging Face-hosted LLM on the Inference Cluster using its model ID.
+This option allows you to deploy any HuggingFace-hosted LLM on the Inference Cluster using its model ID.
 
 **To deploy:**
 
@@ -12,10 +12,10 @@ This option allows you to deploy any Hugging Face-hosted LLM on the Inference Cl
 2. Choose the following options from the menu:
    - `3` – Update Deployed Inference Cluster  
    - `2` – Manage LLM Models  
-   - `4` – Deploy Model from Hugging Face
+   - `4` – Deploy Model from HuggingFace
 
 3. When prompted, provide:
-   - **Hugging Face Model ID** (e.g., `meta-llama/Meta-Llama-3-8B`)  
+   - **HuggingFace Model ID** (e.g., `meta-llama/Meta-Llama-3-8B`)  
    - **Model Deployment Name** (e.g., `metallama-8b`)  
    - **Tensor Parallel Size** (based on available Gaudi cards)
 

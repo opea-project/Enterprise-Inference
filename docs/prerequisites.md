@@ -6,7 +6,7 @@
    - [DNS and SSL/TLS Setup](#dns-and-ssltls-setup)
      - [Production Environment](#production-environment)
      - [Development Environment](#development-environment)
-  - [Hugging Face Token Generation](#hugging-face-token-generation)
+  - [HuggingFace Token Generation](#hugging-face-token-generation)
 
 The first step is to get access to the hardware platforms. This guide assumes the user can log in to all nodes. 
 
@@ -103,8 +103,8 @@ Otherwise, follow the instructions below for a [Production](#production-environm
 Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
 
    
-## Hugging Face Token Generation
-1. Go to the [Hugging Face website](https://huggingface.co/) and sign in or create a new account.
+## HuggingFace Token Generation
+1. Go to the [HuggingFace website](https://huggingface.co/) and sign in or create a new account.
 2. Generate a [user access token](https://huggingface.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
 
 
