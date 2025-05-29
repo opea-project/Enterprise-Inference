@@ -65,7 +65,7 @@
         name: habana-ai-operator
         chart_ref: gaudi-helm/habana-ai-operator
         release_namespace: habana-ai-operator
-        chart_version: 1.20.0-543
+        chart_version: 1.20.1-97
         state: present
       run_once: true     
       

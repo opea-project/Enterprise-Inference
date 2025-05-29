@@ -21,7 +21,7 @@ The first step is to get access to the hardware platforms. This guide assumes th
 
 
 
->**Note**: For Intel® Gaudi AI Accelerators, there are additional steps to ensure the node(s) meet the requirements. Follow the [Gaudi prerequisites guide](./gaudi_prerequisites.md) before proceeding. For Intel® Xeon® Scalable processors, no additional setup is needed.
+>**Note**: For Intel® Gaudi AI Accelerators, there are additional steps to ensure the node(s) meet the requirements. Follow the [Gaudi prerequisites guide](./gaudi-prerequisites.md) before proceeding. For Intel® Xeon® Scalable processors, no additional setup is needed.
 
 All steps need to be completed before deploying Enterprise Inference. By the end of the prerequisites, the following artifacts should be ready:
 1. SSH key pair
