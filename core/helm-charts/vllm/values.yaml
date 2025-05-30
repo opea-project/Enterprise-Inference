@@ -181,6 +181,10 @@ VLLM_CPU_KVCACHE_SPACE: "40"
 VLLM_CONFIGURE_LOGGING: 1
 VLLM_NO_USAGE_STATS: 1
 
+modelConfigs:
+  model:
+    configMapValues: {}
+
 defaultModelConfigs:
   configMapValues:    
     OMPI_MCA_btl_vader_single_copy_mechanism: none
