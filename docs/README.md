@@ -23,8 +23,8 @@ Complete all [prerequisites](./prerequisites.md).
 ## Configuration Files
 Two files are required before deployment:
 
-- `inventory/hosts.yaml` – Cluster inventory and topology ([Single-Node Sample](./examples/single-node/hosts.yaml), [Multi-Node Guide](./examples/multi-node/hosts.yaml))
-- `inference-config.cfg` – Component-level deployment config ([Sample](./configuring-inference-config-cfg-file.md))
+- `inventory/hosts.yaml` – Cluster inventory and topology for [single node](./examples/single-node/hosts.yaml) and [multi-node](./examples/multi-node/hosts.yaml))
+- `inference-config.cfg` – Component-level deployment config [example](./configuring-inference-config-cfg-file.md)
 ---
 ## Deployment Command
 Run the following script to deploy the inference platform:
@@ -33,6 +33,6 @@ bash inference-stack-deploy.sh
 ```
 ---
 ## Post-Deployment
+Follow the steps highlighted in the [Getting Started Example](./getting-started-example.md) to test inference. To access all deployed models, refer to this [guide](./accessing-deployed-models.md).
 
-- [Access Deployed Models](./accessing-deployed-models.md)
-- [Observability & Monitoring](./observability.md)
+[Observability & Monitoring](./observability.md) is also supported.

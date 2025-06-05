@@ -19,15 +19,15 @@ Please replace the placeholder values with your actual configuration details, wh
 
 ##### Fetching the client Secret
 For fetching the Keycloak client secret from please run this script  [**keycloak-fetch-client-secret.sh**](../core/scripts/keycloak-fetch-client-secret.sh)
-`````
+```bash
 keycloak-fetch-client-secret.sh <cluster-url> <keycloak-username> <keycloak-password> <keycloak-client-id>
 Returns:
 Logged in successfully
 Client secret: keycloak-client-secret
-`````
+```
 Once you have the keycloak client secret, please refer below steps
 
-`````
+```bash
 ##### Environment Setup for accessing Models using Curl
                    
 #The Keycloak cluster URL was configured during deployment in the cluster_url field
@@ -46,10 +46,10 @@ export KEYCLOAK_CLIENT_SECRET=<your_keycloak_client_secret>
 export TOKEN=$(curl -k -X POST $BASE_URL/token  -H 'Content-Type: application/x-www-form-urlencoded' -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" | jq -r .access_token)
 
 With the obtained access token, we can proceed to make an Inference API call to the deployed Models.
-`````
+```
 
 ##### Models Endpoints
-`````
+```bash
 For Inferencing with Llama-3-8b:
 curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
@@ -88,8 +88,7 @@ curl -k ${BASE_URL}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions -X POST 
 
 For Inferencing with Deepseek R1 Distill Llama 8b CPU:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
-
-`````
+```
 
 ###### For visual assistance, refer to the following example image of a curl request and response:
 
@@ -97,7 +96,7 @@ curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions -X POST 
 
 
 #### Accessing the model from Inference Cluster deployed without APISIX and Keycloak
-`````
+```bash
 When deploying models for inference without Keycloak and APISIX,
 The model inference API can be invoked directly without the necessity of including an additional bearer token header in the request.
 
@@ -108,5 +107,4 @@ export BASE_URL=https://example.com
 
 For Inferencing with Llama-3-8b:
 curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json'
-
-`````
+```
