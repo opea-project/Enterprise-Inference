@@ -104,8 +104,8 @@ Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
 
    
 ## Hugging Face Token Generation
-1. Go to the [Hugging Face website](https://Hugging Face.co/) and sign in or create a new account.
-2. Generate a [user access token](https://Hugging Face.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
+1. Go to the [Hugging Face website](https://huggingface.co/) and sign in or create a new account.
+2. Generate a [user access token](https://huggingface.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
 
 
 ## Next Steps
