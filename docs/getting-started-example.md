@@ -18,7 +18,7 @@ export TOKEN=$(curl -k -X POST $BASE_URL/token  -H 'Content-Type: application/x-
 Save the token for later use.
 
 ## Set Up Environment
-1. Install Python.
+1. Install Python. Ensure the version is compatible.
 
 2. Install `openai`:
 ```bash
@@ -26,6 +26,9 @@ pip install openai
 ```
 
 3. Set environment variables:
+- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice (i.e. https://api.inference.denvrdata.com). **Note:** If not using LiteLLM, the second part of the model card needs to be appended to the URL i.e. `/Llama-3.3-70B-Instruct` from `meta-llama/Llama-3.3-70B-Instruct`.
+- `OPENAI_API_KEY` is the access token or key to access the model(s) on the server.
+
 ```bash
 export BASE_URL="base_url_or_domain_of_node_or_cluster"
 export OPENAI_API_KEY="contents_of_TOKEN"
@@ -52,7 +55,7 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message)
 ```
 
-Run the script:
+Run the script. The output should be the response to the query.
 ```bash
 python inference.py
 ```
