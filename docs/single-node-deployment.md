@@ -104,3 +104,6 @@ To test on Intel® Gaudi® AI Accelerators:
 ```bash
 curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
+
+## Post-Deployment
+With the deployed model on the server, refer to the [post-deployment instructions](./README.md#post-deployment) for options.

@@ -1,6 +1,22 @@
 # Getting Started Example
 
-At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference. This example lists out steps to test inference using a deployed model.
+This example lists out steps to test inference using a deployed model.
+
+## Prerequisites
+
+1. At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference on-prem or on a CSP. If not, follow the [deployment guide](./README.md) or refer to all [offerings](http://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/enterprise-inference.html) to set up a server.  
+2. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
+  a) Run `inference-stack-deploy.sh` with the `--cpu-or-gpu` option:
+  ```bash
+  export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
+  ./inference-stack-deploy.sh --cpu-or-gpu "gpu"
+  ``` 
+  b) Select Option 3: Update Deployed Inference Cluster to go into the Update Existing Cluster menu.
+  c) Select Option 2: Manage LLM Models to go into the Manage LLM Models menu.
+  d) Select Option 3: List Installed Models to check all deployed models on the node or cluster. 
+  e) After the script has finished, scroll up in the terminal to look at the section with "Print Installed Models in Comma Separated Format" to see the list of deployed models.
+
+  **For servers supporting LiteLLM:** Alternatively, run some [Python code with OpenAI](#optional-for-litellm-only-check-list-of-deployed-models) to get this list of models. This can only be done if the base URL and API key are already acquired.
 
 ## Generate API Token (one time only)
 Run the commands below to generate an API token used to access the node or cluster. The `BASE_URL` needs to be set to the domain used in the setup process.
@@ -26,7 +42,7 @@ pip install openai
 ```
 
 3. Set environment variables:
-- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice (i.e. https://api.inference.denvrdata.com). **Note:** If not using LiteLLM, the second part of the model card needs to be appended to the URL i.e. `/Llama-3.3-70B-Instruct` from `meta-llama/Llama-3.3-70B-Instruct`.
+- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice (i.e. https://api.inference.denvrdata.com). **Note:** If not using LiteLLM, the second part of the model card and `/v1` need to be appended to the URL. Llama models need to include `Meta-` in front of the model. For example, `<DNS>/Meta-Llama-3.1-8B-Instruct/v1` or `<DNS>/Mistral-7B-Instruct/v1`.
 - `OPENAI_API_KEY` is the access token or key to access the model(s) on the server.
 
 ```bash
@@ -35,7 +51,7 @@ export OPENAI_API_KEY="contents_of_TOKEN"
 ```
 
 ## Run Inference 
-Create a script `inference.py` with these contents. Change the model if needed.
+Create a script `inference.py` with these contents. Change the model if needed. The list of models will only work if the remote server is deployed with LiteLLM. Otherwise, only the specified model from the `BASE_URL` will be shown.
 ```python
 from openai import OpenAI
 import os
@@ -44,7 +60,13 @@ client = OpenAI(
     api_key=os.environ["OPENAI_API_KEY"],  # This is the default and can be omitted
     base_url= os.environ["BASE_URL"]
 )
+
+# For remote servers using LiteLLM only: list out available models from endpoint
+models = client.models.list()
+print("Available models: %s" %models)
  
+# Run inference with model
+print("Running inference with selected model:")
 completion = client.chat.completions.create(
   model="meta-llama/Meta-Llama-3.1-8B-Instruct",
   messages=[
