@@ -143,7 +143,7 @@
         - name: Deploy LLM model Llama8b
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b "{{ remote_helm_charts_base }}/vllm"
-            --set LLM_MODEL_ID="meta-llama/Meta-Llama-3.1-8B-Instruct"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.1-8B-Instruct"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}                        
@@ -278,7 +278,7 @@
         - name: Deploy LLM model Llama70b
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-70b "{{ remote_helm_charts_base }}/vllm"
-            --set LLM_MODEL_ID="meta-llama/Meta-Llama-3.1-70B-Instruct"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.1-70B-Instruct"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}            
@@ -322,6 +322,74 @@
       tags: uninstall-llama-70b
       when:
         - "'llama-70b' in model_name_list"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+    - name: Deploy Llama3-3-70b LLM Model
+      block:
+        - name: Delete Ingress resource Llama3.3-70b from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-llama-3-3-70b-ingress
+            state: absent          
+          tags: install-llama-3-3-70b
+        - name: Delete Ingress resource Llama3-3-70b from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-llama-3-3-70b-ingress
+            state: absent
+          tags: install-llama-3-3-70b          
+        - name: Deploy LLM model Llama3-3-70b
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-llama-3-3-70b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.3-70B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}                        
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if gaudi_deployment %}
+              --set tensor_parallel_size=4
+              --values {{ gaudi_values_file }}              
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force             
+          register: helm_upgrade_install_model_deployment
+          failed_when: helm_upgrade_install_model_deployment.rc != 0
+          tags: install-llama-3-3-70b
+      run_once: true
+      when:
+        - model_name_list is defined
+        - "'llama-3-3-70b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - install_true == 'true'
+
+
+    - name: Check if vllm-llama-3-3-70b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-llama-3-3-70b --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-llama-3-3-70b
+    - name: Uninstall vllm-llama-3-3-70b Model 
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-llama-3-3-70b"
+      run_once: true
+      tags: uninstall-llama-3-3-70b
+      when:
+        - "'llama-3.3-70b' in (model_name_list | regex_replace(',', ' ') | split())"
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
@@ -1126,12 +1194,3 @@
       ansible.builtin.file:
         path: "{{ remote_helm_charts_base }}"
         state: absent
-
-
-
-
-
-
-
-
-

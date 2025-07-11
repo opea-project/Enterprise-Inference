@@ -1,0 +1,17 @@
+{
+  "parameters": [
+    {
+      "name": "ssh_key",
+      "type": "string",
+      "description": "Enter your SSH public key",
+      "required": true
+    },
+    {
+      "name": "ibmcloud_region",
+      "type": "string",
+      "default": "us-east-2",
+      "description": "IBM Cloud region",
+      "required": true
+    }
+  ]
+}
