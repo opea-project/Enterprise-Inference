@@ -1,0 +1,13 @@
+cluster_url=${cluster_url}
+cert_file=${cert_file}
+key_file=${key_file}
+keycloak_client_id=${keycloak_client_id}
+keycloak_admin_user=${keycloak_admin_user}
+keycloak_admin_password=${keycloak_admin_password}
+hugging_face_token=${hugging_face_token}
+cpu_or_gpu=${cpu_or_gpu}
+deploy_kubernetes_fresh=${deploy_kubernetes_fresh}
+deploy_ingress_controller=${deploy_ingress_controller}
+deploy_llm_models=${deploy_llm_models}
+deploy_keycloak_apisix=${deploy_keycloak_apisix}
+deploy_observability=${deploy_observability}
