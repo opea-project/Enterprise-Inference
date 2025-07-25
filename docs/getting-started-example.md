@@ -6,6 +6,14 @@ This example lists out steps to test inference using a deployed model.
 
 1. At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference on-prem or on a CSP. If not, follow the [deployment guide](./README.md) or refer to all [offerings](http://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/enterprise-inference.html) to set up a server.  
 2. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
+
+### Method 1: Check APISIX Routes
+  Run this command to see the list of models deployed:
+  ```bash
+  kubectl get apisixroutes
+  ```
+
+### Method 2: Run Inference Script
   a) Run `inference-stack-deploy.sh` with the `--cpu-or-gpu` option:
   ```bash
   export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
@@ -42,7 +50,7 @@ pip install openai
 ```
 
 3. Set environment variables:
-- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice (i.e. https://api.inference.denvrdata.com). **Note:** If not using LiteLLM, the second part of the model card and `/v1` need to be appended to the URL. Llama models need to include `Meta-` in front of the model. For example, `<DNS>/Meta-Llama-3.1-8B-Instruct/v1` or `<DNS>/Mistral-7B-Instruct/v1`.
+- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice and `/v1` (i.e. https://api.example.com/<deployed-model-name>/v1). The deployed model name can be found by running `kubectl get apisixroutes` for a list of deployed models. **Note:** If using LiteLLM, this is not needed. By default, LiteLLM is not used.
 - `OPENAI_API_KEY` is the access token or key to access the model(s) on the server.
 
 ```bash

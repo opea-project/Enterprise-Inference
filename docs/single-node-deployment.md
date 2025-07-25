@@ -25,7 +25,7 @@ Add this line at the end:
 Save and exit (`CTRL+X`, then `Y` and `Enter`).
 
 ### Step 2: Generate a self-signed SSL certificate
-Run the following commands to create a self-signed SSL certificate:
+Run the following commands to create a self-signed SSL certificate. Change the DNS `api.example.com` if needed.
 ```bash
 mkdir -p ~/certs && cd ~/certs
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
@@ -43,6 +43,8 @@ git clone https://github.com/opea-project/Enterprise-Inference.git
 cd Enterprise-Inference
 cp -f docs/examples/single-node/inference-config.cfg core/inference-config.cfg
 ```
+
+Modify `inference-config.cfg` if needed. Ensure the `cluster_url` field is set to the DNS used, and the certificate and key files are pointed to correctly. The keycloak fields and deployment options can be left unchanged.
 
 ### Step 4: Update `hosts.yaml` File
 Copy the single node preset hosts config file to the working directory:
