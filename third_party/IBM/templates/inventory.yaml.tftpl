@@ -1,0 +1,52 @@
+all:
+  hosts:
+%{ for node in target_nodes ~}
+    ${node.name}:
+      ansible_host: ${node.ip}
+      ip: ${node.ip}
+      access_ip: ${node.access_ip}
+      ansible_user: ${node.user}
+      ansible_ssh_private_key_file: ${node.private_key_path}
+%{ endfor ~}
+  children:
+    kube_control_plane:
+      hosts:
+%{ for node in control_plane_nodes ~}
+        ${node}:
+%{ endfor ~}
+    kube-master:
+      hosts:
+%{ for node in control_plane_nodes ~}
+        ${node}:
+%{ endfor ~}
+    kube_node:
+      hosts:
+%{ for node in target_nodes ~}
+        ${node.name}:
+%{ endfor ~}
+    kube-node:
+      hosts:
+%{ for node in target_nodes ~}
+        ${node.name}:
+%{ endfor ~}
+    etcd:
+      hosts:
+%{ for node in etcd_nodes ~}
+        ${node}:
+%{ endfor ~}
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    k8s-cluster:
+      children:
+        kube-master:
+        kube-node:
+    calico-rr:
+      hosts: {}
+    bastion:
+      hosts: {}
+    no-floating:
+      hosts: {}
+    calico_rr:
+      hosts: {}

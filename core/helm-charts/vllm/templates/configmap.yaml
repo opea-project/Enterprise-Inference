@@ -23,13 +23,11 @@ data:
   NUMBA_CACHE_DIR: "/tmp"
   HF_HOME: "/data/.cache/huggingface"
   # HF_HOME: "/data/transformers_cache"
-  TRANSFORMERS_CACHE: "/data/transformers_cache"
   # https://github.com/outlines-dev/outlines/blob/main/outlines/caching.py#L14-L29
   OUTLINES_CACHE_DIR: "/tmp/.cache/outlines"
   # To configure where repositories from the Hub will be cached locally (models, datasets and spaces).
   # Defaults to "$HF_HOME/hub" (e.g. "~/.cache/huggingface/hub" by default).
   # HUGGINGFACE_HUB_CACHE is depricated and replcaed with HF_HUB_CACHE
-  HF_HUB_CACHE: "/data/.cache/huggingface"
   {{- if .Values.HABANA_VISIBLE_DEVICES }}
   HABANA_VISIBLE_DEVICES: {{ .Values.HABANA_VISIBLE_DEVICES | quote}}
   {{- end }}

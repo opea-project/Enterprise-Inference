@@ -7,7 +7,6 @@ The access clients are summarized in the table. To quickly verify the models are
 |---------------|-------------|
 | [**cURL**](#accessing-models-from-curl-client) | A command-line tool that uses URL syntax to transfer data to and from servers. It is widely supported and considered a go-to method for quick API interactions. |
 | [**Postman**](./postman-client-model-access.md) | An API platform for building and using APIs. Postman simplifies each step of the API lifecycle and streamlines collaboration so you can create better APIs faster. It offers a graphical interface and allows for easy management of API requests and responses. |
-| [**OpenAI-based Clients**](./openapi-client-model-access.md) | These clients, such as Swagger UI or Open WebUI, are designed to work with APIs that adhere to the OpenAI Specification (OAS). They provide interactive documentation, automatic code generation, and more, which can be particularly useful. |
 
 
 ### Accessing Models from curl Client

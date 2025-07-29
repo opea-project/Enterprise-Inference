@@ -1,0 +1,489 @@
+{
+    "products": [
+        {
+            "label": "Intel® AI for Enterprise Inference",
+            "name": "da-enterprise-inference",
+            "version": "1.0.0",
+            "product_kind": "solution",
+			"tags": [
+              "opea",
+              "intel_gaudi",
+              "enterprise-inference"
+            ],
+		    "keywords": [
+              "opea",
+              "intel_gaudi",
+              "enterprise-inference"
+            ],
+	    "short_description": "Intel® AI for Enterprise Inference (Enterprise Inference) is aimed to streamline the deployment and management of inference services on Intel® hardware.",
+            "long_description": "This solution leverages Terraform to automate the deployment of virtual machines on IBM Cloud, specifically tailored for AI workloads using Intel® Gaudi® 3 AI accelerators. It installs all necessary Intel Gaudi 3 AI accelerator-specific operators and deploys large language models (LLMs) on single node K8S cluster using Intel® AI for Enterprise Inference framework from the Open Platform for Enterprise AI (OPEA). By integrating cutting-edge AI infrastructure with cloud automation, this solution provides a streamlined approach to deploying and managing machine learning models in a scalable and efficient manner. Deploy this to automate the process of VM spin up, manage installation of Intel Gaudi 3 AI accelerator operators and LLM models on K8S cluster using Terraform referring to OPEA's Intel® AI for Enterprise Inference framework.",
+            "features": [
+	      {
+                "title": "Optimized AI Deployment",
+                "description": "Leverage Intel® Gaudi® 3 AI accelerators to maximize performance for AI workloads, ensuring efficient processing and model deployment"
+              },
+	      {
+                "title": "Automated Infrastructure Setup",
+                "description": "Utilization of Terraform scripts to automate the provisioning of virtual server instances (VSI) on IBM Cloud, reducing setup time and minimizing manual intervention"
+              },
+              {
+                "title": "Seamless Integration with OPEA's Intel® AI for Enterprise Inference",
+                "description": "Deploy large language models (LLMs) using OPEA's Intel AI for Enterprise Inference framework, streamlining operations and improving productivity"
+              }
+            ],
+	        "flavors": [
+                {
+                    "label": "QuickStart",
+                    "name": "quickstart",
+		            "working_directory": "third_party/IBM/patterns/quickstart",
+		            "index": 1,
+                    "compliance": {},
+                    "architecture": {},
+                    "install_type": "fullstack",
+                    "configuration": [
+                        {
+                            "key": "ssh_key",
+                            "type": "string",
+                            "default_value": "ssh_key",
+                            "description": "This variable specifies the ssh key.",
+                            "required": true
+                        },
+                        {
+                            "key": "ssh_private_key",
+                            "type": "multiline_secure_value",
+                            "display_name": "ssh_private_key",
+                            "default_value": "-----BEGIN OPENSSH PRIVATE KEY-----",
+                            "description": "This variable specifies the ssh key.",
+                            "required": true,
+							"custom_config": {
+                                "grouping": "deployment",
+                                "original_grouping": "deployment",
+                                "type": "multiline_secure_value"
+                            }
+                        },
+                        {
+                            "key": "ibmcloud_region",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "IBM Cloud Region",
+                            "required": true,
+							"options": [
+								{
+									"displayname": "Dallas (us-south)",
+									"value": "us-south"
+								},
+								{
+									"displayname": "Washington DC (us-east)",
+									"value": "us-east"
+								},
+                                {
+									"displayname": "Frankfurt (eu-de)",
+									"value": "eu-de"
+								}
+
+							]
+						},
+                        {
+                            "key": "ibmcloud_api_key",
+							"type": "multiline_secure_value",
+							"display_name": "Multiline secure value",
+							"required": true,
+							"custom_config": {
+							"grouping": "deployment",
+							"original_grouping": "deployment",
+							"type": "multiline_secure_value"
+							}
+						},
+						{
+                            "key": "instance_zone",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "This variable specifies the availability zone where the instance will be created",
+                            "required": true,
+							"options": [
+								{
+									"displayname": "eu-de-1",
+									"value": "eu-de-1"
+								},
+								{
+									"displayname": "us-south-2",
+									"value": "us-south-2"
+								},
+								{
+									"displayname": "us-east-3",
+									"value": "us-east-3"
+								},
+								{
+									"displayname": "us-east-2",
+									"value": "us-east-2"
+								}
+							]
+                        },
+                        {
+                            "key": "cluster_url",
+                            "type": "string",
+                            "default_value": "api.example.com",
+                            "description": "Enter the domain name or url of the cluster",
+                            "required": true
+                        },
+			            {
+                            "key": "models",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "Choose the pre-tested model from the dropdown to deploy.",
+                            "required": true,
+							"options": [
+							  {
+								"displayname": "meta-llama/Llama-3.1-8B-Instruct (1 card,disk-20GB)",
+								"value": "1"
+							  },
+							  {
+								"displayname": "meta-llama/Llama-3.3-70B-Instruct(4 card ,disk-150GB)",
+								"value": "12"
+							  },
+							  {
+								"displayname": "meta-llama/Llama-3.1-405B-Instruct(8 card ,disk-900GB)",
+								"value": "11"
+							  }
+							]
+                        },
+                        {
+                            "key": "hugging_face_token",
+                            "type": "multiline_secure_value",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies the Hugging Face token. You can also create a token by referring to the documentation at https://huggingface.co/docs/hub/en/security-tokens. ",
+                            "required": true
+                        },
+			            {
+                            "key": "instance_name",
+                            "type": "string",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies the name of the instance to be created",
+                            "required": true
+                        },
+			            {
+                            "key": "vpc",
+                            "type": "string",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies vpc where all the resources will be created",
+                            "required": true
+                        },
+						{
+                            "key": "security_group",
+                            "type": "string",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies security group used by the resources",
+                            "required": true
+                        },
+			            {
+                            "key": "public_gateway",
+                            "type": "string",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies public gateway used by the resources",
+                            "required": true
+                        },
+			            {
+                            "key": "subnet",
+                            "type": "string",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies subnet used by the resources",
+                            "required": true
+                        },
+			            {
+                            "key": "resource_group",
+                            "default_value": "Default",
+                            "description": "This variable lists resource group name used by the resources",
+                            "required": true,
+							"custom_config": {
+							"config_constraints": {
+								"identifier": "rg_name"
+							},
+							"grouping": "deployment",
+							"original_grouping": "deployment",
+							"type": "resource_group"
+                            }
+                        },    
+			            {
+                            "key": "user_cert",
+			                "type": "multiline_secure_value",
+                            "display_name": "Full chain Certificate",
+                            "default_value": "-----BEGIN CERTIFICATE-----",
+			                "description": "The contents of the TLS certificate (PEM format)",
+			                "required": true
+                        },
+			            {
+                            "key": "user_key",
+			                "type": "multiline_secure_value",
+                            "display_name": "Certificate key",
+                            "default_value": "-----BEGIN PRIVATE KEY-----",
+			                "description": "The contents of the TLS private key (PEM format)",
+			                "required": true
+                        },
+						{
+                            "key": "keycloak_admin_user",
+                            "type": "string",
+                            "default_value": "admin",
+                            "description": "Keycloak admin user name",
+							"required": true
+                        },
+                        {
+                            "key": "keycloak_admin_password",
+                            "type": "multiline_secure_value",
+                            "default_value": "",
+                            "description": "Keycloak admin password",
+							"required": true
+                        },
+			            {
+                            "key": "image",
+                            "type": "string",
+                            "default_value": "gaudi3-os-u22-01-21-0",
+                            "description": "This variable image name to be used for VSI bringup"
+                        },
+			            {
+                            "key": "instance_profile",
+                            "type": "string",
+                            "default_value": "gx3d-160x1792x8gaudi3",
+                            "description": "This variable specifies the profile using which the instance will be created"
+                        },
+                        {
+                            "key": "cert_path",
+                            "type": "string",
+                            "default_value": "~/certs/cert.pem",
+                            "description": "The path to the certificate file"
+                        },
+                        {
+                            "key": "key_path",
+                            "type": "string",
+                            "default_value": "~/certs/key.pem",
+                            "description": "The path to the key file"
+                        },
+                        {
+                            "key": "keycloak_client_id",
+                            "type": "string",
+                            "default_value": "ibm-app",
+                            "description": "Keycloak client id"
+                        },
+						{
+                            "key": "cpu_or_gpu",
+                            "type": "string",
+                            "default_value": "gaudi3",
+                            "description": "This variable specifies where the model should be running"
+                        },
+                        {
+                            "key": "deploy_kubernetes_fresh",
+                            "type": "string",
+                            "default_value": "yes",
+                            "description": "This variable specfies whether to deploy Kubernetes cluster freshly"
+                        },
+                        {
+                            "key": "deploy_ingress_controller",
+                            "type": "string",
+                            "default_value": "yes",
+                            "description": "This variable specfies whether to deploy NGNIX ingress controller or not"
+                        },
+                        {
+                            "key": "deploy_llm_models",
+                            "type": "string",
+                            "default_value": "no",
+                            "description": "This variable specfies whether we need to deploy LLM models"
+                        },
+                        {
+                            "key": "deploy_keycloak_apisix",
+                            "type": "string",
+                            "default_value": "yes",
+                            "description": "This variable specfies whether we need to run keycloak and Apisix components"
+                        }
+                    ]
+                },
+		        {
+                    "label": "Standard",
+                    "name": "standard",
+		            "working_directory": "third_party/IBM/patterns/standard",
+                    "compliance": {},
+		            "index": 2,
+                    "architecture": {},
+                    "install_type": "fullstack",
+                    "configuration": [
+                        {
+                            "key": "ssh_key",
+                            "type": "string",
+                            "default_value": "ssh_key",
+                            "description": "This variable specifies the ssh key.",
+                            "required": true
+                        },
+                        {
+                            "key": "ssh_private_key",
+                            "type": "multiline_secure_value",
+                            "display_name": "ssh_private_key",
+                            "default_value": "-----BEGIN OPENSSH PRIVATE KEY-----",
+                            "description": "This variable specifies the ssh key.",
+                            "required": true,
+							"custom_config": {
+                                "grouping": "deployment",
+                                "original_grouping": "deployment",
+                                "type": "multiline_secure_value"
+                            }
+                        },
+                        {
+                            "key": "ibmcloud_region",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "IBM Cloud Region",
+                            "required": true,
+							"options": [
+								{
+									"displayname": "Dallas (us-south)",
+									"value": "us-south"
+								},
+								{
+									"displayname": "Washington DC (us-east)",
+									"value": "us-east"
+								},
+                                {
+									"displayname": "Frankfurt (eu-de)",
+									"value": "eu-de"
+								}
+
+							]
+						},
+                        {
+                            "key": "ibmcloud_api_key",
+							"type": "multiline_secure_value",
+							"display_name": "Multiline secure value",
+							"required": true,
+							"custom_config": {
+							"grouping": "deployment",
+							"original_grouping": "deployment",
+							"type": "multiline_secure_value"
+                            }
+                        },
+			            {
+                            "key": "instance_zone",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "This variable specifies the availability zone where the instance will be created",
+                            "required": true,
+							"options": [
+								{
+									"displayname": "eu-de-1",
+									"value": "eu-de-1"
+								},
+								{
+									"displayname": "us-south-2",
+									"value": "us-south-2"
+								},
+								{
+									"displayname": "us-east-3",
+									"value": "us-east-3"
+								},
+								{
+									"displayname": "us-east-2",
+									"value": "us-east-2"
+								}
+							]
+                        },
+                        {
+                            "key": "cluster_url",
+                            "type": "string",
+                            "default_value": "api.example.com",
+                            "description": "Enter the domain name or url of the cluster",
+                            "required": true
+                        },
+			            {
+                            "key": "models",
+                            "type": "string",
+                            "default_value": "",
+                            "description": "Choose the pre-tested model from the dropdown to deploy.",
+                            "required": true,
+							"options": [
+							  {
+								"displayname": "meta-llama/Llama-3.1-8B-Instruct (1 card,disk-20GB)",
+								"value": "1"
+							  },
+							  {
+								"displayname": "meta-llama/Llama-3.3-70B-Instruct(4 card ,disk-150GB)",
+								"value": "12"
+							  },
+							  {
+								"displayname": "meta-llama/Llama-3.1-405B-Instruct(8 card ,disk-900GB)",
+								"value": "11"
+							  }
+							]
+                        },
+                        {
+                            "key": "hugging_face_token",
+                            "type": "multiline_secure_value",
+                            "default_value": "__NULL__",
+                            "description": "This variable specifies the Hugging Face token. You can also create a token by referring to the documentation at https://huggingface.co/docs/hub/en/security-tokens. ",
+                            "required": true
+                        },
+			            {
+                            "key": "resource_group",
+                            "default_value": "Default",
+                            "description": "This variable lists resource group name used by the resources",
+                            "required": true,
+							"custom_config": {
+							"config_constraints": {
+								"identifier": "rg_name"
+							},
+							"grouping": "deployment",
+							"original_grouping": "deployment",
+							"type": "resource_group"
+                            }
+                        }, 
+			{
+                            "key": "user_cert",
+			                "type": "multiline_secure_value",
+                            "display_name": "Full chain Certificate",
+                            "default_value": "-----BEGIN CERTIFICATE-----",
+			                "description": "The contents of the TLS certificate (PEM format)",
+			                "required": true
+                        },
+			{
+                            "key": "user_key",
+			                "type": "multiline_secure_value",
+                            "display_name": "Certificate key",
+                            "default_value": "-----BEGIN PRIVATE KEY-----",
+			                "description": "The contents of the TLS private key (PEM format)",
+			                "required": true
+                        },
+						{
+                            "key": "keycloak_admin_user",
+                            "type": "string",
+                            "default_value": "admin",
+                            "description": "Keycloak admin user name",
+							"required": true
+                        },
+                        {
+                            "key": "keycloak_admin_password",
+                            "type": "multiline_secure_value",
+                            "default_value": "",
+                            "description": "Keycloak admin password",
+							"required": true
+                        },
+						{
+                            "key": "ssh_allowed_cidr",
+                            "type": "string",
+                            "default_value": "0.0.0.0/0",
+                            "description": "CIDR block allowed for SSH access. Change to your organization's IP range for better security and for non-developement deployments",
+							"required": true
+                        },
+						{
+                            "key": "image",
+                            "type": "string",
+                            "default_value": "gaudi3-os-u22-01-21-0",
+                            "description": "This variable image name to be used for IAAS bringup on VSI instance"
+                        },
+						{
+                            "key": "cpu_or_gpu",
+                            "type": "string",
+                            "default_value": "gaudi3",
+                            "description": "This variable specifies where the model should be running"
+                        }
+						
+		            ]
+		        }
+	        ]
+        }
+  ]
+}
