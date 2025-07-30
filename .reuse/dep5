@@ -1,0 +1,5 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+
+Files: README.md placeholder.txt .github/* artifacts/* VERSION
+Copyright: 2023 Intel Corporation
+License: LicenseRef-Intel
