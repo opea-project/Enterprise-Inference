@@ -69,7 +69,7 @@ locals {
   model_map = {
     "1"  = "Llama-3.1-8B-Instruct"
     "11" = "Llama-3.1-405B-Instruct"
-    "12"  = "Llama-3.3-70B-Instruct"
+	  "12"  = "Llama-3.3-70B-Instruct"
   }
 
   selected_model = lookup(local.model_map, var.models, "unknown-model")
