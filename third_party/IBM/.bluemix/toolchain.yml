@@ -3,7 +3,7 @@ toolchain:
 services:
   - service_id: githubpublic
     parameters:
-      repo_url: "https://github.com/intel-innersource/applications.ai.erag.infra-automation"
+      repo_url: "https://github.com/opea-project/Enterprise-Inference"
       branch: "main"
 
   - service_id: pipeline
