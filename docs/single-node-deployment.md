@@ -5,7 +5,7 @@ This guide provides step-by-step instructions to deploy Intel® AI for Enterpris
 ## Prerequisites
 Before running the automation, ensure you have the following:
 
-1. **Ubuntu 22.04 Server**: A machine with Ubuntu 22.04 installed where this automation will run, That't it.
+1. **Ubuntu 22.04 Server**: A machine with Ubuntu 22.04 installed where this automation will run, That's it.
 
 ## Setting Up on Ubuntu 22.04
 We'll use api.example.com for this setup, follow steps below:
@@ -34,7 +34,7 @@ This generates:
 - `key.pem`: The private key.
 
 ### Step 3: Configure the Automation config file
-Move the single node preset inference config file to the runnig directory
+Move the single node preset inference config file to the running directory
 
 ```
 cd ~
@@ -44,7 +44,9 @@ cp -f docs/examples/single-node/inference-config.cfg core/inference-config.cfg
 ```
 
 ### Step 4: Update `hosts.yaml` File
-Move the single node preset hosts config file to the runnig directory
+Move the single node preset hosts config file to the running directory
+
+>Note : If the name of the current user is not ubuntu, update the ansible_user field in hosts.yaml to the current Linux username.
 
 ```
 cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
@@ -64,7 +66,7 @@ If your node is CPU only with no gaudi run below to deploy llama 3.1 8b model.
 ```
 ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
-Select option 1 and confirm the Yes/No Pprompt
+Select option 1 and confirm the Yes/No prompt
 
 If your node has gaudi accelerators run below to deploy llama 3.1 8b model.
 ```
