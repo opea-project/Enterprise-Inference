@@ -1,0 +1,270 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Ansible Playbook to install and configure the Enterprise Inference Service on a Single Gaudi node running Ubuntu 22.04+
+# Needs to run as root or with sudo privileges
+# Installs version:
+---
+- name: Configure Ubuntu 22.04+ for Enterprise Inference Service
+  hosts: localhost
+  become: true
+  gather_facts: true
+  vars:
+    cluster_url: "api.example.com"                        # Cluster name, change if you want to use a different DNS name for the service
+    cluster_ip: "127.0.0.1"                               # Cluster IP, this should be the IP of the Gaudi node that will be used to access the service
+    ai_user: "ai-inference"                               # Enterprise Inference Service OS user, change if you want to use a different user
+    ssh_key_file: "/home/{{ ai_user }}/.ssh/id_rsa"       # Path to your private key, this playbook will create this
+    keycloak_client_id: "api"                             # Keycloak client ID
+    keycloak_admin_user: "api-admin"                      # Keycloak admin username
+    keycloak_admin_password: "changeme!!"                 # Keycloak admin password
+    hf_token: "YourHuggingFaceToken"                      # Hugging Face token for all models, you need to supply your Hugging Face token to download models
+    hf_token_falcon3: "YourHuggingFaceToken"              # Hugging Face token for Falcon 3, can be the same as hf_token
+    models: "2,5,8,9"                                     # Comma-separated list of model IDs, see repo
+    cpu_or_gpu: "gpu"                                     # "cpu" or "gpu", set to "gpu" for Gaudi nodes
+    deploy_kubernetes_fresh: "on"
+    deploy_ingress_controller: "on"
+    deploy_keycloak_apisix: "on"
+    deploy_observability: "on"
+    deploy_llm_models: "on"
+    einf_path: "/opt/Enterprise-Inference"                                     # Repo location on disk
+    einf_repo: "https://github.com/opea-project/Enterprise-Inference.git"      # Repo to clone
+
+    # Certificate settings - customize these
+    cert_dir: "/etc/ssl/private"
+    cert_owner: "{{ ai_user }}"
+    cert_group: "{{ ai_user }}"
+    cert_validity_days: 365
+    cert_country: "US"
+    cert_state: "California"
+    cert_locality: "San Francisco"
+    cert_organization: "My Organization"
+    cert_organizational_unit: "IT Department"
+    cert_email: "admin@{{ cluster_url }}"
+    key_size: 2048
+    # Use the server's FQDN by default, or override with a specific CN
+    cert_common_name: "{{ ansible_fqdn }}"
+    # Files to be created
+    key_file: "{{ cert_dir }}/{{ cert_common_name }}.key"
+    csr_file: "{{ cert_dir }}/{{ cert_common_name }}.csr"
+    crt_file: "{{ cert_dir }}/{{ cert_common_name }}.crt"
+    # Optional Subject Alternative Names (SANs)
+    cert_sans:
+      - "DNS:{{ ansible_hostname }}"
+      - "DNS:{{ ansible_fqdn }}"
+      - "DNS:{{ cluster_url }}"
+      - "DNS:localhost"
+      - "IP:{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+      - "IP:{{ cluster_ip }}"
+      - "IP:127.0.0.1"
+  pre_tasks:
+    - name: Install community.general collection
+      command: ansible-galaxy collection install community.crypto
+  tasks:
+    # Ensure the system is up to date and install required packages
+    - name: Ensure all packages are up to date
+      apt:
+        update_cache: true
+        upgrade: dist
+    - name: Install required packages
+      apt:
+        name:
+          - openssl
+        state: present
+    - name: Install kubectl using Snap
+      snap:
+        name: kubectl
+        state: present
+        classic: true
+    - name: Setup the node for Enterprise Inference Service
+      block:
+        - name: Add entry to /etc/hosts if not already present
+          lineinfile:
+            path: /etc/hosts
+            line: "{{ cluster_ip }} {{ cluster_url }}"
+            state: present
+
+        - name: Create new user for the Enterprise Inference Service
+          user:
+            name: ai-inference
+            comment: "Enterprise Inference Service User"
+            shell: /bin/bash
+            create_home: true
+            home: /home/{{ ai_user }}
+            state: present
+
+        - name: Create .ssh directory for ai_user
+          file:
+            path: "/home/{{ ai_user }}/.ssh"
+            state: directory
+            owner: "{{ ai_user }}"
+            group: "{{ ai_user }}"
+            mode: '0700'
+
+        - name: Generate an SSH key pair for the Enterprise Inference Service user
+          openssh_keypair:
+            path: "{{ ssh_key_file }}"
+            type: rsa
+            owner: "{{ ai_user }}"
+            group: "{{ ai_user }}"
+            mode: '0600'
+            state: present
+
+        - name: Add the generated SSH public key to authorized_keys for ai_user
+          authorized_key:
+            user: "{{ ai_user }}"
+            state: present
+            key: "{{ lookup('file', '/home/{{ ai_user }}/.ssh/id_rsa.pub') }}"
+
+        - name: Add the IP to known_hosts
+          known_hosts:
+            path: "/home/{{ ai_user }}/.ssh/known_hosts"
+            name: "{{ cluster_ip }}"
+            key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 {{ cluster_ip }}') }}"
+            state: present
+
+        - name: Add the cluster_url to known_hosts
+          known_hosts:
+            path: "/home/{{ ai_user }}/.ssh/known_hosts"
+            name: "{{ cluster_url }}"
+            key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 {{ cluster_url }}') }}"
+            state: present
+
+        - name: Add the ansible_nodename to known_hosts
+          known_hosts:
+            path: "/home/{{ ai_user }}/.ssh/known_hosts"
+            name: "{{ ansible_nodename }}"
+            key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 {{ ansible_nodename }}') }}"
+            state: present
+
+        - name: Ensure correct ownership and permissions for the entire .ssh directory
+          file:
+            path: "/home/{{ ai_user }}/.ssh"
+            state: directory
+            owner: "{{ ai_user }}"
+            group: "{{ ai_user }}"
+            mode: '0700'
+            recurse: true
+
+        - name: Grant passwordless sudo access to ai_user
+          lineinfile:
+            path: /etc/sudoers.d/{{ ai_user }}
+            create: true
+            mode: '0440'
+            line: "{{ ai_user }} ALL=(ALL) NOPASSWD:ALL"
+            state: present
+
+        - name: Generate a self-signed certificate for the server
+          block:
+            - name: Ensure certificate directory exists
+              file:
+                path: "{{ cert_dir }}"
+                state: directory
+                owner: "{{ cert_owner }}"
+                group: "{{ cert_group }}"
+                mode: '0700'
+
+            - name: Check if certificate already exists
+              stat:
+                path: "{{ crt_file }}"
+              register: cert_file
+
+            - name: Check if key already exists
+              stat:
+                path: "{{ key_file }}"
+              register: key_file_check
+
+            - name: Create OpenSSL configuration file
+              template:
+                src: templates/openssl.cnf.j2
+                dest: "{{ cert_dir }}/openssl.cnf"
+                owner: "{{ cert_owner }}"
+                group: "{{ cert_group }}"
+                mode: '0600'
+              vars:
+                sans_string: "{{ cert_sans | join(',') }}"
+              when: not cert_file.stat.exists or not key_file_check.stat.exists
+
+            - name: Generate private key
+              openssl_privatekey:
+                path: "{{ key_file }}"
+                size: "{{ key_size }}"
+                type: RSA
+                owner: "{{ cert_owner }}"
+                group: "{{ cert_group }}"
+                mode: '0600'
+              when: not key_file_check.stat.exists
+
+            - name: Generate Certificate Signing Request (CSR)
+              openssl_csr:
+                path: "{{ csr_file }}"
+                privatekey_path: "{{ key_file }}"
+                common_name: "{{ cert_common_name }}"
+                country_name: "{{ cert_country }}"
+                state_or_province_name: "{{ cert_state }}"
+                locality_name: "{{ cert_locality }}"
+                organization_name: "{{ cert_organization }}"
+                organizational_unit_name: "{{ cert_organizational_unit }}"
+                email_address: "{{ cert_email }}"
+                subject_alt_name: "{{ cert_sans }}"
+                owner: "{{ cert_owner }}"
+                group: "{{ cert_group }}"
+                mode: '0600'
+              when: not cert_file.stat.exists
+
+            - name: Generate self-signed certificate
+              openssl_certificate:
+                path: "{{ crt_file }}"
+                privatekey_path: "{{ key_file }}"
+                csr_path: "{{ csr_file }}"
+                provider: selfsigned
+                selfsigned_not_after: "+{{ cert_validity_days }}d"
+                owner: "{{ cert_owner }}"
+                group: "{{ cert_group }}"
+                mode: '0644'
+              when: not cert_file.stat.exists
+
+            - name: Display certificate details
+              shell: openssl x509 -in {{ crt_file }} -text -noout
+              register: cert_details
+              changed_when: false
+              when: not cert_file.stat.exists or not ansible_check_mode
+
+            - name: Show certificate information
+              debug:
+                msg: "Certificate generated successfully at {{ crt_file }}"
+              when: not cert_file.stat.exists or not ansible_check_mode
+
+            - name: Certificate information
+              debug:
+                msg: "{{ cert_details.stdout_lines }}"
+              when: not cert_file.stat.exists or not ansible_check_mode
+    - name: Clone the repo
+      git:
+        repo: "{{ einf_repo }}"
+        dest: "{{ einf_path }}"
+        clone: true
+        update: true
+
+    - name: Configure the Enterprise Inference Service
+      block:
+        - name: Deploy the inference-config.cfg file
+          template:
+            src: templates/inference-config.cfg.j2
+            dest: "{{ einf_path }}/core/inference-config.cfg"
+            mode: '0644'
+        - name: Deploy the hosts.yaml file
+          template:
+            src: templates/hosts.yaml.j2
+            dest: "{{ einf_path }}/core/inventory/hosts.yaml"
+            mode: '0644'
+    - name: Run the Enterprise Inference Service installation script
+      shell: |
+        cd {{ einf_path }}/core
+        bash inference-stack-deploy.sh << EOF
+        1
+        yes
+        EOF
+      register: script_output
+    - name: Display script output
+      debug:
+        var: script_output.stdout_lines

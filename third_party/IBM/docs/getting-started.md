@@ -6,6 +6,14 @@ This guide provides an overview of deployment options for Intel® AI for Enterpr
 
 Intel AI for Enterprise Inference is an IBM Cloud deployable architecture that automates the deployment of OpenAI-compatible AI inference endpoints powered by Intel® Gaudi® 3 AI accelerators and Intel® Xeon® processors. It packages everything you need - Kubernetes, model serving, authentication, and monitoring - into a single, automated deployment.
 
+## Before You Begin: Choosing the Right Configuration
+
+Before deploying Intel AI for Enterprise Inference, it's important to understand the capabilities of Intel® Gaudi® 3 AI accelerators and select the appropriate configuration for your AI workload requirements. Please review our [Sizing Guide](./sizing-guide.md) which provides:
+
+- Introduction to Intel® Gaudi® 3 AI Accelerator capabilities
+- AI Model Hosting Requirements to help you choose the optimal configuration
+- Performance metrics for different model sizes and use cases
+
 ## Deployment Patterns
 
 Intel AI for Enterprise Inference provides two deployment patterns to accommodate different infrastructure requirements and organizational preferences.
