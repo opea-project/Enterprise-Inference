@@ -1,0 +1,11 @@
+toolchain:
+  name: "My Deployable Architecture"
+services:
+  - service_id: githubpublic
+    parameters:
+      repo_url: "https://github.com/opea-project/Enterprise-Inference"
+      branch: "main"
+
+  - service_id: pipeline
+    parameters:
+      name: "Terraform Pipeline"
