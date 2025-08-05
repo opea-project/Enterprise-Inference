@@ -28,7 +28,7 @@ resource "random_string" "suffix" {
 }
 
 resource "ibm_is_security_group" "new_sg" {
-    name = "${local.BASENAME}-sg"
+    name = "${local.BASENAME}-sg-${random_string.suffix.result}"
     vpc  = ibm_is_vpc.new_vpc.id
     resource_group = data.ibm_resource_group.target_rg.id
 }
@@ -131,14 +131,14 @@ resource "ibm_is_security_group_rule" "ingress_http" {
 
 # Create a Public Gateway for the VPC
 resource "ibm_is_public_gateway" "new_pgw" {
-  name = "${local.BASENAME}-public-gateway"
+  name = "${local.BASENAME}-public-gateway-${random_string.suffix.result}"
   vpc  = ibm_is_vpc.new_vpc.id
   zone = var.instance_zone
   resource_group = data.ibm_resource_group.target_rg.id
 }
 
 resource "ibm_is_subnet" "new_subnet" {
-    name                     = "${local.BASENAME}-subnet"
+    name                     = "${local.BASENAME}-subnet-${random_string.suffix.result}"
     vpc                      = ibm_is_vpc.new_vpc.id
     zone                     = var.instance_zone
     total_ipv4_address_count = 256
@@ -151,7 +151,7 @@ data "ibm_is_ssh_key" "ssh_key_id" {
 }
 
 resource "ibm_is_instance" "iaas_vsi" {
-    name    = "${local.BASENAME}-vsi"
+    name    = "${local.BASENAME}-vsi-${random_string.suffix.result}"
     vpc     = ibm_is_vpc.new_vpc.id
     zone    = var.instance_zone
     keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
@@ -166,7 +166,7 @@ resource "ibm_is_instance" "iaas_vsi" {
 }
 
 resource "ibm_is_floating_ip" "public_ip" {
-    name    = "${local.BASENAME}-fip"
+    name    = "${local.BASENAME}-fip-${random_string.suffix.result}"
     target = ibm_is_instance.iaas_vsi.primary_network_interface[0].id
     resource_group = data.ibm_resource_group.target_rg.id
 }
