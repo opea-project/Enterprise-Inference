@@ -19,10 +19,10 @@ This example lists out steps to test inference using a deployed model.
   export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
   ./inference-stack-deploy.sh --cpu-or-gpu "gpu"
   ``` 
-  b) Select Option 3: Update Deployed Inference Cluster to go into the Update Existing Cluster menu.
-  c) Select Option 2: Manage LLM Models to go into the Manage LLM Models menu.
-  d) Select Option 3: List Installed Models to check all deployed models on the node or cluster. 
-  e) After the script has finished, scroll up in the terminal to look at the section with "Print Installed Models in Comma Separated Format" to see the list of deployed models.
+  b) Select `Option 3: Update Deployed Inference Cluster` to go into the `Update Existing Cluster` menu. 
+  c) Select `Option 2: Manage LLM Models` to go into the `Manage LLM Models` menu. 
+  d) Select `Option 3: List Installed Models` to check all deployed models on the node or cluster. 
+  e) After the script has finished, scroll up in the terminal to look at the section with "Print Installed Models in Comma Separated Format" to see the list of deployed models. 
 
   **For servers supporting LiteLLM:** Alternatively, run some [Python code with OpenAI](#optional-for-litellm-only-check-list-of-deployed-models) to get this list of models. This can only be done if the base URL and API key are already acquired.
 
@@ -50,7 +50,7 @@ pip install openai
 ```
 
 3. Set environment variables:
-- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice and `/v1` (i.e. https://api.example.com/<deployed-model-name>/v1). The deployed model name can be found by running `kubectl get apisixroutes` for a list of deployed models. **Note:** If using LiteLLM, this is not needed. By default, LiteLLM is not used.
+- `BASE_URL` is the HTTPS endpoint of the remote server with the model of choice and `/v1` (i.e. https://api.example.com/<deployed-model-name>/v1). The deployed model name can be found by running `kubectl get apisixroutes` for a list of deployed models. **Note:** If using LiteLLM, the model name and `v1` are not needed. By default, LiteLLM is not used.
 - `OPENAI_API_KEY` is the access token or key to access the model(s) on the server.
 
 ```bash
@@ -87,7 +87,7 @@ print(completion.choices[0].message)
 
 Run the script. The output should be the response to the query.
 ```bash
-python inference.py
+python3 inference.py
 ```
 
 The model can be customized to any model deployed on the node or cluster. The prompt can be changed in the `messages` argument.
