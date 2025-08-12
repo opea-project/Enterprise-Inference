@@ -28,6 +28,8 @@ All steps need to be completed before deploying Enterprise Inference. By the end
 
 ## SSH Key Setup
 
+Log in as a **non-root** user with sudo privileges to set up an SSH key with enable passwordless SSH. Using `root` or a user with a password may lead to unexpected behavior during deployment.
+
 1. Generate an SSH key pair using the `ssh-keygen` command. Otherwise, an existing key pair can be used.
 
     Open any console terminal on a laptop or server and run this command: 
@@ -70,21 +72,6 @@ When planning for storage, it is important to consider both the needs of the clu
 
 ## DNS and SSL/TLS Setup
 
-### Quick Setup
-For a quick set up, it is assumed a DNS is already purchased and available. Then the certificate files `key.pem` and `cert.pem` can be generated with this OpenSSL command. For this example, `example.com` is used as the DNS and this can be replaced with the name of the desired domain name.
-```bash
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=example.com"
-```
-
-Modify `/etc/hosts` by adding this line to map the node's IP address to the DNS:
-```bash
-For getting the private ip address of the machine run hostname -I
-
-<Private_IP_Address> example.com
-```
-
-Otherwise, follow the instructions below for a [Production](#production-environment) or [Development](#development-environment) environment.
-
 ### Production Environment
 
 #### DNS Setup
@@ -100,9 +87,24 @@ Otherwise, follow the instructions below for a [Production](#production-environm
 - Open required firewall ports (e.g., 80 for HTTP validation) if needed during certificate issuance.
     
 ### Development Environment
-Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
+For this setup, `api.example.com` will be used as the DNS and mapped to `localhost` to test locally.
 
-   
+Modify `/etc/hosts` by adding this line to map the DNS to `127.0.0.1` or `localhost`. Alternatively, the DNS can be mapped to the private IP address of the machine. Run *hostname -I* to acquire the private IP address.
+```bash
+127.0.0.1 api.example.com
+```
+
+Generate a self-signed SSL certificate with OpenSSL. For this example, `api.example.com` is used as the DNS.
+```bash
+mkdir -p ~/certs && cd ~/certs
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
+```
+
+This generates two files:
+- `cert.pem`: The self-signed certificate.
+- `key.pem`: The private key.
+
+
 ## Hugging Face Token Generation
 1. Go to the [Hugging Face website](https://huggingface.co/) and sign in or create a new account.
 2. Generate a [user access token](https://huggingface.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.

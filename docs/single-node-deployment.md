@@ -3,38 +3,11 @@
 This guide provides step-by-step instructions to deploy Intel® AI for Enterprise Inference on a single node.
 
 ## Prerequisites
-Before running the automation, ensure the following requirements are met:
-
-1. Ensure the machine meets all the [System Requirements](./prerequisites.md#system-requirements).
-2. Log on to the machine as a **non-root** user with sudo privileges and passwordless SSH. Using `root` or a user with a password may lead to unexpected behavior during deployment. 
+Before running the automation, complete all [prerequisites](./prerequisites.md).
 
 ## Deployment
 
-### Step 1: Modify the hosts file
-For this setup, `api.example.com` will be the DNS used, but this can be replaced with another available domain. Follow the steps below:
-To test locally, a fake domain (`api.example.com`) needs to be mapped to to `localhost` in the `/etc/hosts` file.
-
-Run the following command to edit the hosts file:
-```bash
-sudo nano /etc/hosts
-```
-Add this line at the end:
-```bash
-127.0.0.1 api.example.com
-```
-Save and exit (`CTRL+X`, then `Y` and `Enter`).
-
-### Step 2: Generate a self-signed SSL certificate
-Run the following commands to create a self-signed SSL certificate. Change the DNS `api.example.com` if needed.
-```bash
-mkdir -p ~/certs && cd ~/certs
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
-```
-This generates:
-- `cert.pem`: The self-signed certificate.
-- `key.pem`: The private key.
-
-### Step 3: Configure the Automation config file
+### Step 1: Configure the Automation config file
 Clone the Enterprise Inference repo, then copy the single node preset inference config file to the working directory:
 
 ```bash
@@ -46,7 +19,7 @@ cp -f docs/examples/single-node/inference-config.cfg core/inference-config.cfg
 
 Modify `inference-config.cfg` if needed. Ensure the `cluster_url` field is set to the DNS used, and the certificate and key files are pointed to correctly. The keycloak fields and deployment options can be left unchanged.
 
-### Step 4: Update `hosts.yaml` File
+### Step 2: Update `hosts.yaml` File
 Copy the single node preset hosts config file to the working directory:
 
 ```bash
@@ -55,7 +28,7 @@ cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 
 > **Note** The `ansible_user` field is set to *ubuntu* by default. Change it to the actual username used. 
 
-### Step 5: Run the Automation
+### Step 3: Run the Automation
 Now run the automation using the configured files.
 ```bash
 cd core
@@ -84,7 +57,7 @@ Select Option 1 and confirm the Yes/No prompt.
 
 This will deploy the setup automatically. If any issues are encountered, double-check the prerequisites and configuration files.
 
-### Step 6: Testing Inference
+### Step 4: Testing Inference
 On the node run the following commands to test if Intel® AI for Enterprise Inference is successfully deployed:
 
 ```bash
