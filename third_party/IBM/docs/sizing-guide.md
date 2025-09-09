@@ -48,7 +48,7 @@ The exact performance is dependent on the software stack and the hardware driver
 
 ### 8B model (meta-llama/Llama-3.1-8B-Instruct) sweet spots (with a single instance – 1 HPU)
 
-| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput per User (Tokens/sec) | TTFT in ms (p90) | SLA |
+| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput (Tokens/sec) | TTFT in ms (p90) | SLA |
 |----------|--------------|---------------|------------------|----------------------------------|------------------|-----|
 | Chatbot | 128 | 128 | 65 | 3264 | 1300 | <=2s |
 | Content Creation | 128 | 2048 | 35 | 3172 | 394 | <=10s |
@@ -61,7 +61,7 @@ The exact performance is dependent on the software stack and the hardware driver
 
 ### 70B model (meta-llama/Llama-3.3-70B-Instruct) sweet spots (with a single instance – 4 HPUs)
 
-| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput per User (Tokens/sec) | TTFT in ms (p90) | SLA |
+| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput (Tokens/sec) | TTFT in ms (p90) | SLA |
 |----------|--------------|---------------|------------------|----------------------------------|------------------|-----|
 | Chatbot | 128 | 128 | 35 | 1120 | 613 | <=2s |
 | Content Creation | 128 | 2048 | 35 | 1269 | 586 | <=10s |
@@ -74,7 +74,7 @@ The exact performance is dependent on the software stack and the hardware driver
 
 ### 405B model (meta-llama/Llama-3.1-405B-Instruct) sweet spots (with a single instance – 8 HPUs)
 
-| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput per User (Tokens/sec) | TTFT in ms (p90) | SLA |
+| Use Case | Input Tokens | Output Tokens | Concurrent Users | Throughput (Tokens/sec) | TTFT in ms (p90) | SLA |
 |----------|--------------|---------------|------------------|----------------------------------|------------------|-----|
 | Chatbot | 128 | 128 | 35 | 493 | 1072 | <=2s |
 | Content Creation | 128 | 2048 | 35 | 557 | 1193 | <=10s |
