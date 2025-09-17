@@ -78,7 +78,7 @@ print("Available models: %s" %models)
 # Run inference with model
 print("Running inference with selected model:")
 completion = client.chat.completions.create(
-  model="meta-llama/Meta-Llama-3.1-8B-Instruct",
+  model="meta-llama/Llama-3.1-8B-Instruct",
   messages=[
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Hello!"}
