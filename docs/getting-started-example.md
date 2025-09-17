@@ -8,6 +8,8 @@ This example lists out steps to test inference using a deployed model.
 2. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
 
 ### Method 1: Check APISIX Routes
+  This works only if APISIX and Keycloak are deployed. Otherwise, refer to [Method 2](#method-2-run-inference-script) below.
+  
   Run this command to see the list of models deployed:
   ```bash
   kubectl get apisixroutes
