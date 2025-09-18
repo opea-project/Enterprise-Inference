@@ -1,6 +1,5 @@
-# Copyright (C) 2024 Intel Corporation
+# Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,4 +32,3 @@ data:
   {{- if .Values.MAX_WARMUP_SEQUENCE_LENGTH }}
   MAX_WARMUP_SEQUENCE_LENGTH: {{ .Values.MAX_WARMUP_SEQUENCE_LENGTH | quote }}
   {{- end }}
-  HF_TOKEN: {{ .Values.global.HUGGINGFACEHUB_API_TOKEN | quote}}

@@ -96,7 +96,7 @@ data "template_file" "inference_config" {
     deploy_ingress_controller  = var.deploy_ingress_controller
     deploy_llm_models          = var.deploy_llm_models
     deploy_keycloak_apisix     = var.deploy_keycloak_apisix
-    deploy_observability      =  var.deploy_observability  
+    deploy_observability       = var.deploy_observability  
   }
 }
 locals {
@@ -116,15 +116,15 @@ resource "null_resource" "wait_for_ssh" {
     }
   }
   
-triggers = {
-  instance_id = ibm_is_instance.instance_name.id
-  ip_address  = ibm_is_floating_ip.instance_name.address
-}
+  triggers = {
+    instance_id = ibm_is_instance.instance_name.id
+    ip_address  = ibm_is_floating_ip.instance_name.address
+  }
 
-depends_on = [
-  ibm_is_instance.instance_name,
-  ibm_is_floating_ip.instance_name
-]
+  depends_on = [
+    ibm_is_instance.instance_name,
+    ibm_is_floating_ip.instance_name
+  ]
 }
 
 resource "null_resource" "run_script" {
@@ -143,7 +143,7 @@ resource "null_resource" "run_script" {
       host        = ibm_is_floating_ip.instance_name.address
     }
   }
-   provisioner "file" {
+  provisioner "file" {
     content     = data.template_file.inference_config.rendered
     destination = "/home/ubuntu/inference-config.cfg"
 
@@ -182,7 +182,7 @@ resource "null_resource" "run_script" {
       private_key = can(file(var.ssh_private_key)) ? file(var.ssh_private_key) : var.ssh_private_key
       host        = ibm_is_floating_ip.instance_name.address
     }
-   inline = [
+    inline = [
       "base64 -d /tmp/cert.b64 > ${var.cert_path}",
       "base64 -d /tmp/key.b64 > ${var.key_path}",
       "chmod +x /tmp/run_script.sh",

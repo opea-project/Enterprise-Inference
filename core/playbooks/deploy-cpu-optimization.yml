@@ -1,0 +1,61 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Deploy CPU Optimization (NRI Balloon Policy Only)
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: true
+  run_once: true
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_llm_models.yml"
+    - "{{ lookup('env', 'PWD') }}/config/inference_env.yml"
+  vars:
+    cpu_playbook: "{{ cpu_playbook | default('false') }}"
+
+  tasks:
+    - name: Display CPU optimization deployment info
+      debug:
+        msg:
+          - "==================================================================="
+          - "Deploying NRI Balloon Policy for CPU Optimization"
+          - "==================================================================="
+          - "CPU Deployment: {{ cpu_playbook }}"
+          - "Target: NRI balloon policy deployment only"
+          - "Note: Topology detection and model configuration handled in model deployment"
+          - "==================================================================="
+      tags: always
+
+    - name: Skip CPU optimization for GPU scenarios
+      ansible.builtin.debug:
+        msg:
+          - "==================================================================="
+          - "Skipping NRI Balloon Policy Deployment"
+          - "==================================================================="
+          - "Reason: GPU deployment detected (cpu_playbook != 'true')"
+          - "NRI balloon policy is only needed for CPU-based model deployments"
+          - "==================================================================="
+      when: cpu_playbook != 'true'
+      tags:
+        - install
+
+    - name: Deploy NRI Balloon Policy
+      when: cpu_playbook == 'true'
+      block:
+        - name: Deploy generic NRI CPU balloon policy
+          ansible.builtin.include_role:
+            name: nri_cpu_balloons
+          tags:
+            - install
+
+        - name: Display NRI balloon policy deployment completion
+          debug:
+            msg:
+              - "==================================================================="
+              - "NRI Balloon Policy Deployment Complete"
+              - "==================================================================="
+              - "✓ NRI balloon policy deployed and configured"
+              - "✓ Ready for CPU-optimized model deployments"
+              - "Note: Model-specific optimization happens during model deployment"
+              - "==================================================================="
+      tags:
+        - install

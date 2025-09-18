@@ -1,0 +1,120 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Generate Ceph cluster-values.yaml from inventory storage nodes
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  vars:
+    ceph_values_template: "{{ helm_charts_base }}/ceph/cluster-values.yaml.j2"
+    ceph_values_template_single: "{{ helm_charts_base }}/ceph/cluster-values-single-node.yaml.j2"
+    ceph_values_output: "{{ remote_helm_charts_base }}/ceph/cluster-values.yaml"
+    release_namespace: rook-ceph
+  tasks:
+    - name: Create remote helm charts directory for ceph
+      file:
+        path: "{{ remote_helm_charts_base }}/ceph"
+        state: directory
+        mode: "0755"
+      run_once: true
+      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+
+    - name: Copy ceph template files to remote location
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {
+            src: "{{ ceph_values_template }}",
+            dest: "{{ remote_helm_charts_base }}/ceph/cluster-values.yaml.j2",
+          }
+        - {
+            src: "{{ ceph_values_template_single }}",
+            dest: "{{ remote_helm_charts_base }}/ceph/cluster-values-single-node.yaml.j2",
+          }
+      run_once: true
+      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+    - name: Build storage_nodes list from inventory
+      set_fact:
+        storage_nodes: >-
+          [{% for host in groups['all'] if hostvars[host].devices is defined %}
+            {"name": "{{ host }}", "devices": {{ hostvars[host].devices | to_json }} }{% if not loop.last %},{% endif %}
+          {% endfor %}]
+      run_once: true
+
+    - name: Print the number of storage nodes
+      debug:
+        msg: "Number of storage nodes: {{ (storage_nodes | from_yaml | length) }}"
+      run_once: true
+
+    - name: Fail if no storage nodes are defined
+      fail:
+        msg: "No storage nodes are defined in the inventory. Ceph values file will not be generated."
+      when: (storage_nodes | from_yaml | length) == 0
+      run_once: true
+
+    - name: Choose Ceph values template based on node count
+      set_fact:
+        ceph_template_to_use: >-
+          {{ ceph_values_template_single if (storage_nodes | from_yaml | length == 1) else ceph_values_template }}
+      run_once: true
+
+    - name: Template Ceph cluster-values.yaml
+      ansible.builtin.template:
+        src: "{{ ceph_template_to_use }}"
+        dest: "{{ ceph_values_output }}"
+      vars:
+        storage_nodes: "{{ storage_nodes | from_yaml }}"
+      run_once: true
+
+    - name: Check if kubectl is available and cluster is ready
+      ansible.builtin.command:
+        cmd: kubectl version --client
+      register: kubectl_check
+      ignore_errors: true
+      run_once: true
+      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+
+    - name: Wait for Kubernetes cluster to be ready
+      ansible.builtin.command:
+        cmd: kubectl get nodes
+      register: cluster_ready_check
+      ignore_errors: true
+      run_once: true
+      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+      when: kubectl_check.rc == 0
+
+    - name: Warn if kubectl or cluster is not available
+      debug:
+        msg: "Warning: kubectl not available or cluster not ready, node labeling will be skipped"
+      when: kubectl_check.rc != 0 or (cluster_ready_check is defined and cluster_ready_check.rc != 0)
+      run_once: true
+
+    - name: Label storage nodes with type=storage-node
+      ansible.builtin.command:
+        cmd: kubectl label node {{ item.name }} type=storage-node --overwrite
+      loop: "{{ storage_nodes | from_yaml }}"
+      when:
+        - storage_nodes | from_yaml | length > 0
+        - kubectl_check.rc == 0
+        - cluster_ready_check is defined and cluster_ready_check.rc == 0
+      ignore_errors: true
+      run_once: true
+      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+    - name: Inform user about manual device cleanup steps
+      debug:
+        msg: |
+          DISCLAIMER: The following steps are NOT executed by this playbook. You must run them manually and with caution, as they will irreversibly erase all data on the specified device.
+
+          To clean up a device, run the following commands (replace <device> with your actual device name, e.g., sdb):
+
+          1. sudo sgdisk --zap-all <device>
+            - Removes all partition table data from the device, erasing any existing partitions.
+          2. sudo wipefs -a <device>
+            - Erases all filesystem signatures from the device, making it appear as a blank disk to the system.
+          3. sudo dd if=/dev/zero of=/dev/<device> bs=1M status=progress
+            - Overwrites the entire device with zeros, ensuring all data is unrecoverable.
+
+          WARNING: These commands will destroy all data and partitions on the device. Ensure you have selected the correct device before proceeding.

@@ -39,14 +39,14 @@ if [[ "$1" == "model-deploy" ]]; then
   cd /home/ubuntu/Enterprise-Inference/core
   echo -e '3\n2\n1\nyes\ny\n' | bash inference-stack-deploy.sh --models "$2"
   kubectl delete pods -l app.kubernetes.io/component=device-plugin,app.kubernetes.io/name=habana-ai -n habana-ai-operator --ignore-not-found=true
-  
+
   echo "[$(date)] Installing habanalabs-container-runtime..."
   if sudo DEBIAN_FRONTEND=noninteractive apt install -y habanalabs-container-runtime=1.21.0-555; then
     echo "[$(date)] habanalabs-container-runtime installation successful"
   else
     echo "[$(date)] WARNING: habanalabs-container-runtime installation failed, continuing with scaling..."
   fi
-  
+
   echo "[$(date)] Starting scaling logic for model $2..."
   # scaling logic
   if [[ "$2" == "1" ]]; then

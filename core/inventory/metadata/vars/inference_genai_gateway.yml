@@ -1,0 +1,4 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+helm_charts_base_genai: "{{ lookup('env', 'PWD') }}/helm-charts/genai-gateway"
+helm_charts_base_genai_trace: "{{ lookup('env', 'PWD') }}/helm-charts/genai-gateway-trace"

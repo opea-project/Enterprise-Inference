@@ -1,0 +1,33 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+# NRI CPU Balloons Configuration - Single Generic Balloon Policy
+nri_cpu_balloons:
+  enabled: true
+  namespace: "kube-system"
+  auto_install: true
+  installation_timeout: 300
+  helm:
+    repo_url: "https://containers.github.io/nri-plugins"
+    repo_name: "nri-plugins"
+    chart_name: "nri-resource-policy-balloons"
+    release_name: "nri-cpu-balloons"
+
+# Generic balloon configuration
+generic_balloon:
+  name: "vllm-balloon"
+  match_expression: "name=vllm"
+  policy_settings:
+    preferIsolCpus: false
+    preferNewBalloons: true
+    hideHyperthreads: false
+
+# System reserved CPU percentage (for single node clusters)
+system_reserved_cpu_percent: 50
+
+# Minimum reserved CPUs for system processes
+min_reserved_cpus: 4
+
+# Temporary directory for configuration files
+tmp_dir: "/tmp/balloon-config"

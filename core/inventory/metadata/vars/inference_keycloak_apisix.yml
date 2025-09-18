@@ -1,0 +1,7 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+ingress_file: "all_models_apisix_ingres_nginx.yaml"
+keycloak_url: "https://{{ secret_name }}"
+deploy_keycloak: "no"
+deploy_apisix: "no"
+delete_pv_on_purge: 'no'

@@ -4,8 +4,8 @@
 # User-configurable parameters (can be set via --set during helm install)
 accelDevice: "gaudi"
 
-block_size: 128          # Default KV cache block size
-max_num_seqs: 256        # Default maximum number of sequences
+block_size: 128 # Default KV cache block size
+max_num_seqs: 256 # Default maximum number of sequences
 max_seq_len_to_capture: 2048 # Default maximum sequence length
 d_type: "bfloat16"
 max_model_len: 5120
@@ -14,7 +14,6 @@ image:
   repository: opea/vllm-gaudi
   tag: "1.3.1"
   pullPolicy: IfNotPresent
-
 
 affinity:
   nodeAffinity:
@@ -27,21 +26,18 @@ affinity:
               values:
                 - "true"
 
-
 runtime: "habana"
 HABANA_VISIBLE_DEVICES: "all"
 VLLM_NO_USAGE_STATS: 1
 DO_NOT_TRACK: 1
 
-
-
 LLM_MODEL_ID: ""
 
-modelConfigs:        
+modelConfigs:
   # meta-llama/Llama-3.1-8B-Instruct
   "meta-llama/Llama-3.1-8B-Instruct":
     configMapValues:
-      PT_HPU_LAZY_MODE: "1" 
+      PT_HPU_LAZY_MODE: "1"
       EXPERIMENTAL_WEIGHT_SHARING: "0"
       VLLM_SKIP_WARMUP: "false"
       VLLM_DELAYED_SAMPLING: "true"
@@ -54,9 +50,10 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_STEP: "256"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8128"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.95","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling","--disable-log-requests"]
     tensor_parallel_size: "1"
-  
+
   # meta-llama/Llama-3.1-70B-Instruct
   "meta-llama/Llama-3.1-70B-Instruct":
     configMapValues:
@@ -73,6 +70,7 @@ modelConfigs:
       VLLM_PROMPT_BS_BUCKET_STEP: "32"
       VLLM_PROMPT_SEQ_BUCKET_STEP: "256"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.95","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling","--disable-log-requests"]
     tensor_parallel_size: "4"
 
@@ -92,18 +90,33 @@ modelConfigs:
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_DECODE_BS_BUCKET_STEP: "32"
       VLLM_PROMPT_BS_BUCKET_STEP: "32"
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling","--disable-log-requests"]
     tensor_parallel_size: "4"
 
-  # meta-llama/Llama-3.1-405B-Instruct-FP8	
+  # meta-llama/Llama-3.1-405B-Instruct-FP8
   "meta-llama/Llama-3.1-405B-Instruct-FP8":
     configMapValues:
       EXPERIMENTAL_WEIGHT_SHARING: "0"
       VLLM_SKIP_WARMUP: "true"
       QUANT_CONFIG: "/data/41bd4c9e7e4fb318ca40e721131d4933966c2cc1/maxabs_quant_g2.json"
-    extraCmdArgs: ["--quantization","inc","--kv-cache-dtype","fp8_inc", "--weights-load-device", "cpu", "--max-model-len","33024", "--max-num-seq","256", "--max-num-batched-tokens","8192"]
+    extraCmdArgs:
+      [
+        "--quantization",
+        "inc",
+        "--kv-cache-dtype",
+        "fp8_inc",
+        "--weights-load-device",
+        "cpu",
+        "--max-model-len",
+        "33024",
+        "--max-num-seq",
+        "256",
+        "--max-num-batched-tokens",
+        "8192",
+      ]
     tensor_parallel_size: "8"
-  
+
   # meta-llama/Llama-3.1-405B-Instruct
   "meta-llama/Llama-3.1-405B-Instruct":
     configMapValues:
@@ -120,6 +133,7 @@ modelConfigs:
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_DECODE_BS_BUCKET_STEP: "32"
       VLLM_PROMPT_BS_BUCKET_STEP: "32"
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,8192"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.96","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling","--disable-log-requests"]
     tensor_parallel_size: "8"
 
@@ -134,9 +148,10 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_MAX: "33024"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling"]
     tensor_parallel_size: "1"
-  
+
   # mistralai/Mistral-7B-Instruct-v0.1
   "mistralai/Mistral-7B-Instruct-v0.1":
     configMapValues:
@@ -148,9 +163,10 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_MAX: "33024"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling"]
     tensor_parallel_size: "1"
-  
+
   # mistralai/Mixtral-8x7B-Instruct-v0.1
   "mistralai/Mixtral-8x7B-Instruct-v0.1":
     configMapValues:
@@ -162,6 +178,7 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_MAX: "33024"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling"]
     tensor_parallel_size: "2"
 
@@ -171,8 +188,9 @@ modelConfigs:
       OMPI_MCA_btl_vader_single_copy_mechanism: none
       PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
       VLLM_CPU_KVCACHE_SPACE: "40"
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size", "128", "--dtype", "bfloat16", "--max-model-len","5196"]
-    tensor_parallel_size: "1"    
+    tensor_parallel_size: "1"
 
   # deepseek-ai/DeepSeek-R1-Distill-Llama-8B
   "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
@@ -185,6 +203,7 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_MAX: "33024"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
@@ -199,9 +218,20 @@ modelConfigs:
       VLLM_PROMPT_SEQ_BUCKET_MAX: "33024"
       VLLM_DECODE_BLOCK_BUCKET_MAX: "8256"
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "4"
-  
+
+  # deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+  "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
+    configMapValues:
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: true
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32768","--gpu-memory-util","0.99","--max-num-prefill-seqs","16","--num_scheduler_steps","16","--use-padding-aware-scheduling","--disable-log-requests"]
+    tensor_parallel_size: "2"
+
 # Default arguments if the model ID is not found
 defaultModelConfigs:
   configMapValues:
@@ -209,5 +239,6 @@ defaultModelConfigs:
     OMPI_MCA_btl_vader_single_copy_mechanism: none
     PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
     VLLM_CPU_KVCACHE_SPACE: "40"
+    PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
   extraCmdArgs: ["--block-size", "128", "--dtype", "bfloat16", "--max-model-len","5196"]
   tensor_parallel_size: "1"

@@ -17,11 +17,14 @@ The first step is to get access to the hardware platforms. This guide assumes th
 |---------------------|-------------------------------------------------------------------------------------------------------------------|
 | Operating System    | Ubuntu 22.04                                                                                                |
 | Hardware Platforms  | 4th Gen Intel® Xeon® Scalable processors<br>5th Gen Intel® Xeon® Scalable processors<br>6th Gen Intel® Xeon® Scalable processors<br>3rd Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator<br>4th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator <br>6th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 3 AI Accelerator|
-| Gaudi Firmware Version | 1.20.0
+| Gaudi Firmware Version | 1.20.0 or newer
 
+## Intel® Gaudi® Setup Automation
 
+For Intel® Gaudi® AI Accelerators, the platform includes automated firmware and driver management tools that streamline the setup process.
 
 >**Note**: For Intel® Gaudi AI Accelerators, there are additional steps to ensure the node(s) meet the requirements. Follow the [Gaudi prerequisites guide](./gaudi-prerequisites.md) before proceeding. For Intel® Xeon® Scalable processors, no additional setup is needed.
+
 
 All steps need to be completed before deploying Enterprise Inference. By the end of the prerequisites, the following artifacts should be ready:
 1. SSH key pair
@@ -109,6 +112,126 @@ Follow steps here [**Quick Start Guide**](./single-node-deployment.md)
 1. Go to the [Hugging Face website](https://huggingface.co/) and sign in or create a new account.
 2. Generate a [user access token](https://huggingface.co/docs/transformers.js/en/guides/private#step-1-generating-a-user-access-token). Write down the value of the token in some place safe.
 
+## Istio
+
+Istio is an open-source service mesh platform that provides a way to manage, secure, and observe microservices in a distributed application architecture, particularly in Kubernetes environments. Refer [Istio Documentation](https://istio.io/latest/docs/) for more information on Istio.
+
+Configure `inference-config.cfg` file to add `deploy_istio=on` option to install Istio.
+
+To verify mutual TLS refer [Verify mutual TLS](https://istio.io/latest/docs/ambient/usage/verify-mtls-enabled/).
+
+
+## Ceph Storage Filesystem
+Ceph is a distributed storage system that provides file, block and object storage and is deployed in large scale production clusters. For mode informaton refer [Rook Ceph Documentation](https://rook.io/docs/rook/latest/Getting-Started/intro/) 
+
+### Ceph Prerequisites
+
+To configure the Ceph storage cluster, ensure that at least one of the following local storage types is available:
+
+- **Raw devices** (no partitions or formatted filesystems)
+- **Raw partitions** (no formatted filesystem)
+- **LVM Logical Volumes** (no formatted filesystem)
+- **Persistent Volumes** available from a storage class in block mode
+
+To check if your devices or partitions are formatted with filesystems, use the following command:
+
+```bash
+lsblk -f
+```
+
+Example output:
+```
+NAME                  FSTYPE      LABEL UUID                                   MOUNTPOINT
+vda
+└─vda1                LVM2_member       >eSO50t-GkUV-YKTH-WsGq-hNJY-eKNf-3i07IB
+    ├─ubuntu--vg-root   ext4              c2366f76-6e21-4f10-a8f3-6776212e2fe4   /
+    └─ubuntu--vg-swap_1 swap              9492a3dc-ad75-47cd-9596-678e8cf17ff9   [SWAP]
+vdb
+```
+
+If the FSTYPE field is not empty, there is a filesystem on top of the corresponding device. In this example, vdb is available to Rook, while vda and its partitions have a filesystem and are not available.
+
+Configure `inference-config.cfg` file to add `deploy_ceph=on` option to enable ceph storage clutser setup.
+
+Configure `inventory/hosts.yaml` file to add the avialable device under the required hosts. Refer the below example where vdb and vdc devices are added to `master1.
+
+```yaml
+all:
+  hosts:
+    master1:
+      devices: [vdb, vdc]
+      ansible_connection: local
+      ansible_user: ubuntu
+      ansible_become: true
+  children:
+    kube_control_plane:
+      hosts:
+        master1:
+    kube_node:
+      hosts:
+        master1:
+    etcd:
+      hosts:
+        master1:
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+    calico_rr:
+      hosts: {}
+```
+
+### Uninstall Ceph Cluster
+
+⚠️ **Warning**: Uninstalling the Ceph cluster will permanently erase all Ceph data. Any workloads using Ceph storage will be disrupted and may require redeployment after removal.
+
+To uninstall the Ceph storage cluster:
+
+1. Set `uninstall_ceph=on` in the `inference-config.cfg` file to uninstall the Ceph storage cluster setup.
+
+2. This option will permanently delete all Ceph data by:
+   - Removing all Ceph storage pools and filesystems
+   - Deleting all persistent volume claims
+   - Uninstalling Rook-Ceph operator and cluster
+   - Removing all Ceph-related CRDs
+   - Deleting local storage data (`/var/lib/rook`)
+
+3. **Format storage devices if required:**
+   ```bash
+   # Replace <device> with your actual storage device (e.g., /dev/vdb)
+   sudo wipefs -a /dev/<device>
+   sudo sgdisk --zap-all /dev/<device>
+   sudo dd if=/dev/zero of=/dev/<device> bs=1M count=100 status=progress
+   ```
+
+   **Important**: Always verify the device name before running these commands to avoid data loss.
 
 ## Next Steps
 After completing the prerequisites, proceed to the [Deployment Configuration](./README.md#customizing-components-for-inference-deployment-with-inference-configcfg) section of the guide to set up Enterprise Inference.
+
+
+## Troubleshooting
+
+  ### Ceph Storage Cluster Setup
+
+  If Ceph OSDs skip devices due to GPT headers or existing filesystems, clean the device before use. Replace `<device>` with your actual device name (e.g., `/dev/vdb`):
+
+  ```bash
+  sudo sgdisk --zap-all <device>
+  sudo wipefs -a <device>
+  ```
+
+  Repeat for each device as needed. **Always verify the device name to avoid data loss.**
+
+  ### Istio CNI Error: File Descriptor Limit
+
+  Increase file descriptor and inotify limits with the following commands:
+
+  ```bash
+  ulimit -n 262144
+  sudo sysctl -w fs.inotify.max_user_watches=1048576
+  sudo sysctl -w fs.inotify.max_user_instances=8192
+  sudo sysctl -w fs.inotify.max_queued_events=32768
+  ```
+
+  **Note:** Adjust these values based on your system requirements.

@@ -1,3 +1,4 @@
+
 provider "ibm" {
   ibmcloud_api_key = var.ibmcloud_api_key
   region           = var.ibmcloud_region
@@ -5,7 +6,7 @@ provider "ibm" {
 }
 
 locals {
-    BASENAME = "iaas-gaudi"
+  BASENAME = "iaas-gaudi"
 }
 
 data "ibm_resource_group" "target_rg" {
@@ -13,12 +14,12 @@ data "ibm_resource_group" "target_rg" {
 }
 
 data "ibm_is_image" "iaas_packer_image" {
-    name = var.image
+  name = var.image
 }
 
 resource "ibm_is_vpc" "new_vpc" {
-    name = "${local.BASENAME}-vpc-${random_string.suffix.result}"
-    resource_group = data.ibm_resource_group.target_rg.id
+  name           = "${local.BASENAME}-vpc-${random_string.suffix.result}"
+  resource_group = data.ibm_resource_group.target_rg.id
 }
 
 resource "random_string" "suffix" {
@@ -28,21 +29,21 @@ resource "random_string" "suffix" {
 }
 
 resource "ibm_is_security_group" "new_sg" {
-    name = "${local.BASENAME}-sg-${random_string.suffix.result}"
-    vpc  = ibm_is_vpc.new_vpc.id
-    resource_group = data.ibm_resource_group.target_rg.id
+  name           = "${local.BASENAME}-sg-${random_string.suffix.result}"
+  vpc            = ibm_is_vpc.new_vpc.id
+  resource_group = data.ibm_resource_group.target_rg.id
 }
 
 # SSH access - restrict to specific IP ranges For production, replace "0.0.0.0/0
 resource "ibm_is_security_group_rule" "ingress_ssh_restricted" {
-    group     = ibm_is_security_group.new_sg.id
-    direction = "inbound"
-    remote    = var.ssh_allowed_cidr
+  group     = ibm_is_security_group.new_sg.id
+  direction = "inbound"
+  remote    = var.ssh_allowed_cidr
 
-    tcp {
-      port_min = 22
-      port_max = 22
-    }
+  tcp {
+    port_min = 22
+    port_max = 22
+  }
 }
 
 # Allow HTTPS outbound (443)
@@ -131,44 +132,44 @@ resource "ibm_is_security_group_rule" "ingress_http" {
 
 # Create a Public Gateway for the VPC
 resource "ibm_is_public_gateway" "new_pgw" {
-  name = "${local.BASENAME}-public-gateway-${random_string.suffix.result}"
-  vpc  = ibm_is_vpc.new_vpc.id
-  zone = var.instance_zone
+  name           = "${local.BASENAME}-public-gateway-${random_string.suffix.result}"
+  vpc            = ibm_is_vpc.new_vpc.id
+  zone           = var.instance_zone
   resource_group = data.ibm_resource_group.target_rg.id
 }
 
 resource "ibm_is_subnet" "new_subnet" {
-    name                     = "${local.BASENAME}-subnet-${random_string.suffix.result}"
-    vpc                      = ibm_is_vpc.new_vpc.id
-    zone                     = var.instance_zone
-    total_ipv4_address_count = 256
-    public_gateway           = ibm_is_public_gateway.new_pgw.id
-    resource_group           = data.ibm_resource_group.target_rg.id
+  name                     = "${local.BASENAME}-subnet-${random_string.suffix.result}"
+  vpc                      = ibm_is_vpc.new_vpc.id
+  zone                     = var.instance_zone
+  total_ipv4_address_count = 256
+  public_gateway           = ibm_is_public_gateway.new_pgw.id
+  resource_group           = data.ibm_resource_group.target_rg.id
 }
 
 data "ibm_is_ssh_key" "ssh_key_id" {
-    name = var.ssh_key
+  name = var.ssh_key
 }
 
 resource "ibm_is_instance" "iaas_vsi" {
-    name    = "${local.BASENAME}-vsi-${random_string.suffix.result}"
-    vpc     = ibm_is_vpc.new_vpc.id
-    zone    = var.instance_zone
-    keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
-    image   = data.ibm_is_image.iaas_packer_image.id
-    resource_group = data.ibm_resource_group.target_rg.id
-    profile = "gx3d-160x1792x8gaudi3"
+  name           = "${local.BASENAME}-vsi-${random_string.suffix.result}"
+  vpc            = ibm_is_vpc.new_vpc.id
+  zone           = var.instance_zone
+  keys           = [data.ibm_is_ssh_key.ssh_key_id.id]
+  image          = data.ibm_is_image.iaas_packer_image.id
+  resource_group = data.ibm_resource_group.target_rg.id
+  profile        = "gx3d-160x1792x8gaudi3"
 
-    primary_network_interface {
-        subnet          = ibm_is_subnet.new_subnet.id
-        security_groups = [ibm_is_security_group.new_sg.id]
-    }
+  primary_network_interface {
+    subnet          = ibm_is_subnet.new_subnet.id
+    security_groups = [ibm_is_security_group.new_sg.id]
+  }
 }
 
 resource "ibm_is_floating_ip" "public_ip" {
-    name    = "${local.BASENAME}-fip-${random_string.suffix.result}"
-    target = ibm_is_instance.iaas_vsi.primary_network_interface[0].id
-    resource_group = data.ibm_resource_group.target_rg.id
+  name           = "${local.BASENAME}-fip-${random_string.suffix.result}"
+  target         = ibm_is_instance.iaas_vsi.primary_network_interface[0].id
+  resource_group = data.ibm_resource_group.target_rg.id
 }
 
 # Kubernetes security group rules (after subnet is defined)
@@ -236,7 +237,7 @@ locals {
   model_map = {
     "1"  = "Llama-3.1-8B-Instruct"
     "11" = "Llama-3.1-405B-Instruct"
-	"12"  = "Llama-3.3-70B-Instruct"
+    "12" = "Llama-3.3-70B-Instruct"
   }
 
   selected_model = lookup(local.model_map, var.models, "unknown-model")
@@ -264,7 +265,7 @@ data "template_file" "inference_config" {
     deploy_ingress_controller  = var.deploy_ingress_controller
     deploy_llm_models          = var.deploy_llm_models
     deploy_keycloak_apisix     = var.deploy_keycloak_apisix
-    deploy_observability      =  var.deploy_observability
+    deploy_observability       = var.deploy_observability
   }
 }
 locals {
@@ -285,15 +286,15 @@ resource "null_resource" "wait_for_ssh" {
     }
   }
   
-triggers = {
-  instance_id = ibm_is_instance.iaas_vsi.id
-  ip_address  = ibm_is_floating_ip.public_ip.address
-}
+  triggers = {
+    instance_id = ibm_is_instance.iaas_vsi.id
+    ip_address  = ibm_is_floating_ip.public_ip.address
+  }
 
-depends_on = [
-  ibm_is_instance.iaas_vsi,
-  ibm_is_floating_ip.public_ip
-]
+  depends_on = [
+    ibm_is_instance.iaas_vsi,
+    ibm_is_floating_ip.public_ip
+  ]
 }
 resource "null_resource" "run_script" {
   triggers = {

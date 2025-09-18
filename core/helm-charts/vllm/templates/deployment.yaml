@@ -1,6 +1,6 @@
 # Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,12 +17,20 @@ spec:
       {{- include "vllm.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- if not .Values.accelDevice }}
+        {{- if .Values.cpu_balloon_annotation }}
+        balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
         {{- include "vllm.selectorLabels" . | nindent 8 }}
+        {{- if not .Values.accelDevice }}
+        name: vllm
+        {{- end }}
     spec:
       # {{- with .Values.imagePullSecrets }}
       # imagePullSecrets:
@@ -42,6 +50,8 @@ spec:
                 name: {{ .Values.global.extraEnvConfig }}
                 optional: true
             {{- end }}
+            - secretRef:
+                name: {{ include "vllm.fullname" . }}-secret
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -54,27 +64,32 @@ spec:
           #   - |
           #     python3 -m vllm.entrypoints.openai.api_server --dtype {{ .Values.d_type }}  --model {{ .Values.LLM_MODEL_ID }} --port {{ .Values.port }} --tensor-parallel-size {{ .Values.tensor_parallel_size }} --block-size {{ .Values.block_size }} --max-model-len {{ .Values.max_model_len }} --disable-log-requests
           args:
-            {{- if .Values.accelDevice }}
-            {{- $modelConfig := (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict) }}
+            {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
             {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
             {{- range $modelArgs }}
             - {{ . | quote }}
             {{- end }}
-            
-
-            # Ensure tensor_parallel_size is passed correctly as a number
+            {{- if .Values.accelDevice }}
             - "--tensor-parallel-size"
-            - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            {{- else }}
+            # CPU deployment - add parallelism settings
+            - "--tensor-parallel-size"
+            - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            - "--pipeline-parallel-size"
+            - {{ .Values.pipeline_parallel_size | default (index .Values.modelConfigs $modelName | default dict).pipeline_parallel_size | default .Values.defaultModelConfigs.pipeline_parallel_size | quote}}
             {{- end }}
             - "--model"
             - {{ .Values.LLM_MODEL_ID | quote }}
+            - --served-model-name
+            - {{ $modelName | quote }}
             - "--port"
             - {{ .Values.port | quote }}
           volumeMounts:
             - mountPath: /data
               name: model-volume
-            # - mountPath: /dev/shm
-            #   name: shm
+            - mountPath: /dev/shm
+              name: shm
             - mountPath: /tmp
               name: tmp
           ports:
@@ -113,10 +128,10 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
-        # - name: shm
-        #   emptyDir:
-        #     medium: Memory
-        #     sizeLimit: {{ .Values.shmSize }}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shmSize }}
         - name: tmp
           emptyDir: {}
       {{- with .Values.nodeSelector }}

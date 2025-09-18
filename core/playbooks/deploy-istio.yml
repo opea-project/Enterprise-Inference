@@ -1,0 +1,202 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Install and configure Istio in Ambient mode
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  vars:
+    test_ns: test-ns
+    default_ns: default
+    ingress_ns: ingress-nginx
+    genai_gw_ns: genai-gateway
+    observability_ns: observability
+    habana_ns: habana-ai-operator
+    auth_apisix_ns: auth-apisix
+    peer_auth_path_base: "{{ helm_charts_base }}/istio/peer-authentication.yaml"
+    peer_auth_ingress_path_base: "{{ helm_charts_base }}/istio/peer-auth-ingress.yaml"
+    peer_auth_path: "{{ remote_helm_charts_base }}/istio/peer-authentication.yaml"
+    peer_auth_ingress_path: "{{ remote_helm_charts_base }}/istio/peer-auth-ingress.yaml"
+    istio_chart_version: "1.26.2"
+
+  tasks:
+    - name: Create remote helm charts directory for istio
+      file:
+        path: "{{ remote_helm_charts_base }}/istio"
+        state: directory
+        mode: "0755"
+      run_once: true
+
+    - name: Copy istio configuration files to remote location
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {
+            src: "{{ peer_auth_path_base }}",
+            dest: "{{ remote_helm_charts_base }}/istio/peer-authentication.yaml",
+          }
+        - {
+            src: "{{ peer_auth_ingress_path_base }}",
+            dest: "{{ remote_helm_charts_base }}/istio/peer-auth-ingress.yaml",
+          }
+      run_once: true
+    - name: Check if genai-gateway namespace exists
+      command: kubectl get namespace {{ genai_gw_ns }}
+      register: genai_gw_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Check if default namespace exists
+      command: kubectl get namespace {{ default_ns }}
+      register: default_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Patch all networkpolicies in genai-gateway namespace
+      shell: |
+        for np in $(kubectl get networkpolicies -n {{ genai_gw_ns }} -o jsonpath='{.items[*].metadata.name}'); do
+          echo "patching networkpolicy -> $np"
+          kubectl patch networkpolicy $np -n {{ genai_gw_ns }} -p '{"spec":{"ingress":[{"ports":[{"port":15008,"protocol":"TCP"},{"port":80,"protocol":"TCP"}]}]}}'
+        done
+      args:
+        executable: /bin/bash
+      when: genai_gw_ns_check.rc == 0
+      run_once: true
+
+    - name: Patch all networkpolicies in default namespace
+      shell: |
+        for np in $(kubectl get networkpolicies -n {{ default_ns }} -o jsonpath='{.items[*].metadata.name}'); do
+          echo "patching networkpolicy -> $np"
+          kubectl patch networkpolicy $np -n {{ default_ns }} -p '{"spec":{"ingress":[{"ports":[{"port":15008,"protocol":"TCP"},{"port":80,"protocol":"TCP"}]}]}}'
+        done
+      args:
+        executable: /bin/bash
+      when: default_ns_check.rc == 0
+      run_once: true
+
+    - name: Add Istio Helm repo
+      command: helm repo add istio https://istio-release.storage.googleapis.com/charts
+      register: helm_repo
+      changed_when: "'has been added' in helm_repo.stdout or 'already exists' in helm_repo.stdout"
+      run_once: true
+
+    - name: Update Helm repos
+      command: helm repo update
+      run_once: true
+
+    - name: Install/upgrade istio-base
+      command: helm upgrade --install istio-base istio/base -n istio-system --create-namespace --wait --version {{ istio_chart_version }}
+      run_once: true
+
+    - name: Ensure Gateway API CRDs are installed
+      shell: |
+        kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || \
+        kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+      run_once: true
+
+    - name: Install/upgrade istiod in ambient mode
+      command: helm upgrade --install istiod istio/istiod --namespace istio-system --set profile=ambient --wait --version {{ istio_chart_version }}
+      run_once: true
+
+    - name: Install/upgrade istio-cni in ambient mode
+      command: helm upgrade --install istio-cni istio/cni -n istio-system --set profile=ambient --wait --version {{ istio_chart_version }}
+      run_once: true
+
+    - name: Install/upgrade ztunnel
+      command: helm upgrade --install ztunnel istio/ztunnel -n istio-system --wait --version {{ istio_chart_version }}
+      run_once: true
+
+    - name: Show istiod Helm values
+      command: helm show values istio/istiod
+      run_once: true
+
+    - name: List Helm releases in istio-system
+      command: helm ls -n istio-system
+      run_once: true
+
+    - name: Get pods in istio-system
+      command: kubectl get pods -n istio-system
+      run_once: true
+
+    - name: Label default namespace for ambient mode
+      command: kubectl label namespace {{ default_ns }} istio.io/dataplane-mode=ambient --overwrite
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to default namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ default_ns }}
+      run_once: true
+
+    - name: Check if genai-gateway namespace exists
+      command: kubectl get namespace {{ genai_gw_ns }}
+      register: genai_gw_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Label genai-gateway namespace for ambient mode
+      command: kubectl label namespace {{ genai_gw_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: genai_gw_ns_check.rc == 0
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to genai-gateway namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ genai_gw_ns }}
+      when: genai_gw_ns_check.rc == 0
+      run_once: true
+
+    - name: Check if habana-ai-operator namespace exists
+      command: kubectl get namespace {{ habana_ns }}
+      register: habana_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Label habana-ai-operator namespace for ambient mode
+      command: kubectl label namespace {{ habana_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: habana_ns_check.rc == 0
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to habana-ai-operator namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ habana_ns }}
+      when: habana_ns_check.rc == 0
+      run_once: true
+
+    - name: Check if observability namespace exists
+      command: kubectl get namespace {{ observability_ns }}
+      register: observability_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Label observability namespace for ambient mode
+      command: kubectl label namespace {{ observability_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: observability_ns_check.rc == 0
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to observability namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ observability_ns }}
+      when: observability_ns_check.rc == 0
+      run_once: true
+
+    - name: Label ingress-nginx namespace for ambient mode
+      command: kubectl label namespace {{ ingress_ns }} istio.io/dataplane-mode=ambient --overwrite
+      run_once: true
+
+    - name: Apply peer-auth-ingress.yaml to ingress-nginx namespace
+      command: kubectl apply -f {{ peer_auth_ingress_path }} -n {{ ingress_ns }}
+      run_once: true
+
+    - name: Check if auth-apisix namespace exists
+      command: kubectl get namespace {{ auth_apisix_ns }}
+      register: auth_apisix_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: Label auth-apisix namespace for ambient mode
+      command: kubectl label namespace {{ auth_apisix_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: auth_apisix_ns_check.rc == 0
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to auth-apisix namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ auth_apisix_ns }}
+      when: auth_apisix_ns_check.rc == 0
+      run_once: true

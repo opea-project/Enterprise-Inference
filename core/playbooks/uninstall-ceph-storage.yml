@@ -1,0 +1,435 @@
+---
+- name: Rook Ceph Cluster Complete Uninstall
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  vars:
+    namespace: rook-ceph
+    confirmation_timeout: 30
+
+  tasks:
+    - name: Display warning about data destruction
+      pause:
+        prompt: |
+          [WARNING] This will PERMANENTLY DELETE ALL CEPH DATA! [WARNING]
+
+          This playbook will:
+          - Remove all Ceph storage pools and filesystems
+          - Delete all persistent volume claims
+          - Uninstall Rook-Ceph operator and cluster
+          - Remove all Ceph-related CRDs
+          - Delete local storage data (/var/lib/rook)
+
+          ALL DATA WILL BE LOST AND CANNOT BE RECOVERED!
+
+          Type 'yes-really-destroy-data' to proceed, or Ctrl+C to cancel
+        echo: yes
+      register: user_confirmation
+      run_once: true
+
+    - name: Validate user confirmation
+      fail:
+        msg: "Operation cancelled. User must type 'yes-really-destroy-data' to proceed."
+      when: user_confirmation.user_input != "yes-really-destroy-data"
+      run_once: true
+
+    - name: Check if rook-ceph namespace exists
+      ansible.builtin.command: kubectl get namespace {{ namespace }}
+      register: namespace_check
+      failed_when: false
+      changed_when: false
+      run_once: true
+
+    - name: Skip uninstall if namespace doesn't exist
+      debug:
+        msg: "Rook-Ceph namespace '{{ namespace }}' doesn't exist. Nothing to uninstall."
+      when: namespace_check.rc != 0
+      run_once: true
+
+    - name: Proceed with uninstall
+      block:
+        - name: Remove finalizers from CephCluster
+          ansible.builtin.command: >
+            kubectl patch cephcluster rook-ceph -n {{ namespace }} --type merge
+            -p '{"metadata":{"finalizers":null}}'
+          register: patch_cluster
+          failed_when: false
+          run_once: true
+
+        - name: Remove finalizers from CephBlockPool
+          ansible.builtin.command: >
+            kubectl patch cephblockpool ceph-blockpool -n {{ namespace }} --type merge
+            -p '{"metadata":{"finalizers":null}}'
+          register: patch_blockpool
+          failed_when: false
+          run_once: true
+
+        - name: Remove finalizers from CephFilesystem
+          ansible.builtin.command: >
+            kubectl patch cephfilesystem ceph-filesystem -n {{ namespace }} --type merge
+            -p '{"metadata":{"finalizers":null}}'
+          register: patch_filesystem
+          failed_when: false
+          run_once: true
+
+        - name: Remove finalizers from CephObjectStore
+          ansible.builtin.command: >
+            kubectl patch cephobjectstore ceph-objectstore -n {{ namespace }} --type merge
+            -p '{"metadata":{"finalizers":null}}'
+          register: patch_objectstore
+          failed_when: false
+          run_once: true
+
+        - name: Remove finalizers from CephObjectStoreUsers
+          ansible.builtin.shell: |
+            kubectl get cephobjectstoreusers.ceph.rook.io -n {{ namespace }} -o name 2>/dev/null | while read resource; do
+              echo "Patching $resource"
+              kubectl patch $resource -n {{ namespace }} --type merge -p '{"metadata":{"finalizers":null}}'
+            done || echo "No CephObjectStoreUsers found"
+          register: patch_objectstore_users
+          failed_when: false
+          run_once: true
+
+        - name: Display finalizer removal results
+          debug:
+            msg:
+              - "CephCluster finalizer removal: {{ 'Success' if patch_cluster.rc == 0 else 'Failed/Not Found' }}"
+              - "CephBlockPool finalizer removal: {{ 'Success' if patch_blockpool.rc == 0 else 'Failed/Not Found' }}"
+              - "CephFilesystem finalizer removal: {{ 'Success' if patch_filesystem.rc == 0 else 'Failed/Not Found' }}"
+              - "CephObjectStore finalizer removal: {{ 'Success' if patch_objectstore.rc == 0 else 'Failed/Not Found' }}"
+              - "CephObjectStoreUsers: {{ patch_objectstore_users.stdout_lines }}"
+          run_once: true
+
+        - name: Set cleanup policy on CephCluster for data destruction
+          ansible.builtin.command: >
+            kubectl -n {{ namespace }} patch cephcluster rook-ceph --type merge
+            -p '{"spec":{"cleanupPolicy":{"confirmation":"yes-really-destroy-data"}}}'
+          register: cleanup_policy
+          failed_when: false
+          run_once: true
+
+        - name: Display cleanup policy result
+          debug:
+            msg: "Cleanup policy set: {{ 'Success' if cleanup_policy.rc == 0 else 'Failed/Not Found' }}"
+          run_once: true
+
+        - name: Wait a moment for finalizer removal to take effect
+          pause:
+            seconds: 10
+          run_once: true
+
+        - name: Delete CephBlockPool
+          ansible.builtin.command: kubectl delete cephblockpool ceph-blockpool -n {{ namespace }} --timeout=300s
+          register: delete_blockpool
+          failed_when: false
+          run_once: true
+
+        - name: Delete CephFilesystem
+          ansible.builtin.command: kubectl delete cephfilesystem ceph-filesystem -n {{ namespace }} --timeout=300s
+          register: delete_filesystem
+          failed_when: false
+          run_once: true
+
+        - name: Delete CephFilesystemSubvolumeGroup
+          ansible.builtin.command: kubectl delete cephfilesystemsubvolumegroup ceph-filesystem-csi -n {{ namespace }} --timeout=300s
+          register: delete_subvolumegroup
+          failed_when: false
+          run_once: true
+
+        - name: Delete CephObjectStore
+          ansible.builtin.command: kubectl delete cephobjectstore ceph-objectstore -n {{ namespace }} --timeout=300s
+          register: delete_objectstore
+          failed_when: false
+          run_once: true
+
+        - name: Delete CephCluster
+          ansible.builtin.command: kubectl -n {{ namespace }} delete cephcluster rook-ceph --timeout=600s
+          register: delete_cluster
+          failed_when: false
+          run_once: true
+
+        - name: Display resource deletion results
+          debug:
+            msg:
+              - "CephBlockPool deletion: {{ 'Success' if delete_blockpool.rc == 0 else 'Failed/Not Found' }}"
+              - "CephFilesystem deletion: {{ 'Success' if delete_filesystem.rc == 0 else 'Failed/Not Found' }}"
+              - "CephFilesystemSubvolumeGroup deletion: {{ 'Success' if delete_subvolumegroup.rc == 0 else 'Failed/Not Found' }}"
+              - "CephObjectStore deletion: {{ 'Success' if delete_objectstore.rc == 0 else 'Failed/Not Found' }}"
+              - "CephCluster deletion: {{ 'Success' if delete_cluster.rc == 0 else 'Failed/Not Found' }}"
+          run_once: true
+
+        - name: Delete all PVCs in rook-ceph namespace
+          ansible.builtin.command: kubectl -n {{ namespace }} delete pvc --all --timeout=300s
+          register: delete_pvcs
+          failed_when: false
+          run_once: true
+
+        - name: Display PVC deletion result
+          debug:
+            msg: "PVC deletion: {{ 'Success' if delete_pvcs.rc == 0 else 'Failed/Not Found' }}"
+          run_once: true
+
+        - name: Wait for resource cleanup to complete
+          pause:
+            seconds: 30
+          run_once: true
+
+        - name: Uninstall Helm releases
+          ansible.builtin.command: helm uninstall rook-ceph rook-ceph-cluster -n {{ namespace }}
+          register: helm_uninstall
+          failed_when: false
+          run_once: true
+
+        - name: Display Helm uninstall result
+          debug:
+            msg: "Helm releases uninstall: {{ 'Success' if helm_uninstall.rc == 0 else 'Failed/Not Found' }}"
+          run_once: true
+
+        - name: Get list of Rook CRDs
+          ansible.builtin.shell: kubectl get crd | grep rook | awk '{print $1}'
+          register: rook_crds
+          failed_when: false
+          changed_when: false
+          run_once: true
+
+        - name: Delete Rook CRDs
+          ansible.builtin.command: kubectl delete crd {{ item }} --timeout=60s
+          register: delete_crd
+          failed_when: false
+          loop: "{{ rook_crds.stdout_lines }}"
+          when: rook_crds.stdout_lines | length > 0
+          run_once: true
+
+        - name: Display CRD deletion results
+          debug:
+            msg:
+              - "Found {{ rook_crds.stdout_lines | length }} Rook CRDs"
+              - "CRDs: {{ rook_crds.stdout_lines }}"
+              - "Deletion results: {{ delete_crd.results | map(attribute='rc') | list if delete_crd.results is defined else 'No results' }}"
+          when: rook_crds.stdout_lines | length > 0
+          run_once: true
+
+        - name: Wait for CRD deletion to complete
+          pause:
+            seconds: 10
+          run_once: true
+
+        - name: Check for remaining stuck CRDs after deletion attempt
+          ansible.builtin.shell: kubectl get crd | grep rook | awk '{print $1}'
+          register: stuck_crds
+          failed_when: false
+          changed_when: false
+          run_once: true
+
+        - name: Force delete stuck CRDs by removing finalizers
+          ansible.builtin.shell: |
+            echo "Force deleting CRD: {{ item }}"
+            # Remove finalizers first
+            kubectl patch crd {{ item }} --type='merge' -p '{"metadata":{"finalizers":null}}' 2>/dev/null || echo "Failed to patch finalizers for {{ item }}"
+            # Force delete with grace period 0
+            kubectl delete crd {{ item }} --force --grace-period=0 2>/dev/null || echo "Failed to force delete {{ item }}"
+          register: force_delete_crd
+          failed_when: false
+          loop: "{{ stuck_crds.stdout_lines }}"
+          when: stuck_crds.stdout_lines | length > 0
+          run_once: true
+
+        - name: Display force deletion results
+          debug:
+            msg:
+              - "Found {{ stuck_crds.stdout_lines | length }} stuck CRDs requiring force deletion"
+              - "Stuck CRDs: {{ stuck_crds.stdout_lines }}"
+              - "Force deletion completed for all stuck CRDs"
+          when: stuck_crds.stdout_lines | length > 0
+          run_once: true
+
+        - name: Final verification - check for any remaining Rook CRDs
+          ansible.builtin.shell: kubectl get crd | grep rook | awk '{print $1}'
+          register: final_crd_check
+          failed_when: false
+          changed_when: false
+          run_once: true
+
+        - name: Display final CRD verification
+          debug:
+            msg:
+              - "Final CRD check: {{ 'All Rook CRDs successfully removed' if final_crd_check.stdout_lines | length == 0 else 'Warning: Some CRDs still remain' }}"
+              - "Remaining CRDs: {{ final_crd_check.stdout_lines if final_crd_check.stdout_lines | length > 0 else 'None' }}"
+          run_once: true
+
+        - name: Revert vLLM PVC template to use ReadWriteOnce access mode
+          ansible.builtin.replace:
+            path: "{{ playbook_dir }}/../../helm-charts/vllm/templates/pvc.yaml"
+            regexp: '(\s+accessModes:\n\s+)- ReadWriteMany'
+            replace: '\1- ReadWriteOnce'
+          register: pvc_template_revert
+          run_once: true
+          delegate_to: localhost
+          failed_when: false
+
+        - name: Display PVC template revert result
+          debug:
+            msg: "PVC template reverted successfully to use ReadWriteOnce"
+          when: pvc_template_revert.changed
+          run_once: true
+
+        - name: Restore local-path storageclass as default
+          ansible.builtin.command: >
+            kubectl patch storageclass local-path -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+          register: local_path_restore
+          failed_when: false # Allow failure if storageclass doesn't exist
+          run_once: true
+
+        - name: Display local-path storageclass restore result
+          debug:
+            msg: "Local-path storageclass restored as default: {{ 'Success' if local_path_restore.rc == 0 else 'Failed/Not Found' }}"
+          run_once: true
+
+        - name: Delete rook-ceph namespace
+          ansible.builtin.command: kubectl delete namespace {{ namespace }} --timeout=300s
+          register: delete_namespace
+          failed_when: false
+          run_once: true
+
+        - name: Wait for namespace deletion
+          pause:
+            seconds: 15
+          run_once: true
+
+        - name: Check if namespace is stuck in terminating state
+          ansible.builtin.command: kubectl get namespace {{ namespace }} -o yaml
+          register: namespace_status
+          failed_when: false
+          run_once: true
+
+        - name: Handle stuck namespace resources
+          block:
+            - name: Get remaining configmaps with finalizers
+              ansible.builtin.shell: kubectl get configmaps -n {{ namespace }} -o name 2>/dev/null || echo "No configmaps found"
+              register: remaining_configmaps
+              failed_when: false
+              run_once: true
+
+            - name: Get remaining secrets with finalizers
+              ansible.builtin.shell: kubectl get secrets -n {{ namespace }} -o name 2>/dev/null || echo "No secrets found"
+              register: remaining_secrets
+              failed_when: false
+              run_once: true
+
+            - name: Remove finalizers from remaining configmaps
+              ansible.builtin.shell: |
+                for cm in $(kubectl get configmaps -n {{ namespace }} -o name 2>/dev/null); do
+                  echo "Removing finalizers from $cm"
+                  kubectl patch $cm -n {{ namespace }} --type='merge' -p '{"metadata":{"finalizers":null}}' || echo "Failed to patch $cm"
+                done
+              register: patch_configmaps
+              failed_when: false
+              run_once: true
+              when: "'configmap/' in remaining_configmaps.stdout"
+
+            - name: Remove finalizers from remaining secrets
+              ansible.builtin.shell: |
+                for secret in $(kubectl get secrets -n {{ namespace }} -o name 2>/dev/null); do
+                  echo "Removing finalizers from $secret"
+                  kubectl patch $secret -n {{ namespace }} --type='merge' -p '{"metadata":{"finalizers":null}}' || echo "Failed to patch $secret"
+                done
+              register: patch_secrets
+              failed_when: false
+              run_once: true
+              when: "'secret/' in remaining_secrets.stdout"
+
+            - name: Display stuck resource cleanup results
+              debug:
+                msg:
+                  - "Stuck namespace resource cleanup completed"
+                  - "ConfigMaps found: {{ remaining_configmaps.stdout_lines | length }}"
+                  - "Secrets found: {{ remaining_secrets.stdout_lines | length }}"
+                  - "Finalizers removed from remaining resources"
+              run_once: true
+
+          when: namespace_status.rc == 0 and "'Terminating' in namespace_status.stdout"
+
+        - name: Final namespace deletion verification
+          ansible.builtin.command: kubectl get namespace {{ namespace }}
+          register: final_namespace_check
+          failed_when: false
+          run_once: true
+
+        - name: Display namespace deletion result
+          debug:
+            msg: "Namespace deletion: {{ 'Success - Namespace fully removed' if final_namespace_check.rc != 0 else 'Warning - Namespace still exists' }}"
+          run_once: true
+
+      when: namespace_check.rc == 0
+
+- name: Remove local Rook data directories on all nodes
+  hosts: all
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  tasks:
+    - name: Remove local Rook data directories
+      ansible.builtin.file:
+        path: /var/lib/rook
+        state: absent
+      register: remove_local_data
+
+    - name: Display local data removal results
+      debug:
+        msg: "Local Rook data removal on {{ inventory_hostname }}: {{ 'Success' if remove_local_data.changed else 'Already clean' }}"
+
+- name: Final verification and summary
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  tasks:
+    - name: Check remaining Rook resources
+      ansible.builtin.shell: |
+        echo "=== Remaining Rook CRDs ==="
+        kubectl get crd | grep rook || echo "No Rook CRDs found"
+        echo ""
+        echo "=== Remaining Rook Namespaces ==="
+        kubectl get namespaces | grep rook || echo "No Rook namespaces found"
+        echo ""
+        echo "=== Storage Classes ==="
+        kubectl get storageclass
+      register: remaining_resources
+      failed_when: false
+      run_once: true
+
+    - name: Display remaining resources
+      debug:
+        msg: "{{ remaining_resources.stdout_lines }}"
+      run_once: true
+
+    - name: Display uninstall completion summary
+      debug:
+        msg:
+          - "Rook-Ceph Uninstall Complete!"
+          - ""
+          - "Summary of actions performed:"
+          - "COMPLETE: Removed finalizers from Ceph resources"
+          - "COMPLETE: Set cleanup policy for data destruction"
+          - "COMPLETE: Deleted all Ceph storage resources"
+          - "COMPLETE: Deleted all PVCs"
+          - "COMPLETE: Uninstalled Helm releases"
+          - "COMPLETE: Removed Rook CRDs"
+          - "COMPLETE: Deleted rook-ceph namespace"
+          - "COMPLETE: Cleaned local data directories on all nodes"
+          - ""
+          - "WARNING: All Ceph data has been permanently destroyed"
+          - "NOTE: You may need to manually clean up any remaining storage classes"
+          - "NOTE: Check the 'remaining resources' output above for cleanup verification"
+          - ""
+          - "FORMAT STORAGE DEVICES IF REQUIRED:"
+          - "   # Replace <device> with your actual storage device (e.g., /dev/vdb)"
+          - "   sudo wipefs -a /dev/<device>"
+          - "   sudo sgdisk --zap-all /dev/<device>"
+          - "   sudo dd if=/dev/zero of=/dev/<device> bs=1M count=100 status=progress"
+          - ""
+          - "   Note: Only format devices if you plan to reuse them for a fresh Ceph deployment"
+          - "   or if you encounter issues with previous Ceph metadata on the devices."
+      run_once: true

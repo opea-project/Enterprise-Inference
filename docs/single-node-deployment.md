@@ -67,6 +67,9 @@ If your node is CPU only with no gaudi run below to deploy llama 3.1 8b model.
 Select option 1 and confirm the Yes/No Pprompt
 
 If your node has gaudi accelerators run below to deploy llama 3.1 8b model.
+
+> **📝 Note**: If you're using Intel® Gaudi® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./gaudi-prerequisites.md#automated-installationupgrade-process) before deployment.
+
 ```
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```

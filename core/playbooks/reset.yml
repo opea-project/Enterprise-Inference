@@ -30,8 +30,39 @@
     - name: Gather information about installed services
       service_facts:
 
-  environment: "{{ proxy_disable_env }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
   roles:
-    - { role: kubespray-defaults}
-    - { role: kubernetes/preinstall, when: "dns_mode != 'none' and resolvconf_mode == 'host_resolvconf'", tags: resolvconf, dns_early: true }
+    - { role: kubespray-defaults }
+    - {
+        role: kubernetes/preinstall,
+        when: "dns_mode != 'none' and resolvconf_mode == 'host_resolvconf'",
+        tags: resolvconf,
+        dns_early: true,
+      }
     - { role: reset, tags: reset }
+
+- name: Cleanup PVC directories
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: False
+  tags: always
+  tasks:
+    - name: Find PVC directories on remote host
+      find:
+        paths: "{{ pvc_base_path | default('/opt/local-path-provisioner') }}"
+        patterns: "pvc*"
+        file_type: any
+      register: pvc_dirs
+      tags: always
+
+    - name: Show PVC directories to be deleted
+      debug:
+        var: pvc_dirs.files
+      tags: always
+
+    - name: Cleanup PVC
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ pvc_dirs.files }}"
+      failed_when: false
+      tags: always

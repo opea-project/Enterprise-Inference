@@ -1,0 +1,296 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Rook Ceph Cluster Minimal Setup
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  vars:
+    operator_values_path: "{{ remote_helm_charts_base }}/ceph/operator-values.yaml"
+    cluster_values_path: "{{ remote_helm_charts_base }}/ceph/cluster-values.yaml"
+    rook_ceph_version: "v1.17.5"
+
+  tasks:
+    - name: Copy operator-values.yaml to remote location
+      copy:
+        src: "{{ helm_charts_base }}/ceph/operator-values.yaml"
+        dest: "{{ remote_helm_charts_base }}/ceph/operator-values.yaml"
+        mode: "0644"
+      run_once: true
+
+    - name: Check if helm is already installed
+      ansible.builtin.command: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+      run_once: true
+
+    - name: Install Deployment Client
+      ansible.builtin.shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        executable: /bin/bash
+      become: true
+      run_once: true
+      when: helm_check.rc != 0
+
+    - name: Add rook-release Helm repo
+      ansible.builtin.command: helm repo add rook-release https://charts.rook.io/release
+      register: helm_repo
+      changed_when: "'has been added' in helm_repo.stdout or 'already exists' in helm_repo.stdout"
+      run_once: true
+
+    - name: Update Helm repositories
+      ansible.builtin.command: helm repo update
+      run_once: true
+
+    - name: Install/upgrade rook-ceph operator
+      ansible.builtin.command: >
+        helm upgrade --install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph --version {{ rook_ceph_version }} -f {{ operator_values_path }}
+      register: operator_install_result
+      run_once: true
+
+    - name: Display operator installation result
+      debug:
+        msg: "{{ operator_install_result.stdout_lines }}"
+      run_once: true
+
+    - name: Wait for Rook-Ceph Operator to be ready
+      ansible.builtin.shell: |
+        kubectl get deployment rook-ceph-operator -n rook-ceph -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0"
+      register: operator_ready_replicas
+      until: operator_ready_replicas.stdout | int > 0
+      retries: 100
+      delay: 15
+      changed_when: false
+      run_once: true
+
+    - name: Install/upgrade rook-ceph-cluster
+      ansible.builtin.command: >
+        helm upgrade --install --create-namespace --namespace rook-ceph rook-ceph-cluster --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster --version {{ rook_ceph_version }} -f {{ cluster_values_path }}
+      register: cluster_install_result
+      run_once: true
+
+    - name: Display cluster installation result
+      debug:
+        msg: "{{ cluster_install_result.stdout_lines }}"
+      run_once: true
+
+    - name: Wait for Ceph tools deployment to be ready
+      ansible.builtin.shell: kubectl get deployment rook-ceph-tools -n rook-ceph -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0"
+      register: tools_ready
+      until: tools_ready.stdout | int > 0
+      retries: 100
+      delay: 15
+      changed_when: false
+      run_once: true
+
+    - name: Wait for all hosts to have at least one OSD up
+      ansible.builtin.shell: |
+        # Get the OSD tree and check for OSDs that are up per host
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree --format json 2>/dev/null | jq -r '
+            [.nodes[] | select(.type == "host")] as $hosts |
+            [.nodes[] | select(.type == "osd" and .status == "up")] as $up_osds |
+            ($hosts | length) as $total_hosts |
+            ($hosts | map({
+              name: .name,
+              up_osds: [ $up_osds[] | select(.crush_weight > 0)] | length
+            }) | map(select(.up_osds > 0)) | length) as $hosts_with_up_osds |
+          # Require ALL hosts to have at least one OSD up
+          $total_hosts as $min_required |
+          "Total hosts: \($total_hosts), Hosts with at least 1 OSD in up status: \($hosts_with_up_osds), Required: ALL hosts (\($min_required))" |
+          if ($hosts_with_up_osds >= $min_required) then ("PASSED: " + .) else ("FAILED: " + .) end |
+          if ($hosts_with_up_osds >= $min_required) then . + "\n1" else . + "\n0" end
+        ' | tee /dev/stderr | tail -1 || echo "0"
+      register: osd_readiness_check
+      retries: 100
+      delay: 30
+      until: osd_readiness_check.stdout | int == 1
+      changed_when: false
+      run_once: true
+
+    - name: Get total count of up OSDs
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree --format json 2>/dev/null | jq -r '.nodes[] | select(.type == "osd" and .status == "up") | .id' | wc -l || echo "0"
+      register: up_osd_count
+      run_once: true
+
+    - name: Display cluster readiness summary
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree --format json 2>/dev/null | jq -r '
+          [.nodes[] | select(.type == "host")] as $hosts |
+          [.nodes[] | select(.type == "osd" and .status == "up")] as $up_osds |
+          ($hosts | length) as $total_hosts |
+          ($hosts | map({
+            name: .name,
+            up_osds: [$up_osds[] | select(.crush_weight > 0)] | length
+          }) | map(select(.up_osds > 0)) | length) as $hosts_with_up_osds |
+          $total_hosts as $min_required |
+          "Total hosts: \($total_hosts), Hosts with at least 1 OSD in up status: \($hosts_with_up_osds), Required: ALL hosts (\($min_required))"
+        ' || echo "Unable to get cluster readiness summary"
+      register: cluster_readiness_summary
+      run_once: true
+
+    - name: Show cluster readiness summary
+      debug:
+        msg: "{{ cluster_readiness_summary.stdout }}"
+      run_once: true
+
+    - name: Display OSD distribution across hosts
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree --format json 2>/dev/null | jq -r '
+          [.nodes[] | select(.type == "host")] as $hosts |
+          [.nodes[] | select(.type == "osd")] as $all_osds |
+          $hosts | map({
+            host: .name,
+            total_osds: [$all_osds[] | select(.host == .name)] | length,
+            up_osds: [$all_osds[] | select(.host == .name and .status == "up")] | length
+          }) |
+          .[] | "Host: \(.host) - Total OSDs: \(.total_osds), Up OSDs: \(.up_osds)"
+        ' || echo "Unable to get OSD distribution"
+      register: osd_distribution
+      run_once: true
+
+    - name: Show OSD distribution
+      debug:
+        msg: "{{ osd_distribution.stdout_lines }}"
+      run_once: true
+
+    - name: Display OSD pods status
+      ansible.builtin.shell: kubectl get pods -n rook-ceph -l app=rook-ceph-osd
+      register: osd_pods_status
+      run_once: true
+
+    - name: Show OSD pods
+      debug:
+        msg: "{{ osd_pods_status.stdout_lines }}"
+      run_once: true
+
+    - name: Check for any failed OSD pods (warning only)
+      ansible.builtin.shell: |
+        kubectl get pods -n rook-ceph -l app=rook-ceph-osd --no-headers 2>/dev/null | grep -E "Error|CrashLoopBackOff|Init:Error" || echo "No failed OSD pods"
+      register: failed_osds
+      run_once: true
+
+    - name: Display failed OSD pods as warning (not failure)
+      debug:
+        msg:
+          - "WARNING: Some OSD pods are not running properly:"
+          - "{{ failed_osds.stdout_lines }}"
+          - "Cluster may still function with reduced redundancy"
+      when: "'No failed OSD pods' not in failed_osds.stdout"
+      run_once: true
+
+    - name: Wait for Ceph cluster to be operational (allow HEALTH_WARN)
+      ansible.builtin.shell: |
+        kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph status --format json-pretty 2>/dev/null || echo '{"health":{"status":"ERR"},"osdmap":{"num_osds":0,"num_up_osds":0,"num_in_osds":0}}'
+      register: ceph_health_status
+      retries: 100
+      delay: 30
+      until: >
+        ceph_health_status.rc == 0 and
+        (ceph_health_status.stdout | from_json).health.status in ['HEALTH_OK', 'HEALTH_WARN'] and
+        (ceph_health_status.stdout | from_json).osdmap.num_osds | int > 0 and
+        (ceph_health_status.stdout | from_json).osdmap.num_up_osds | int > 0 and
+        (ceph_health_status.stdout | from_json).osdmap.num_in_osds | int > 0
+      changed_when: false
+      run_once: true
+
+    - name: Display Ceph cluster and OSD status
+      debug:
+        msg:
+          - "Ceph cluster status: {{ (ceph_health_status.stdout | from_json).health.status | default('UNKNOWN') }}"
+          - "Total OSDs: {{ (ceph_health_status.stdout | from_json).osdmap.num_osds | default(0) }}"
+          - "OSDs Up: {{ (ceph_health_status.stdout | from_json).osdmap.num_up_osds | default(0) }}"
+          - "OSDs In: {{ (ceph_health_status.stdout | from_json).osdmap.num_in_osds | default(0) }}"
+          - "Full status output:"
+          - "{{ ceph_health_status.stdout_lines }}"
+      run_once: true
+
+    - name: Verify OSD tree and status details
+      ansible.builtin.shell: kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph osd tree
+      register: osd_tree_status
+      run_once: true
+
+    - name: Display OSD tree
+      debug:
+        msg: "{{ osd_tree_status.stdout_lines }}"
+      run_once: true
+
+    - name: Patch vLLM PVC template to use ReadWriteMany access mode
+      ansible.builtin.replace:
+        path: "{{ playbook_dir }}/../../helm-charts/vllm/templates/pvc.yaml"
+        regexp: '(\s+accessModes:\n\s+)- ReadWriteOnce'
+        replace: '\1- ReadWriteMany'
+      register: pvc_template_patch
+      run_once: true
+      delegate_to: localhost
+      when: osd_readiness_check.stdout | int == 1
+
+    - name: Display PVC template patching result
+      debug:
+        msg: "PVC template patched successfully to use ReadWriteMany"
+      when:
+        - pvc_template_patch.changed
+        - osd_readiness_check.stdout | int == 1
+      run_once: true
+
+    - name: Wait for ceph-filesystem storageclass to be available
+      ansible.builtin.shell: kubectl get storageclass ceph-filesystem
+      register: ceph_fs_check
+      retries: 100
+      delay: 15
+      until: ceph_fs_check.rc == 0
+      run_once: true
+      when: osd_readiness_check.stdout | int == 1
+
+    - name: Patch local-path storageclass to not be default
+      ansible.builtin.command: >
+        kubectl patch storageclass local-path -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+      register: local_path_patch
+      failed_when: false # Allow failure if storageclass doesn't exist
+      run_once: true
+      when:
+        - ceph_fs_check.rc == 0
+        - osd_readiness_check.stdout | int == 1
+
+    - name: Patch ceph-block storageclass to not be default
+      ansible.builtin.command: >
+        kubectl patch storageclass ceph-block -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+      register: ceph_block_patch
+      failed_when: false # Allow failure if storageclass doesn't exist yet
+      run_once: true
+      when:
+        - ceph_fs_check.rc == 0
+        - osd_readiness_check.stdout | int == 1
+
+    - name: Patch ceph-bucket storageclass to not be default
+      ansible.builtin.command: >
+        kubectl patch storageclass ceph-bucket -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+      register: ceph_bucket_patch
+      failed_when: false # Allow failure if storageclass doesn't exist yet
+      run_once: true
+      when:
+        - ceph_fs_check.rc == 0
+        - osd_readiness_check.stdout | int == 1
+
+    - name: Patch ceph-filesystem storageclass to be default
+      ansible.builtin.command: >
+        kubectl patch storageclass ceph-filesystem -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+      run_once: true
+      when:
+        - ceph_fs_check.rc == 0
+        - osd_readiness_check.stdout | int == 1
+
+    - name: Display final storage class configuration
+      ansible.builtin.shell: kubectl get storageclass -o wide
+      register: storage_classes
+      run_once: true
+      when: osd_readiness_check.stdout | int == 1
+
+    - name: Show storage classes
+      debug:
+        msg: "{{ storage_classes.stdout_lines }}"
+      run_once: true
+      when: osd_readiness_check.stdout | int == 1

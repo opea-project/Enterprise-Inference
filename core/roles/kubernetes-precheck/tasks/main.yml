@@ -1,0 +1,28 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Check if kubectl is Available
+  command: kubectl version --client
+  register: kubectl_available
+  failed_when: false
+  changed_when: false
+  tags: always
+
+- name: Fail if kubectl is not Available
+  fail:
+    msg: "Kubernetes server is not reachable. Aborting Inference Stack Deployment"
+  when: kubectl_available.rc != 0
+  tags: always
+
+- name: Check Kubernetes API server connectivity
+  command: kubectl get nodes
+  register: k8s_api_access
+  failed_when: false
+  changed_when: false
+  tags: always
+
+- name: Fail if Kubernetes API is not reachable
+  fail:
+    msg: "Kubernetes API server is not reachable. Aborting Inference Stack Deployment"
+  when: k8s_api_access.rc != 0
+  tags: always

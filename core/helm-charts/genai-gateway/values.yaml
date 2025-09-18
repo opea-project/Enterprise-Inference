@@ -1,0 +1,134 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+replicaCount: 1
+image:
+  repository: ghcr.io/berriai/litellm-non_root
+  tag: main-v1.75.8-stable
+  pullPolicy: Always
+  imagePullSecrets: []
+service:
+  type: LoadBalancer
+  port: 4000
+
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""
+
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+probes:
+  startup:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    successThreshold: 1
+    failureThreshold: 30
+    timeoutSeconds: 10
+  liveness:
+    initialDelaySeconds: 180
+    periodSeconds: 30
+    successThreshold: 1
+    failureThreshold: 5
+    timeoutSeconds: 15
+  readiness:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    successThreshold: 1
+    failureThreshold: 3
+    timeoutSeconds: 10
+
+ingress:
+  host: ""
+  secretname: ""
+env:
+  LITELLM_MASTER_KEY: "<REPLACE_WITH_MASTER_KEY>"
+  LITELLM_SALT_KEY: "<REPLACE_WITH_SALT_KEY>"
+  REDIS_HOST: genai-gateway-redis-master
+  REDIS_PORT: "6379"
+  STORE_MODEL_IN_DB: "True"
+  PROXY_LOGOUT_URL: /sso/key/generate
+  LANGFUSE_SECRET_KEY: "<REPLACE_WITH_LANGFUSE_SECRET_KEY>"
+  LANGFUSE_PUBLIC_KEY: "<REPLACE_WITH_LANGFUSE_PUBLIC_KEY>"
+  LANGFUSE_HOST: "http://genai-gateway-trace-web:3000"
+config:
+  proxy_config_yaml: |
+    router_settings:
+      routing_strategy: usage-based-routing-v2
+      redis_host: os.environ/REDIS_HOST
+      redis_port: os.environ/REDIS_PORT
+      redis_password: os.environ/REDIS_PASSWORD
+    litellm_settings:
+      drop_params: true
+      return_response_headers: false
+      callbacks: ["langfuse"]
+      turn_off_message_logging: true
+      redact_user_api_key_info: false
+    general_settings:
+      disable_spend_logs: True
+      disable_error_logs: True
+postgresql:
+  enabled: true
+  architecture: standalone
+  image:
+    repository: bitnamilegacy/postgresql
+  auth:
+    username: "<DB_USER>"
+    password: "<DB_PASS>"
+    database: litellm
+    postgresPassword: "<DB_PASS>"
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+redis:
+  enabled: true
+  architecture: standalone
+  image:
+    repository: "bitnamilegacy/redis"
+  auth:
+    enabled: true
+    password: "<REPLACE_WITH_REDIS_PASSWORD>"
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+      storageClass: ""
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+backup:
+  enabled: false
+  postgresBackupSchedule: "0 2 * * *" # Every day at 2am
+  s3:
+    enabled: false # Set to true to enable S3 backup
+    bucket: s3-for-lite-llm-logs
+    region: us-west-2
+    accessKeyId: "<REPLACE_WITH_AWS_ACCESS_KEY>"
+    secretAccessKey: "<REPLACE_WITH_AWS_SECRET_KEY>"
+  pvc:
+    enabled: true # Set to true to enable PVC backup
+    claimName: postgres-backup-pvc # Update this with your PVC name if using PVC
+restoreJob:
+  enabled: false # Set to true to enable the restore job
+  restoreFile: backup-file.sql #update the restore file name as per your backup naming convention
+  source: s3 # options: pvc or s3
+namespace: genai-gateway

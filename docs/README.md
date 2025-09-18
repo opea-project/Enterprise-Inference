@@ -1,6 +1,8 @@
 # TLDR;
 # Getting Started
-To setup prerequisities and quickstart deployment of Intel® AI for Enterprise Inference on a single node follow steps here [**Quick Start Guide**](./single-node-deployment.md)
+To setup prerequisites and quickstart deployment of Intel® AI for Enterprise Inference on a single node follow steps here [**Quick Start Guide**](./single-node-deployment.md)
+
+> 🚀 **New**: Automated Gaudi firmware and driver management! See [Gaudi Prerequisites](./gaudi-prerequisites.md) for automated setup scripts.
 
 
 # Intel® AI for Enterprise Inference Cluster Setup

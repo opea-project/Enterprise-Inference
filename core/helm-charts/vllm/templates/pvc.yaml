@@ -1,6 +1,6 @@
 # Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-{{- if .Values.pvc.enabled }}
+{{- if and .Values.pvc.enabled .Release.IsInstall }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,10 +8,8 @@ metadata:
   namespace: default
 spec:
   accessModes:
-  #- ReadWriteMany Enable this for supported storage provisioner like Ceph or EFS or Azure Files
   - ReadWriteOnce
   resources:
     requests:
-      storage: 250Gi # Adjust this accroding to model storage size
-  storageClassName: local-path # Adjuts this according to storage class deployment ceph-filesystem
+      storage: 250Gi # Adjust this according to model storage size
 {{- end }}

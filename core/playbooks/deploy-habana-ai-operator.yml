@@ -2,45 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy Habana AI Operator Namespace and Labels
-  hosts: kube_control_plane
-  vars:
-    ansible_python_interpreter: /usr/bin/python3    
-    helm_charts_base: "{{ lookup('env', 'PWD') }}/scripts"        
-    remote_helm_charts_base: "/tmp/helm-charts"
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
-  environment: "{{ proxy_disable_env | default({}) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+  roles:
+    - role: inference-tools
   tasks:
-    - name: Ensure Python pip module is installed
-      ansible.builtin.package:
-        name: python3-pip
-        state: present
-      become: true
-    - name: Install Kubernetes Python SDK
-      ansible.builtin.pip:
-        name: kubernetes
-        state: present
-        executable: /usr/bin/pip3
-      become: true
-    - name: Install Deployment Client
-      ansible.builtin.shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        executable: /bin/bash
-      become: true            
-    - name: Ensure jq is Installed
-      ansible.builtin.package:
-        name: jq
-        state: present
-      become: true    
-      
-    - name:  Create Kubernetes Namespace for Habana AI Operator
+    - name: Create Kubernetes Namespace for Habana AI Operator
       community.kubernetes.k8s:
         state: present
         kind: Namespace
         name: habana-ai-operator
-
-    - name: Label namespace for pod Security Enforcement      
+    - name: Label namespace for pod Security Enforcement
       community.kubernetes.k8s:
         state: present
         kind: Namespace
@@ -50,40 +27,38 @@
             labels:
               pod-security.kubernetes.io/enforce: privileged
               pod-security.kubernetes.io/audit: privileged
-              pod-security.kubernetes.io/warn: privileged                             
-    
+              pod-security.kubernetes.io/warn: privileged
     - name: Add Gaudi Repository
       community.kubernetes.helm_repository:
         name: gaudi-helm
         repo_url: https://vault.habana.ai/artifactory/api/helm/gaudi-helm
         state: present
-      
-    
-    
+
+    - name: Update Gaudi Helm Repository
+      ansible.builtin.command:
+        cmd: helm repo update gaudi-helm
+      run_once: true
+
     - name: Deploy Habana AI Operator
       community.kubernetes.helm:
         name: habana-ai-operator
         chart_ref: gaudi-helm/habana-ai-operator
         release_namespace: habana-ai-operator
-        chart_version: "{{ gaudi_operator }} "
+        chart_version: "{{ gaudi_operator }}"
         state: present
-      run_once: true     
-      
+      run_once: true
     - name: Output waiting status
       debug:
         msg: "Waiting for Habana AI Operator"
       run_once: true
-      
     - name: Wait for Habana Operator Pods to be Running
       pause:
         minutes: 5
       register: pause_result
-      
     - name: Output the Result
       debug:
         msg: "Please Wait for few minutes for Habana AI Operator pods to be running."
       run_once: true
-      
     - name: Ensure all Habana AI Operator Pods Are Running and Ready
       shell: |
         kubectl get pods -n habana-ai-operator -o json | jq -r '
@@ -95,28 +70,21 @@
       retries: 260
       delay: 10
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
-    
-    
     - name: Check if Gaudi 3 Nodes are Available
       shell: "kubectl get nodes -l habana.ai/device.type=GAUDI3 --no-headers | wc -l"
       register: gaudi_node_count
       changed_when: false
-
     - name: Set Fact if Gaudi 3 Nodes are Available
       set_fact:
         gaudi_available: "{{ gaudi_node_count.stdout | int > 0 }}"
-              
-
     - name: Check if Habana AI Resources Exists
       ansible.builtin.command: kubectl get ds -n habana-ai-operator -o name
       register: habana_ds
       changed_when: false
       failed_when: false
-    
     - name: Debug DaemonSet Output
       ansible.builtin.debug:
         msg: "{{ habana_ds.stdout }}"
-
     - name: Install Habana Container Runtime
       ansible.builtin.apt:
         name: habanalabs-container-runtime
@@ -124,24 +92,21 @@
       environment:
         DEBIAN_FRONTEND: noninteractive
       when: habana_ds.stdout_lines is defined and 'daemonset.apps/habana-ai-runtime-ds' not in habana_ds.stdout_lines
-                    
     - name: Store Original config.toml
       ansible.builtin.copy:
         src: /etc/containerd/config.toml
         dest: /etc/containerd/config.toml.bak
         remote_src: yes
       when: habana_ds.stdout_lines is defined and 'daemonset.apps/habana-ai-runtime-ds' not in habana_ds.stdout_lines
-    
     - name: Transfer Dependency files
       ansible.builtin.copy:
-        src: "{{ helm_charts_base }}/habana/config.toml"
+        src: "{{ remote_home_scripts_dir }}/habana/config.toml"
         dest: /etc/containerd/config.toml
-        mode: '0644'
+        mode: "0644"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         remote_src: no
       when: habana_ds.stdout_lines is defined and 'daemonset.apps/habana-ai-runtime-ds' not in habana_ds.stdout_lines
-                        
     - name: Restart Containerd Service
       ansible.builtin.systemd:
         name: containerd
@@ -150,8 +115,6 @@
       become: yes
       run_once: true
       when: habana_ds.stdout_lines is defined and 'daemonset.apps/habana-ai-runtime-ds' not in habana_ds.stdout_lines
-    
-            
     - name: Install Habana Kubernetes Device Plugin for Gaudi 3
       kubernetes.core.k8s:
         state: present
@@ -162,10 +125,6 @@
       delay: 10
       when: habana_ds.stdout_lines is defined and 'daemonset.apps/habana-ai-device-plugin-ds' not in habana_ds.stdout_lines
       run_once: true
-        
-                        
     - name: Display User Message
       debug:
-        msg: "All Habana AI Operator pods are running and ready."      
-
-   
+        msg: "All Habana AI Operator pods are running and ready."

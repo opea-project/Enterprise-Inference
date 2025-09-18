@@ -1,0 +1,98 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.restoreJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-restore
+spec:
+  template:
+    spec:
+      containers:
+      - name: pg-restore
+        image: postgres:17.5
+        env:
+        - name: PGURL
+          value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@genai-gateway-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+        - name: AWS_ACCESS_KEY_ID
+          value: "{{ .Values.backup.s3.accessKeyId }}"
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "{{ .Values.backup.s3.secretAccessKey }}"
+        - name: AWS_DEFAULT_REGION
+          value: "{{ .Values.backup.s3.region }}"
+        command:
+          - "/bin/bash"
+          - "-c"
+          - |
+            check_db_empty() {
+              echo "Checking if the database is empty..."
+              # Check if there are any user tables with data
+              TABLE_COUNT=$(psql $PGURL -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")
+              echo "Table count: $TABLE_COUNT"
+              # If there are no tables, we can proceed with the restore
+              if [ "$TABLE_COUNT" -gt 0 ]; then
+                # ROW_COUNT=$(psql $PGURL -tAc "SELECT SUM(reltuples)::int FROM pg_class WHERE relkind='r' AND relname NOT LIKE 'pg_%' AND relname NOT LIKE 'sql_%';")
+                ROW_COUNT=$(psql $PGURL -tAc "SELECT SUM(n_live_tup) FROM pg_stat_user_tables;")
+                echo "Row count in user tables: $ROW_COUNT"
+                if [ "$ROW_COUNT" -gt 0 ]; then
+                  echo 'Database already contains data. Skipping restore.'
+                  exit 0
+                fi
+              fi
+            }
+            
+            until pg_isready -d "$PGURL"; do echo "Waiting for PostgreSQL..."; sleep 5; done
+            check_db_empty
+            if [ "{{ .Values.restoreJob.source }}" = "s3" ]; then
+              apt-get update && apt-get install -y awscli && \
+              echo "Downloading restore file..." && \
+              aws s3 cp s3://{{ .Values.backup.s3.bucket }}/{{ .Values.restoreJob.restoreFile }} /restore/restore.sql && \
+              ls -a /restore && \
+              if [ -f /restore/restore.sql ]; then \
+                echo "Restoring database from S3..."; \
+                psql $PGURL -f /restore/restore.sql; \
+              else \
+                echo "Restore file not found from S3!"; \
+                exit 1; \
+              fi; \
+            elif [ "{{ .Values.restoreJob.source }}" = "pvc" ]; then
+              ls -a / &&
+              cd backup &&
+              echo "Checking for restore file in PVC..." && 
+              if [ -f /backup/{{ .Values.restoreJob.restoreFile }} ]; then 
+                echo "Restoring database from PVC..."; 
+                psql $PGURL -f /backup/{{ .Values.restoreJob.restoreFile }}; 
+              else 
+                echo "Restore file not found in PVC!"; 
+                exit 1; 
+              fi; \
+            else
+              echo "Unknown restore source: {{ .Values.restoreJob.source }}"; \
+              exit 1;
+            fi
+        volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+      restartPolicy: OnFailure
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      {{- if and .Values.backup.pvc.enabled (eq .Values.restoreJob.source "pvc") }}
+      - name: backup-volume
+        persistentVolumeClaim:
+          claimName: {{ .Values.backup.pvc.claimName }}
+      {{- else }}
+      - name: backup-volume
+        emptyDir: {}
+      {{- end }}
+{{- end }}

@@ -18,6 +18,7 @@ Intel® AI for Enterprise Inference, powered by OPEA, is compatible with OpenAI 
    - **APISIX**: A cloud-native API gateway, handling API traffic and providing advanced features caching, and authentication, enabling efficient and secure access to deployed AI models.
    - **Observability**: An open-source monitoring solution designed to operate natively within Kubernetes clusters, providing comprehensive visibility into the performance, health, and resource utilization of deployed applications and cluster components through metrics, visualization, and alerting capabilities.
    - **Model Deployments**: Automated deployment and management of AI LLM models within the Kubernetes inference cluster, enabling scalable and reliable AI inference capabilities.
+   - **GenAI Gateway**: An integrated gateway leveraging LiteLLM and Langfuse to provide flexible interfaces for routing and managing generative AI models. It enables user and key management, user token telemetry, and analytics for LLM inference workflows.
    
 ## Table of Contents
 -   [Usage](#usage)

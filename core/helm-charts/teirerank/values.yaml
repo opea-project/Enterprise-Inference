@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Intel Corporation
+# Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Default values for teirerank.
@@ -48,8 +48,13 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 0
+  fsGroup: 0
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   readOnlyRootFilesystem: true
@@ -58,7 +63,7 @@ securityContext:
   runAsUser: 1001
   capabilities:
     drop:
-    - ALL
+      - ALL
   seccompProfile:
     type: RuntimeDefault
   # Init container sets the downloaded model dir to be group writable, so that container
@@ -75,7 +80,7 @@ apisix:
   enabled: false
 
 ingress:
-  enabled: false  # Set to true to enable the Ingress resource
+  enabled: false # Set to true to enable the Ingress resource
   host: ""
   namespace: default
   secretname: ""
@@ -87,7 +92,8 @@ oidc:
   discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
   introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
 
-resources: {}
+resources:
+  {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following

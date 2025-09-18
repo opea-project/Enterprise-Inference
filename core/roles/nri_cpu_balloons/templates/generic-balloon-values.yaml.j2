@@ -1,0 +1,45 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Generic NRI Balloon Policy Template for vLLM Models (Simplified)
+config:
+  reservedResources:
+    cpu: 1000m
+  allocatorTopologyBalancing: true
+  reservedPoolNamespaces:
+    - kube-system
+    - ingress-nginx
+    - keycloak
+    - monitoring
+  preserve:
+    matchExpressions:
+    - key: name
+      operator: NotIn
+      values:
+      - vllm
+  balloonTypes:
+    - name: "{{ balloon_name }}"
+      namespaces:
+        - default
+      matchExpressions:
+        - key: "{{ match_expression.split('=')[0] }}"
+          operator: In
+          values:
+            - "{{ match_expression.split('=')[1] }}"
+      allocatorPriority: "high"
+      allocatorTopologyBalancing: true
+      # CPU resource allocation handled in Helm chart values.yaml resources section
+      preferSpreadOnPhysicalCores: false
+      preferIsolCpus: {{ prefer_isol_cpus | lower }}
+      preferNewBalloons: {{ prefer_new_balloons | lower }}
+      hideHyperthreads: false
+      pinCpus: true
+      pinMemory: false
+  instrumentation:
+    httpEndpoint: ":8891"
+    prometheusExport: {{ prometheus_enabled | lower }}
+    reportPeriod: 60s
+  log:
+    source: true
+    debug:
+      - policy

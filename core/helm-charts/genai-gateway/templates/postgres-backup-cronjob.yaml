@@ -1,0 +1,73 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup  
+spec:
+  schedule: "{{ .Values.backup.postgresBackupSchedule }}" # Moved to values.yaml
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: pg-backup
+            image: postgres:17.5
+            env:
+            - name: PGURL
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@genai-gateway-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            - name: AWS_ACCESS_KEY_ID
+              value: "{{ .Values.backup.s3.accessKeyId }}"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "{{ .Values.backup.s3.secretAccessKey }}"
+            - name: AWS_DEFAULT_REGION
+              value: "{{ .Values.backup.s3.region }}"
+            command:
+              - "/bin/bash"
+              - "-c"
+              - |
+                echo "Waiting for PostgreSQL to be ready..." && \
+                until pg_isready -d "$PGURL"; do echo "Waiting for PostgreSQL..."; sleep 5; done && \
+                echo "PostgreSQL is ready. Starting backup..." && \
+                apt-get update && apt-get install -y awscli && \
+                {{- if .Values.backup.pvc.enabled }}
+                BACKUP_DIR=/backup
+                {{- else }}
+                BACKUP_DIR=/tmp/backup
+                mkdir -p $BACKUP_DIR
+                {{- end }}
+                BACKUP_FILE=$BACKUP_DIR/backup-$(date +%F-%H-%M).sql && \
+                pg_dump $PGURL -f $BACKUP_FILE && \
+                if [ "{{ .Values.backup.s3.enabled }}" = "true" ]; then \
+                  aws s3 cp $BACKUP_FILE s3://{{ .Values.backup.s3.bucket }}/$(basename $BACKUP_FILE); \
+                  echo " Backup uploaded to S3 bucket s3://{{ .Values.backup.s3.bucket }}/$(basename $BACKUP_FILE)"; \
+                fi
+                {{- if .Values.backup.pvc.enabled }}
+                echo "Backup saved to PVC at $BACKUP_FILE"
+                {{- end }}
+            {{- if .Values.backup.pvc.enabled }}
+            volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+            {{- end }}
+          restartPolicy: OnFailure
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backup.pvc.enabled }}
+          volumes:
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: {{ .Values.backup.pvc.claimName }}
+          {{- end }}
+{{- end }}
