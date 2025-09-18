@@ -66,9 +66,10 @@
 							]
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/realms/{{KEYCLOAK_REALM}}/protocol/openid-connect/token",
+							"raw": "https://{{CLUSTER_URL}}/realms/{{KEYCLOAK_REALM}}/protocol/openid-connect/token",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"realms",
@@ -83,7 +84,7 @@
 					"response": []
 				},
 				{
-					"name": "CPU-Meta-Llama-3.1-8B-Instruct",
+					"name": "CPU-Llama-3.1-8B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -107,9 +108,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"Meta-Llama-3.1-8B-Instruct-vllmcpu",
@@ -145,9 +147,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"DeepSeek-R1-Distill-Llama-8B-vllmcpu",
@@ -183,9 +186,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"DeepSeek-R1-Distill-Qwen-32B-vllmcpu",
@@ -198,7 +202,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-8B-Instruct",
+					"name": "Llama-3.1-8B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -221,9 +225,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-8B-Instruct/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/Meta-Llama-3.1-8B-Instruct/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"Meta-Llama-3.1-8B-Instruct",
@@ -236,7 +241,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-70B-Instruct",
+					"name": "Llama-3.1-70B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -260,9 +265,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/Meta-Llama-3.1-70B-Instruct/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/Meta-Llama-3.1-70B-Instruct/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"Meta-Llama-3.1-70B-Instruct",
@@ -275,7 +281,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-405B-Instruct",
+					"name": "Llama-3.1-405B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -298,9 +304,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/Llama-3.1-405B-Instruct/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/Llama-3.1-405B-Instruct/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"Llama-3.1-405B-Instruct",
@@ -336,9 +343,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Llama-8B/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/DeepSeek-R1-Distill-Llama-8B/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"DeepSeek-R1-Distill-Llama-8B",
@@ -374,9 +382,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/DeepSeek-R1-Distill-Qwen-32B/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/DeepSeek-R1-Distill-Qwen-32B/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"DeepSeek-R1-Distill-Qwen-32B",
@@ -412,9 +421,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/Falcon3-7B-Instruct/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/Falcon3-7B-Instruct/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"Falcon3-7B-Instruct",
@@ -450,9 +460,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/CodeLlama-34b-Instruct-hf/v1/completions",
+							"raw": "https://{{CLUSTER_URL}}/CodeLlama-34b-Instruct-hf/v1/completions",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"CodeLlama-34b-Instruct-hf",
@@ -488,9 +499,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/bge-base-en-v1.5/v1/embeddings",
+							"raw": "https://{{CLUSTER_URL}}/bge-base-en-v1.5/v1/embeddings",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"bge-base-en-v1.5",
@@ -526,9 +538,10 @@
 							}
 						},
 						"url": {
-							"raw": "{{KEYCLOAK_ADDR}}/bge-reranker-base/rerank",
+							"raw": "https://{{CLUSTER_URL}}/bge-reranker-base/rerank",
+							"protocol": "https",
 							"host": [
-								"{{KEYCLOAK_ADDR}}"
+								"{{CLUSTER_URL}}"
 							],
 							"path": [
 								"bge-reranker-base",
@@ -545,7 +558,46 @@
 			"name": "Keycloak and APISIX Disabled API's",
 			"item": [
 				{
-					"name": "CPU-Meta-Llama-3.1-8B-Instruct",
+					"name": "CPU-Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"model\": \"meta-llama/Meta-Llama-3.1-8B-Instruct\", \"prompt\": \"What is Deep Learning?\", \"max_tokens\": 15, \"temperature\": 0}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{CLUSTER_URL}}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"Meta-Llama-3.1-8B-Instruct-vllmcpu",
+								"v1",
+								"completions"
+							]
+						},
+						"description": "Meta-Llama-3.1-8B-Instruct-vllmcpu Model Endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "CPU-Llama-3.1-8B-Instruct Copy",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -660,7 +712,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-8B-Instruct",
+					"name": "Llama-3.1-8B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -698,7 +750,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-70B-Instruct",
+					"name": "Llama-3.1-70B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -737,7 +789,7 @@
 					"response": []
 				},
 				{
-					"name": "Meta-Llama-3.1-405B-Instruct",
+					"name": "Llama-3.1-405B-Instruct",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -994,6 +1046,49 @@
 							]
 						},
 						"description": "bge-reranker-base Model Endpoint"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "GenAI Gateway API's",
+			"item": [
+				{
+					"name": "Llama-3.1-8B-Instruct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{GENAI_GATEWAY_LITELLM_KEY}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"model\": \"meta-llama/Llama-3.1-8B-Instruct\",\r\n    \"messages\": [\r\n        {\r\n            \"role\": \"user\",\r\n            \"content\": \"Hello!\"\r\n        }\r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{CLUSTER_URL}}/v1/chat/completions",
+							"protocol": "https",
+							"host": [
+								"{{CLUSTER_URL}}"
+							],
+							"path": [
+								"v1",
+								"chat",
+								"completions"
+							]
+						}
 					},
 					"response": []
 				}

@@ -1,0 +1,26 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+ansible_python_interpreter: /usr/bin/python3
+helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
+remote_home_dir: "{{ lookup('env', 'PWD') }}/scripts"
+remote_helm_charts_base: "/tmp/helm-charts"
+ingress_file: "all_models_apisix_ingres_nginx.yaml"
+keycloak_url: "https://{{ secret_name }}"
+uninstall_true: 'false'
+install_true: 'false'
+list_model_true: 'false'
+model_name_list: 'false'
+gpu_playbook: 'false'
+cpu_playbook: 'false'
+apisix_enabled: 'false'
+ingress_enabled: 'false'
+deploy_keycloak: 'no'
+tensor_parallel_size_vllm: 1
+gaudi_deployment: 'true'
+huggingface_model_id: 'false'
+hugging_face_model_deployment: 'false'
+huggingface_model_deployment_name: 'None'
+hugging_face_model_remove_name: 'false'
+gaudi_values_file: "{{ remote_helm_charts_base }}/vllm/gaudi-values.yaml"
+huggingface_tensor_parellel_size: 'false'
+vllm_metrics_enabled: 'false'

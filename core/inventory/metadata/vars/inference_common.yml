@@ -1,0 +1,7 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
+remote_home_dir: "{{ lookup('env', 'PWD') }}/scripts"
+remote_helm_charts_base: "/tmp/helm-charts"
+ansible_python_interpreter: /usr/bin/python3
+remote_home_scripts_dir: "{{ lookup('env', 'PWD') }}/scripts"

@@ -1,0 +1,492 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Set default NRI CPU balloons configuration if not defined
+  ansible.builtin.set_fact:
+    nri_cpu_balloons:
+      enabled: true
+      namespace: "kube-system"
+      auto_install: true
+      installation_timeout: 300
+      helm:
+        repo_url: "https://containers.github.io/nri-plugins"
+        repo_name: "nri-plugins"
+        chart_name: "nri-resource-policy-balloons"
+        release_name: "nri-cpu-balloons"
+  when: nri_cpu_balloons is not defined
+  tags:
+    - install
+
+- name: Set default generic balloon configuration if not defined
+  ansible.builtin.set_fact:
+    generic_balloon:
+      name: "vllm-balloon"
+      match_expression: "name=vllm"
+      preserve_existing: true
+      policy_settings:
+        preferIsolCpus: false
+        preferNewBalloons: true
+        hideHyperthreads: true
+  when: generic_balloon is not defined
+  tags:
+    - install
+
+- name: Check if this is a CPU deployment
+  ansible.builtin.fail:
+    msg: "This role should only be used for CPU deployments. Set cpu_playbook=true"
+  when: cpu_playbook != 'true'
+  tags:
+    - install
+
+- name: Display generic balloon deployment info
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Generic NRI Balloon Policy Creation"
+      - "==================================================================="
+      - "Creating single generic balloon policy for all models"
+      - "Balloon Name: {{ generic_balloon.name }}"
+      - "Match Expression: {{ generic_balloon.match_expression }}"
+      - "==================================================================="
+  tags:
+    - install
+
+- name: Check if existing balloon policy exists
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: "nri-resource-policy-balloons-config"
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: existing_balloon_config
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  tags:
+    - install
+
+- name: Parse existing balloon configuration
+  ansible.builtin.set_fact:
+    existing_config: "{{ (existing_balloon_config.resources[0].data['values.yaml'] | from_yaml) if existing_balloon_config.resources | length > 0 else {} }}"
+  tags:
+    - install
+
+- name: Check if generic vllm balloon already exists
+  ansible.builtin.set_fact:
+    vllm_balloon_exists: >-
+      {{
+        existing_config.config.balloonTypes | default([])
+        | selectattr('name', 'equalto', generic_balloon.name)
+        | list | length > 0
+      }}
+  tags:
+    - install
+
+- name: Get existing balloon configuration if it exists
+  ansible.builtin.set_fact:
+    existing_balloon_config: >-
+      {{
+        (existing_config.config.balloonTypes | default([])
+        | selectattr('name', 'equalto', generic_balloon.name)
+        | list | first) if vllm_balloon_exists else {}
+      }}
+  tags:
+    - install
+
+- name: Check if existing balloon configuration needs update
+  ansible.builtin.set_fact:
+    balloon_needs_update: >-
+      {{
+        vllm_balloon_exists and (
+          existing_balloon_config.get('allocatorPriority') != 'high' or
+          existing_balloon_config.get('allocatorTopologyBalancing') != true or
+          existing_balloon_config.get('preferSpreadOnNuma') is defined or
+          existing_balloon_config.get('preserveCpus') is defined or
+          existing_balloon_config.get('allocatorPriority', '') == '0' or
+          existing_balloon_config.get('allocatorPriority', '') | type_debug == 'int' or
+          existing_config.config.get('preserve') is not defined or
+          existing_config.config.get('pinMemory', true) != false
+        )
+      }}
+  tags:
+    - install
+
+- name: Display existing balloon status
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Existing Balloon Policy Status"
+      - "==================================================================="
+      - "Configuration exists: {{ 'YES' if existing_config != {} else 'NO' }}"
+      - "Generic vLLM balloon exists: {{ 'YES' if vllm_balloon_exists else 'NO' }}"
+      - "Balloon configuration needs update: {{ 'YES' if balloon_needs_update | default(false) else 'NO' }}"
+      - "{{ 'Reason: Outdated configuration detected (old fields or wrong priority)' if balloon_needs_update | default(false) else '' }}"
+      - "{{ 'Proceeding with balloon update/creation' if (not vllm_balloon_exists or balloon_needs_update | default(false)) else 'Skipping - balloon already properly configured' }}"
+      - "==================================================================="
+  tags:
+    - install
+
+- name: Install NRI if not present and balloon doesn't exist or needs update
+  ansible.builtin.include_tasks: install_nri.yaml
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - not nri_supported | default(false)
+    - nri_cpu_balloons.auto_install | default(true)
+  tags:
+    - install
+
+- name: Calculate expected balloon configuration for comparison
+  ansible.builtin.set_fact:
+    expected_balloon_config:
+      name: "{{ generic_balloon.name }}"
+      namespaces:
+        - default
+      matchExpressions:
+        - key: "{{ generic_balloon.match_expression.split('=')[0] }}"
+          operator: In
+          values:
+            - "{{ generic_balloon.match_expression.split('=')[1] }}"
+      allocatorPriority: "high"
+      allocatorTopologyBalancing: true
+      # CPU resource allocation moved to Helm chart values.yaml resources section
+      preferSpreadOnPhysicalCores: false
+      preferIsolCpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
+      preferNewBalloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
+      hideHyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
+      pinCpus: true
+      pinMemory: false
+  when: vllm_balloon_exists
+  tags:
+    - install
+
+- name: Re-evaluate if existing balloon configuration needs update
+  ansible.builtin.set_fact:
+    balloon_needs_update: >-
+      {{
+        vllm_balloon_exists and (
+          existing_balloon_config.get('allocatorPriority') != expected_balloon_config.allocatorPriority or
+          existing_balloon_config.get('allocatorTopologyBalancing') != expected_balloon_config.allocatorTopologyBalancing or
+          existing_balloon_config.get('preferSpreadOnPhysicalCores') != expected_balloon_config.preferSpreadOnPhysicalCores or
+          existing_balloon_config.get('preferIsolCpus') != expected_balloon_config.preferIsolCpus or
+          existing_balloon_config.get('preferNewBalloons') != expected_balloon_config.preferNewBalloons or
+          existing_balloon_config.get('hideHyperthreads') != expected_balloon_config.hideHyperthreads or
+          existing_balloon_config.get('pinCpus') != expected_balloon_config.pinCpus or
+          existing_balloon_config.get('pinMemory') != expected_balloon_config.pinMemory or
+          existing_balloon_config.get('namespaces', []) != expected_balloon_config.namespaces or
+          existing_balloon_config.get('matchExpressions', []) != expected_balloon_config.matchExpressions or
+          existing_balloon_config.get('preferSpreadOnNuma') is defined or
+          existing_balloon_config.get('preserveCpus') is defined or
+          existing_balloon_config.get('allocatorPriority', '') == '0' or
+          existing_balloon_config.get('allocatorPriority', '') | type_debug == 'int'
+        )
+      }}
+  when: vllm_balloon_exists
+  tags:
+    - install
+
+- name: Debug balloon comparison details
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Balloon Configuration Comparison Details"
+      - "==================================================================="
+      - "Existing balloon configuration:"
+      - "  allocatorPriority: {{ existing_balloon_config.get('allocatorPriority', 'NOT_SET') }}"
+      - "  allocatorTopologyBalancing: {{ existing_balloon_config.get('allocatorTopologyBalancing', 'NOT_SET') }}"
+      - "  preferSpreadOnPhysicalCores: {{ existing_balloon_config.get('preferSpreadOnPhysicalCores', 'NOT_SET') }}"
+      - "  preferIsolCpus: {{ existing_balloon_config.get('preferIsolCpus', 'NOT_SET') }}"
+      - "  preferNewBalloons: {{ existing_balloon_config.get('preferNewBalloons', 'NOT_SET') }}"
+      - "  hideHyperthreads: {{ existing_balloon_config.get('hideHyperthreads', 'NOT_SET') }}"
+      - "  pinCpus: {{ existing_balloon_config.get('pinCpus', 'NOT_SET') }}"
+      - "  pinMemory: {{ existing_balloon_config.get('pinMemory', 'NOT_SET') }}"
+      - "  namespaces: {{ existing_balloon_config.get('namespaces', 'NOT_SET') }}"
+      - "  matchExpressions: {{ existing_balloon_config.get('matchExpressions', 'NOT_SET') }}"
+      - ""
+      - "Expected balloon configuration:"
+      - "  allocatorPriority: {{ expected_balloon_config.allocatorPriority }}"
+      - "  allocatorTopologyBalancing: {{ expected_balloon_config.allocatorTopologyBalancing }}"
+      - "  preferSpreadOnPhysicalCores: {{ expected_balloon_config.preferSpreadOnPhysicalCores }}"
+      - "  preferIsolCpus: {{ expected_balloon_config.preferIsolCpus }}"
+      - "  preferNewBalloons: {{ expected_balloon_config.preferNewBalloons }}"
+      - "  hideHyperthreads: {{ expected_balloon_config.hideHyperthreads }}"
+      - "  pinCpus: {{ expected_balloon_config.pinCpus }}"
+      - "  pinMemory: {{ expected_balloon_config.pinMemory }}"
+      - "  namespaces: {{ expected_balloon_config.namespaces }}"
+      - "  matchExpressions: {{ expected_balloon_config.matchExpressions }}"
+      - ""
+      - "Note: CPU resource allocation now handled in Helm chart resources section"
+      - "Deprecated fields present in existing config:"
+      - "  preferSpreadOnNuma: {{ 'YES' if existing_balloon_config.get('preferSpreadOnNuma') is defined else 'NO' }}"
+      - "  preserveCpus: {{ 'YES' if existing_balloon_config.get('preserveCpus') is defined else 'NO' }}"
+      - "Global configuration issues:"
+      - "  preserve section missing: {{ 'YES' if existing_config.config.get('preserve') is not defined else 'NO' }}"
+      - "  global pinMemory incorrect: {{ 'YES' if existing_config.config.get('pinMemory', true) != false else 'NO' }}"
+      - "==================================================================="
+  when: vllm_balloon_exists
+  tags:
+    - install
+
+- name: Ensure temporary directory exists
+  ansible.builtin.file:
+    path: "{{ tmp_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Create generic balloon values file
+  ansible.builtin.template:
+    src: "generic-balloon-values.yaml.j2"
+    dest: "{{ tmp_dir }}/generic-balloon-values.yaml"
+    mode: "0644"
+  vars:
+    balloon_name: "{{ generic_balloon.name }}"
+    match_expression: "{{ generic_balloon.match_expression }}"
+    preserve_existing: "{{ generic_balloon.preserve_existing }}"
+    prefer_isol_cpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
+    prefer_new_balloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
+    hide_hyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
+    prometheus_enabled: "{{ enable_prometheus | default('false') }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Ensure NRI plugins Helm repository is available
+  kubernetes.core.helm_repository:
+    name: "{{ nri_cpu_balloons.helm.repo_name }}"
+    repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
+    state: present
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  retries: 3
+  delay: 10
+  register: helm_repo_result
+  until: helm_repo_result is succeeded
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Update Helm repositories
+  ansible.builtin.command: helm repo update
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Load generic balloon configuration
+  ansible.builtin.slurp:
+    src: "{{ tmp_dir }}/generic-balloon-values.yaml"
+  register: balloon_config_content
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Parse generic balloon configuration
+  ansible.builtin.set_fact:
+    new_balloon_config: "{{ balloon_config_content.content | b64decode | from_yaml }}"
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Initialize base configuration if none exists
+  ansible.builtin.set_fact:
+    base_config:
+      config:
+        reservedResources:
+          cpu: 1000m
+        allocatorTopologyBalancing: true
+        reservedPoolNamespaces:
+          - kube-system
+          - ingress-nginx
+          - keycloak
+          - monitoring
+        preserve:
+          matchExpressions:
+            - key: name
+              operator: NotIn
+              values:
+                - vllm
+        balloonTypes: []
+        instrumentation:
+          httpEndpoint: ":8891"
+          prometheusExport: "{{ enable_prometheus | default(false) }}"
+          reportPeriod: 60s
+        log:
+          source: true
+          debug:
+            - policy
+        # Global pin settings
+        pinMemory: false
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - existing_config == {}
+  tags:
+    - install
+
+- name: Use existing configuration as base
+  ansible.builtin.set_fact:
+    base_config: "{{ existing_config }}"
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - existing_config != {}
+  tags:
+    - install
+
+- name: Remove existing balloon if updating
+  ansible.builtin.set_fact:
+    balloons_without_old: >-
+      {{
+        base_config.config.balloonTypes | default([])
+        | rejectattr('name', 'equalto', generic_balloon.name)
+        | list
+      }}
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Add generic balloon type to configuration (new or updated)
+  ansible.builtin.set_fact:
+    updated_config: >-
+      {%- if balloon_needs_update | default(false) -%}
+      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': balloons_without_old + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
+      {%- else -%}
+      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': base_config.config.balloonTypes + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
+      {%- endif -%}
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Deploy/Update generic balloon policy ConfigMap
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "nri-resource-policy-balloons-config"
+        namespace: "{{ nri_cpu_balloons.namespace }}"
+        labels:
+          app.kubernetes.io/name: nri-resource-policy-balloons
+      data:
+        "values.yaml": "{{ updated_config | to_nice_yaml }}"
+    state: present
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Create temporary values file for NRI deployment
+  ansible.builtin.copy:
+    content: "{{ updated_config | to_nice_yaml }}"
+    dest: "{{ tmp_dir }}/nri-values.yaml"
+    mode: "0644"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Deploy/Update NRI resource policy with generic balloon
+  ansible.builtin.command: >
+    helm upgrade --install nri-resource-policy-balloons
+    {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
+    --namespace {{ nri_cpu_balloons.namespace }}
+    --values {{ tmp_dir }}/nri-values.yaml
+    --wait
+    --timeout 300s
+    --atomic
+    {{ '--force' if balloon_needs_update | default(false) else '' }}
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  register: helm_result
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Verify NRI balloon daemonset is ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: "nri-resource-policy-balloons"
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: nri_daemonset_status
+  failed_when:
+    - nri_daemonset_status.resources | length == 0
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Export balloon configuration for model deployments
+  ansible.builtin.set_stats:
+    data:
+      # Generic balloon annotation for all model pods
+      cpu_balloon_annotation:
+        "balloon.balloons.resource-policy.nri.io": "{{ generic_balloon.name }}"
+
+      # Parallelism configuration
+      model_parallelism_config:
+        tensor_parallel_size: "{{ parallelism_config.tensor_parallel_size | default(1) }}"
+        pipeline_parallel_size: "{{ parallelism_config.pipeline_parallel_size | default(1) }}"
+        strategy: "{{ parallelism_config.strategy | default('tensor_parallel') }}"
+    aggregate: false
+  tags:
+    - install
+
+- name: Display final deployment status
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Generic NRI Balloon Policy Deployment Complete"
+      - "==================================================================="
+      - >-
+        {%- if not vllm_balloon_exists -%}
+        New generic balloon policy created successfully
+        {%- elif balloon_needs_update | default(false) -%}
+        Balloon policy updated successfully (fixed outdated configuration)
+        {%- else -%}
+        Balloon policy already existed - no changes made
+        {%- endif -%}
+      - ""
+      - "Balloon Configuration:"
+      - "  Name: {{ generic_balloon.name }}"
+      - "  Match Expression: {{ generic_balloon.match_expression }}"
+      - "  CPU Pinning: Enabled"
+      - "  Memory Pinning: Disabled"
+      - ""
+      - "Model Deployment Instructions:"
+      - "  Add this annotation to model pods:"
+      - "  balloon.balloons.resource-policy.nri.io: {{ generic_balloon.name }}"
+      - ""
+      - "  All models matching 'name=vllm' will automatically use this balloon"
+      - "==================================================================="
+  tags:
+    - install
+
+- name: Clean up temporary files
+  ansible.builtin.file:
+    path: "{{ tmp_dir }}"
+    state: absent
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install

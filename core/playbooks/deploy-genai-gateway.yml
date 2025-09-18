@@ -1,0 +1,164 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy GenAI Gateway
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_genai_gateway.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+
+  roles:
+    - role: inference-tools
+  tasks:
+    - name: Output config
+      debug:
+        var: cert_file, key_file, secret_name
+      run_once: true
+    - name: Create Namespace for GenAI Gateway
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: genai-gateway
+      run_once: true
+    - name: Create TLS secret for GenAI Gateway
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ secret_name }}"
+            namespace: genai-gateway
+          type: kubernetes.io/tls
+          data:
+            tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
+            tls.key: "{{ lookup('file', key_file) | b64encode }}"
+      register: kubectl_output
+      run_once: true
+    - name: TLS Create
+      debug:
+        msg: "Secret {{ secret_name }} created."
+      run_once: true
+    - name: Copy Dependency Files Message
+      debug:
+        msg: "Copying dependency files to the nodes please wait..."
+      run_once: true
+    - name: Ensure Remote Directory Exists
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      run_once: true
+    - name: Sync dependency files to Deployment Nodes
+      ansible.posix.synchronize:
+        src: "{{ item.src }}/"
+        dest: "{{ item.dest }}/"
+        recursive: yes
+        delete: no
+        mode: push
+      loop:
+        - {
+            src: "{{ helm_charts_base_genai }}",
+            dest: "{{ remote_helm_charts_base }}/genai-gateway",
+          }
+        - {
+            src: "{{ helm_charts_base_genai_trace }}",
+            dest: "{{ remote_helm_charts_base }}/genai-gateway-trace",
+          }
+      run_once: true
+    - name: Delete Ingress Resource
+      kubernetes.core.k8s:
+        state: absent
+        kind: Ingress
+        name: keycloak
+        namespace: default
+      run_once: true
+    - name: Install GenAI Gateway System
+      command: >
+        helm dependency update {{ remote_helm_charts_base }}/genai-gateway
+      register: genai_gateway_deps
+      run_once: true
+    - name: Install GenAI Gateway System
+      command: >
+        helm upgrade --install genai-gateway {{ remote_helm_charts_base }}/genai-gateway
+        --namespace genai-gateway
+        --create-namespace
+        --set env.LITELLM_MASTER_KEY={{ litellm_master_key }}
+        --set env.LITELLM_SALT_KEY={{ litellm_salt_key }}
+        --set env.LANGFUSE_SECRET_KEY={{ langfuse_secret_key }}
+        --set env.LANGFUSE_PUBLIC_KEY={{ langfuse_public_key }}
+        --set postgresql.auth.username={{ postgresql_username }}
+        --set postgresql.auth.password={{ postgresql_password }}
+        --set postgresql.auth.postgresPassword={{ postgresql_password }}
+        --set redis.auth.password={{ redis_password }}
+        --set ingress.host={{ secret_name }}
+        --set ingress.secretname={{ secret_name }}
+        -f {{ remote_helm_charts_base }}/genai-gateway/values.yaml
+      run_once: true
+    - name: Wait for GenAI Gateway Pods to be Ready
+      shell: |
+        kubectl get pods -n genai-gateway -l app=litellm -o json | jq -r '
+          .items[] |
+          select(.status.phase != "Running" or (.status.containerStatuses[] | select(.ready != true))) |
+          .metadata.name' | wc -l
+      register: pod_status
+      until: pod_status.stdout == "0" and pod_status.rc == 0
+      retries: 60
+      delay: 10
+      failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
+      run_once: true
+    - name: Update GenAI Gateway Trace (Langfuse) Helm Dependencies
+      command: >
+        helm dependency update {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse
+      register: langfuse_deps
+      run_once: true
+    - name: Install GenAI Gateway Trace System
+      command: >
+        helm upgrade --install genai-gateway-trace {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse
+        --namespace genai-gateway
+        --set fullnameOverride=genai-gateway-trace
+        --set nameOverride=genai-gateway-trace
+        --set clickhouse.auth.username={{ clickhouse_username }} \
+        --set clickhouse.auth.password={{ clickhouse_password }} \
+        --set langfuse.additionalEnv[0].value={{ langfuse_public_key }} \
+        --set langfuse.additionalEnv[1].value={{ langfuse_secret_key }} \
+        --set langfuse.additionalEnv[2].value={{ langfuse_login }} \
+        --set langfuse.additionalEnv[3].value={{ langfuse_user }} \
+        --set langfuse.additionalEnv[4].value={{ langfuse_password }} \
+        --set langfuse.salt.value={{ clickhouse_password }} \
+        --set s3.auth.rootPassword={{ minio_secret }} \
+        --set s3.auth.rootUser={{ minio_user }} \
+        --set postgresql.auth.password={{ postgres_password }} \
+        --set postgresql.auth.username={{ postgres_user }} \
+        --set redis.auth.password={{ clickhouse_password }} \
+        --set langfuse.ingress.enabled=true \
+        --set langfuse.ingress.className=nginx \
+        --set langfuse.ingress.tls.enabled="true" \
+        --set langfuse.ingress.hosts[0].host="trace.{{ secret_name }}" \
+        --set langfuse.ingress.tls.secretName="trace.{{ secret_name }}" \
+        --set langfuse.nextauth.url="https://trace.{{ secret_name }}" \
+        --set langfuse.nextauth.secret.value={{ clickhouse_password }} \
+        -f {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse/values.yaml
+      run_once: true
+    - name: Wait for All GenAI Gateway Trace Pods to be Ready
+      shell: |
+        kubectl get pods -n genai-gateway -l app.kubernetes.io/instance=genai-gateway-trace -o json | jq -r '
+          .items[] |
+          select(.status.phase != "Running" or (.status.containerStatuses[] | select(.ready != true))) |
+          .metadata.name' | wc -l
+      register: pod_status
+      until: pod_status.stdout == "0" and pod_status.rc == 0
+      retries: 60
+      delay: 10
+      failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
+      run_once: true

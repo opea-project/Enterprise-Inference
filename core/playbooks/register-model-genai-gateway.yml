@@ -1,0 +1,65 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Check if model deployed with Litellm exists
+  uri:
+    url: "https://{{ secret_name }}/models?return_wildcard_routes=false"
+    method: GET
+    headers:
+      accept: "application/json"
+      Authorization: "Bearer {{ litellm_master_key }}"
+    validate_certs: no
+    status_code: [200, 404]
+  register: existing_models
+  tags: always
+
+- name: Parse existing models and check if our model exists
+  set_fact:
+    model_exists: "{{ existing_models.json.data | selectattr('id', 'equalto', reg_model_name) | list | length > 0 }}"
+  when: existing_models.status == 200 and existing_models.json.data is defined
+  tags: always
+
+- name: Set model_exists to false if API call failed or no data
+  set_fact:
+    model_exists: false
+  when: existing_models.status != 200 or existing_models.json.data is not defined
+  tags: always
+
+- name: Register deployed model with API
+  uri:
+    url: "https://{{ secret_name }}/model/new"
+    method: POST
+    headers:
+      accept: "*/*"
+      cache-control: "no-cache"
+      content-type: "application/json"
+      Authorization: "Bearer {{ litellm_master_key }}"
+    validate_certs: no
+    body_format: json
+    body:
+      model_name: "{{ reg_model_name }}"
+      litellm_params:
+        model: "{{ reg_litellm_model }}"
+        custom_llm_provider: "{{ reg_custom_llm_provider }}"
+        api_key: "none"
+        api_base: "{{ reg_api_base }}"
+        input_cost_per_token: "{{ reg_input_cost_per_token }}"
+        output_cost_per_token: "{{ reg_output_cost_per_token }}"
+        model_info:
+          mode: "{{ reg_model_mode | default('chat') }}"
+    status_code: 200
+  register: api_register_result
+  when: not model_exists
+  tags: always
+
+- name: Model registration skipped (already exists)
+  debug:
+    msg: "Model '{{ reg_model_name }}' already exists, skipping registration"
+  when: model_exists
+  tags: always
+
+- name: Model registration completed
+  debug:
+    msg: "Model '{{ reg_model_name }}' registered successfully"
+  when: not model_exists and api_register_result is defined
+  tags: always

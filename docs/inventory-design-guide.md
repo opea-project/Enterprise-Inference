@@ -2,7 +2,6 @@
    
    Design your inventory file located at `core/inventory/hosts.yaml` according to your enterprise deployment requirements for the inference cluster.    
 
-- [Designing Inventory for Inference Cluster Deployment](#designing-inventory-for-inference-cluster-deployment)
    - [Control Plane Node Sizing](#control-plane-node-sizing)
    - [Workload Node Sizing](#workload-node-sizing)
    - [CPU-based Workloads (Intel Xeon)](#cpu-based-workloads-intel-xeon)

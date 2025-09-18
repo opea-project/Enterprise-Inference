@@ -41,6 +41,8 @@ spec:
                 name: {{ .Values.global.extraEnvConfig }}
                 optional: true
             {{- end }}
+            - secretRef:
+                name: {{ include "tei.fullname" . }}-secret
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

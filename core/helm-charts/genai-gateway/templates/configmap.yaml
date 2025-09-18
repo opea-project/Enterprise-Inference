@@ -1,0 +1,11 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genai-gateway-config  
+  labels:
+    app: litellm  
+data:
+  proxy_config.yaml: |-
+    {{ .Values.config.proxy_config_yaml | nindent 4 }}

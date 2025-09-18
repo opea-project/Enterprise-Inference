@@ -48,7 +48,10 @@ Run the command below to deploy the Llama 3.1 8B parameter model on CPU.
 ```
 
 #### Intel® Gaudi® AI Accelerators
-Run the command below to deploy Llama 3.1 8B parameter model on Intel® Gaudi®.
+
+> **📝 Note**: If you're using Intel® Gaudi® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./gaudi-prerequisites.md#automated-installationupgrade-process) before deployment.
+
+Run the command below to deploy the Llama 3.1 8B parameter model on Intel® Gaudi®.
 ```bash
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
