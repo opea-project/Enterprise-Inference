@@ -1,0 +1,335 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+image:
+  repository: docker.io/rook/ceph
+  tag: v1.16.5
+  pullPolicy: IfNotPresent
+crds:
+  enabled: true
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 128Mi
+nodeSelector:
+  type: storage-node
+tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+    operator: Exists
+unreachableNodeTolerationSeconds: 5
+currentNamespaceOnly: false
+operatorPodLabels: {}
+annotations: {}
+logLevel: INFO
+rbacEnable: true
+rbacAggregate:
+  enableOBCs: false
+pspEnable: false
+priorityClassName:
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 2016
+  runAsGroup: 2016
+  capabilities:
+    drop: ["ALL"]
+allowLoopDevices: false
+csi:
+  enableRbdDriver: true
+  enableCephfsDriver: true
+  disableCsiDriver: "false"
+  enableCSIHostNetwork: true
+  enableCephfsSnapshotter: true
+  enableNFSSnapshotter: true
+  enableRBDSnapshotter: true
+  enablePluginSelinuxHostMount: false
+  enableCSIEncryption: false
+  enableVolumeGroupSnapshot: true
+  pluginPriorityClassName: system-node-critical
+  provisionerPriorityClassName: system-cluster-critical
+  rbdFSGroupPolicy: "File"
+  cephFSFSGroupPolicy: "File"
+  nfsFSGroupPolicy: "File"
+  enableOMAPGenerator: false
+  cephFSKernelMountOptions:
+  enableMetadata: false
+  provisionerReplicas: 2
+  clusterName:
+  logLevel: 0
+  sidecarLogLevel:
+  csiDriverNamePrefix:
+  rbdPluginUpdateStrategy:
+  rbdPluginUpdateStrategyMaxUnavailable:
+  cephFSPluginUpdateStrategy:
+  cephFSPluginUpdateStrategyMaxUnavailable:
+  nfsPluginUpdateStrategy:
+  grpcTimeoutInSeconds: 150
+  kubeApiBurst:
+  kubeApiQPS:
+  csiRBDPluginVolume:
+  csiRBDPluginVolumeMount:
+  csiCephFSPluginVolume:
+  csiCephFSPluginVolumeMount:
+  csiRBDProvisionerResource: |
+    - name : csi-provisioner
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-resizer
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-attacher
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-snapshotter
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-rbdplugin
+      resource:
+        requests:
+          memory: 512Mi
+        limits:
+          memory: 1Gi
+    - name : csi-omap-generator
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+    - name : liveness-prometheus
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+  csiRBDPluginResource: |
+    - name : driver-registrar
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+    - name : csi-rbdplugin
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+    - name : liveness-prometheus
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+  csiCephFSProvisionerResource: |
+    - name : csi-provisioner
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-resizer
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-attacher
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-snapshotter
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-cephfsplugin
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+    - name : liveness-prometheus
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+  csiCephFSPluginResource: |
+    - name : driver-registrar
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+    - name : csi-cephfsplugin
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+    - name : liveness-prometheus
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+  csiNFSProvisionerResource: |
+    - name : csi-provisioner
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 100m
+        limits:
+          memory: 256Mi
+    - name : csi-nfsplugin
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+    - name : csi-attacher
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+  csiNFSPluginResource: |
+    - name : driver-registrar
+      resource:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 256Mi
+    - name : csi-nfsplugin
+      resource:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+  provisionerTolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+  provisionerNodeAffinity:
+    type: storage-node
+  pluginTolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  pluginNodeAffinity:
+  enableLiveness: false
+  cephfsLivenessMetricsPort:
+  csiAddonsPort:
+  csiAddonsRBDProvisionerPort:
+  csiAddonsCephFSProvisionerPort:
+  forceCephFSKernelClient: true
+  rbdLivenessMetricsPort:
+  serviceMonitor:
+    enabled: false
+    interval: 10s
+    labels: {}
+    namespace:
+  kubeletDirPath:
+  csiLeaderElectionLeaseDuration:
+  csiLeaderElectionRenewDeadline:
+  csiLeaderElectionRetryPeriod:
+  cephcsi:
+    repository: quay.io/cephcsi/cephcsi
+    tag: v3.13.0
+  registrar:
+    repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    tag: v2.13.0
+  provisioner:
+    repository: registry.k8s.io/sig-storage/csi-provisioner
+    tag: v5.1.0
+  snapshotter:
+    repository: registry.k8s.io/sig-storage/csi-snapshotter
+    tag: v8.2.0
+  attacher:
+    repository: registry.k8s.io/sig-storage/csi-attacher
+    tag: v4.8.0
+  resizer:
+    repository: registry.k8s.io/sig-storage/csi-resizer
+    tag: v1.13.1
+  imagePullPolicy: IfNotPresent
+cephfsPodLabels:
+nfsPodLabels:
+rbdPodLabels:
+  csiAddons:
+    enabled: false
+    repository: quay.io/csiaddons/k8s-sidecar
+    tag: v0.11.0
+  nfs:
+    enabled: false
+  topology:
+    enabled: false
+    domainLabels:
+  cephFSAttachRequired: true
+  rbdAttachRequired: true
+  nfsAttachRequired: true
+enableDiscoveryDaemon: false
+discoveryDaemonInterval: 60m
+cephCommandsTimeoutSeconds: "15"
+useOperatorHostNetwork:
+scaleDownOperator: false
+discover:
+  toleration: NoSchedule
+  tolerationKey: node-role.kubernetes.io/control-plane
+  tolerations:
+     - key: node-role.kubernetes.io/control-plane
+       operator: Exists
+       effect: NoSchedule
+  nodeAffinity:
+    type: storage-node
+podLabels:
+  resources:
+customHostnameLabel:
+hostpathRequiresPrivileged: false
+enforceHostNetwork: false
+disableDeviceHotplug: false
+revisionHistoryLimit:
+discoverDaemonUdev:
+imagePullSecrets:
+enableOBCWatchOperatorNamespace: true
+obcProvisionerNamePrefix:
+monitoring:
+  enabled: false
+

@@ -1,6 +1,6 @@
 # Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,26 +8,17 @@ metadata:
   labels:
     {{- include "vllm.labels" . | nindent 4 }}
 data:
-  HF_TOKEN: {{ .Values.global.HUGGINGFACEHUB_API_TOKEN | quote}}
-
   {{- if .Values.global.HF_ENDPOINT }}
   HF_ENDPOINT: {{ .Values.global.HF_ENDPOINT | quote}}
   {{- end }}
   http_proxy: {{ .Values.global.http_proxy | quote }}
   https_proxy: {{ .Values.global.https_proxy | quote }}
   no_proxy: {{ .Values.global.no_proxy | quote }}
-  {{- if contains "opea/vllm-gaudi" .Values.image.repository }}
   HABANA_LOGS: "/tmp/habana_logs"
   TORCHINDUCTOR_CACHE_DIR: "/tmp"
-  {{- end }}
   NUMBA_CACHE_DIR: "/tmp"
-  HF_HOME: "/data/.cache/huggingface"
-  # HF_HOME: "/data/transformers_cache"
-  # https://github.com/outlines-dev/outlines/blob/main/outlines/caching.py#L14-L29
-  OUTLINES_CACHE_DIR: "/tmp/.cache/outlines"
-  # To configure where repositories from the Hub will be cached locally (models, datasets and spaces).
-  # Defaults to "$HF_HOME/hub" (e.g. "~/.cache/huggingface/hub" by default).
-  # HUGGINGFACE_HUB_CACHE is depricated and replcaed with HF_HUB_CACHE
+  HF_HOME: "/data"
+  OUTLINES_CACHE_DIR: "/tmp/.cache/outlines"  
   {{- if .Values.HABANA_VISIBLE_DEVICES }}
   HABANA_VISIBLE_DEVICES: {{ .Values.HABANA_VISIBLE_DEVICES | quote}}
   {{- end }}
@@ -41,7 +32,7 @@ data:
   DO_NOT_TRACK: {{ .Values.DO_NOT_TRACK | quote}}
   {{- end }}
 
-  {{- $modelConfig := (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).configMapValues | default .Values.defaultModelConfigs.configMapValues }}
+  {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict).configMapValues | default .Values.defaultModelConfigs.configMapValues }}
   {{- range $key, $value := $modelConfig }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

@@ -1,0 +1,142 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Detect container runtime version
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+  register: node_info
+
+- name: Validate nodes are available
+  ansible.builtin.fail:
+    msg: "No Kubernetes nodes found. Cannot detect container runtime."
+  when: node_info.resources | length == 0
+
+- name: Extract runtime version from first node
+  ansible.builtin.set_fact:
+    container_runtime: "{{ node_info.resources[0].status.nodeInfo.containerRuntimeVersion }}"
+    runtime_name: "{{ node_info.resources[0].status.nodeInfo.containerRuntimeVersion.split('://')[0] if '://' in node_info.resources[0].status.nodeInfo.containerRuntimeVersion else 'unknown' }}"
+    runtime_version: "{{ node_info.resources[0].status.nodeInfo.containerRuntimeVersion.split('://')[1] if '://' in node_info.resources[0].status.nodeInfo.containerRuntimeVersion else node_info.resources[0].status.nodeInfo.containerRuntimeVersion }}"
+
+- name: Check containerd version compatibility
+  ansible.builtin.set_fact:
+    containerd_needs_patch: >-
+      {{
+        runtime_name == 'containerd' and
+        runtime_version is version('2.0.0', '<')
+      }}
+    crio_needs_patch: >-
+      {{
+        runtime_name == 'cri-o' and
+        runtime_version is version('1.26.0', '<')
+      }}
+
+- name: Check if NRI socket exists (for newer runtimes)
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name | default('') }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "test -S /var/run/nri/nri.sock && echo 'nri_socket_exists' || echo 'nri_socket_missing'"
+  register: nri_socket_check
+  ignore_errors: true
+  when:
+    - optimizer_pod_name is defined
+    - not (containerd_needs_patch | default(false))
+    - not (crio_needs_patch | default(false))
+
+- name: Display runtime compatibility info
+  ansible.builtin.debug:
+    msg:
+      - "Container Runtime: {{ container_runtime }}"
+      - "Runtime Name: {{ runtime_name }}"
+      - "Runtime Version: {{ runtime_version }}"
+      - "Containerd needs patch: {{ containerd_needs_patch | default(false) }}"
+      - "CRI-O needs patch: {{ crio_needs_patch | default(false) }}"
+      - "NRI Socket Status: {{ nri_socket_check.stdout | default('not_checked') }}"
+
+- name: Install NRI prerequisites if needed
+  ansible.builtin.debug:
+    msg:
+      - "Installing NRI support with runtime-specific configuration..."
+      - "Runtime patching required: {{ (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false)) }}"
+
+- name: Add NRI plugins Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ nri_cpu_balloons.helm.repo_name }}"
+    repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
+    state: present
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+
+- name: Update Helm repositories for NRI
+  ansible.builtin.command: helm repo update
+
+- name: Deploy NRI resource policy with runtime patching (for older runtimes)
+  ansible.builtin.command: >
+    helm upgrade --install nri-resource-policy-balloons
+    {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
+    --namespace {{ nri_cpu_balloons.namespace }}
+    --create-namespace
+    --set nri.runtime.patchConfig=true
+    --wait
+    --timeout {{ nri_cpu_balloons.installation_timeout }}s
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  when: (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false))
+
+- name: Deploy NRI resource policy without runtime patching (for newer runtimes)
+  ansible.builtin.command: >
+    helm upgrade --install nri-resource-policy-balloons
+    {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
+    --namespace {{ nri_cpu_balloons.namespace }}
+    --create-namespace
+    --wait
+    --timeout {{ nri_cpu_balloons.installation_timeout }}s
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  when: not ((containerd_needs_patch | default(false)) or (crio_needs_patch | default(false)))
+
+- name: Wait for container runtime restart (when patching is applied)
+  ansible.builtin.pause:
+    seconds: 30
+    prompt: "Waiting for container runtime to restart after configuration patch..."
+  when: (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false))
+
+- name: Wait for NRI daemon to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: "nri-resource-policy-balloons"
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: nri_daemon_status
+  until:
+    - nri_daemon_status.resources | length > 0
+    - nri_daemon_status.resources[0].status.numberReady | default(0) > 0
+  retries: 20
+  delay: 30
+
+- name: Verify NRI socket is available (final check)
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name | default('') }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "test -S /var/run/nri/nri.sock && echo 'NRI socket ready' || echo 'NRI socket not found'"
+  register: final_nri_check
+  ignore_errors: true
+  when: optimizer_pod_name is defined
+
+- name: Confirm NRI installation
+  ansible.builtin.debug:
+    msg:
+      - "NRI resource policy installed successfully"
+      - "Runtime: {{ container_runtime }}"
+      - "Patching applied: {{ (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false)) }}"
+      - "NRI Socket Status: {{ final_nri_check.stdout | default('not_checked') }}"
+      - "Daemon Status: {{ nri_daemon_status.resources[0].status.numberReady | default(0) }} pods ready"

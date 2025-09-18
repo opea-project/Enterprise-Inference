@@ -1,0 +1,92 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Gather OS facts
+  setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - distribution
+      - distribution_version
+      - distribution_major_version
+  tags: always
+
+- name: Validate supported OS version
+  block:
+    - name: Check if OS is officially supported
+      set_fact:
+        os_supported: >-
+          {{
+            (ansible_distribution == "Ubuntu" and ansible_distribution_version == "22.04") or
+            (ansible_distribution == "RedHat" and ansible_distribution_major_version == "9")
+          }}
+    
+    - name: Display OS support status
+      debug:
+        msg: |
+          {% if os_supported %}
+          ✓ OS validation passed: {{ ansible_distribution }} {{ ansible_distribution_version }} is officially supported
+          {% else %}
+          Unsupported OS detected: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          
+          Officially supported operating systems:
+          - Ubuntu 22.04
+          - RHEL 9
+          
+          Current system: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          {% endif %}
+    
+    - name: Prompt for user acknowledgment on unsupported OS
+      pause:
+        prompt: |          
+          WARNING: Unsupported Operating System Detected
+          
+          You are running on: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          
+          This OS version has not been officially tested or validated for Intel AI Enterprise Inference.
+          Proceeding may result in:
+          - Installation failures
+          - Runtime issues
+          - Performance degradation
+          - Unexpected behavior
+          
+          Officially supported platforms:
+          - Ubuntu 22.04
+          - RHEL 9
+          
+          Do you want to proceed anyway at your own risk? (yes/no)
+      register: user_ack_unsupported
+      when: not os_supported
+    
+    - name: Validate user acknowledgment
+      fail:
+        msg: |
+          Deployment cancelled by user choice.
+          Please install on a supported OS version or contact support for guidance.
+      when: 
+        - not os_supported
+        - user_ack_unsupported.user_input | lower not in ['yes', 'y']
+    
+    - name: Log user acknowledgment for unsupported OS
+      debug:
+        msg: |
+          User acknowledged proceeding on unsupported OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          This deployment is not officially supported and may encounter issues.
+      when: 
+        - not os_supported
+        - user_ack_unsupported.user_input | lower in ['yes', 'y']
+    
+    - name: Display OS information
+      debug:
+        msg: |
+          Detected OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Major version: {{ ansible_distribution_major_version }}
+          OS family: {{ ansible_os_family }}
+  tags: always
+
+- name: Check if kubectl is Available
+  command: kubectl version --client
+  register: kubectl_available
+  failed_when: false
+  changed_when: false
+  tags: always

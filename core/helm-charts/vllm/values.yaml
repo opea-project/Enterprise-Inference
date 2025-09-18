@@ -21,11 +21,11 @@ accelDevice: ""
 port: 2080
 shmSize: 1Gi
 image:
-  repository: opea/vllm
+  repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
   # Uncomment the following line to set desired image pull policy if needed, as one of Always, IfNotPresent, Never.
   # pullPolicy: ""
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.2"
+  tag: "v0.10.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -44,6 +44,9 @@ serviceAccount:
 
 podAnnotations: {}
 
+# CPU Balloon configuration for NRI resource policy
+cpu_balloon_annotation: ""
+
 podSecurityContext:
   fsGroup: 1001
   runAsUser: 1001
@@ -55,7 +58,7 @@ securityContext:
       - ALL
     add:
       - SYS_NICE
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1001
   seccompProfile:
@@ -80,12 +83,14 @@ apisix:
   enabled: false
 
 ingress:
-  enabled: false  # Set to true to enable the Ingress resource
+  enabled: false # Set to true to enable the Ingress resource
   host: ""
   namespace: default
   secretname: ""
 
-
+#This is just a placeholder value. It will be dynamically replaced by the playbook
+cpu: 8
+memory: 8Gi
 
 oidc:
   realm: master
@@ -94,7 +99,7 @@ oidc:
   discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
   introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
 
-resources: {}
+resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -102,9 +107,9 @@ resources: {}
   # limits:
   #   cpu: 100m
   #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+  requests:
+    cpu: "{{ .Values.cpu }}"
+    memory: "{{ .Values.memory }}"
 
 extraCmdArgs: []
 
@@ -131,7 +136,6 @@ extraCmdArgs: []
 #   periodSeconds: 10
 #   failureThreshold: 7200  # Allows up to 2 hours (10s * 7200 = 72000s)
 
-
 readinessProbe:
   httpGet:
     path: /health
@@ -143,19 +147,17 @@ readinessProbe:
 #   httpGet:
 #     path: /health
 #     port: http
-#   initialDelaySeconds: 120 
+#   initialDelaySeconds: 120
 #   periodSeconds: 30
 #   failureThreshold: 79
-
 
 nodeSelector: {}
 
 tolerations: []
 
-
 affinity:
   nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:      
+    preferredDuringSchedulingIgnoredDuringExecution:
       - weight: 100
         preference:
           matchExpressions:
@@ -172,30 +174,146 @@ affinity:
                 - "true"
 
 LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
-
+SERVED_MODEL_NAME: ""
 # Environment variables for vLLM (set in configmap):
 # https://docs.vllm.ai/en/latest/getting_started/gaudi-installation.html#environment-variables
-OMPI_MCA_btl_vader_single_copy_mechanism: ""
-PT_HPU_ENABLE_LAZY_COLLECTIVES: ""
 VLLM_CPU_KVCACHE_SPACE: "40"
+VLLM_RPC_TIMEOUT: "100000"
+VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
 VLLM_CONFIGURE_LOGGING: 1
 VLLM_NO_USAGE_STATS: 1
+VLLM_CPU_SGL_KERNEL: "1"
+DO_NOT_TRACK: 1
+
+# CPU optimization settings (can be updated by automation)
+cpu_optimization_enabled: false
+max_num_batched_tokens: "2048"
+max_num_seqs: "256"
+
+# Parallelism configuration (root level for global access)
+tensor_parallel_size: "2"
+pipeline_parallel_size: "1"
 
 modelConfigs:
-  model:
-    configMapValues: {}
+  "meta-llama/Llama-3.1-8B-Instruct":
+    configMapValues:
+      VLLM_CPU_KVCACHE_SPACE: "40"
+      VLLM_RPC_TIMEOUT: "100000"
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
+      VLLM_CPU_SGL_KERNEL: "1"
+    extraCmdArgs:
+      [
+        "--block-size",
+        "128",
+        "--dtype",
+        "bfloat16",
+        "--max-model-len",
+        "8192",
+        "--distributed_executor_backend",
+        "mp",
+        "--enable_chunked_prefill",
+        "--enforce-eager",
+        "--max-num-batched-tokens",
+        "2048",
+        "--max-num-seqs",
+        "256",
+        "--disable-log-requests",
+      ]
+    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
+
+  "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
+    configMapValues:
+      VLLM_CPU_KVCACHE_SPACE: "40"
+      VLLM_RPC_TIMEOUT: "100000"
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
+      VLLM_CPU_SGL_KERNEL: "1"
+    extraCmdArgs:
+      [
+        "--block-size",
+        "128",
+        "--dtype",
+        "bfloat16",
+        "--max-model-len",
+        "8192",
+        "--distributed_executor_backend",
+        "mp",
+        "--enable_chunked_prefill",
+        "--enforce-eager",
+        "--max-num-batched-tokens",
+        "2048",
+        "--max-num-seqs",
+        "256",
+        "--disable-log-requests",
+      ]
+    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
+
+  "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
+    configMapValues:
+      VLLM_CPU_KVCACHE_SPACE: "40"
+      VLLM_RPC_TIMEOUT: "100000"
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
+      VLLM_CPU_SGL_KERNEL: "1"
+    extraCmdArgs:
+      [
+        "--block-size",
+        "128",
+        "--dtype",
+        "bfloat16",
+        "--max-model-len",
+        "8192",
+        "--distributed_executor_backend",
+        "mp",
+        "--enable_chunked_prefill",
+        "--enforce-eager",
+        "--max-num-batched-tokens",
+        "2048",
+        "--max-num-seqs",
+        "256",
+        "--disable-log-requests",
+      ]
+    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
 defaultModelConfigs:
-  configMapValues:    
-    OMPI_MCA_btl_vader_single_copy_mechanism: none
-    PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
+  configMapValues:
     VLLM_CPU_KVCACHE_SPACE: "40"
-  extraCmdArgs: ["--block-size", "128", "--dtype", "bfloat16", "--max-model-len","5196"]
-  tensor_parallel_size: "1"
+    VLLM_RPC_TIMEOUT: "100000"
+    VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+    VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+    VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
+    VLLM_CPU_SGL_KERNEL: "1"
+  extraCmdArgs:
+    [
+      "--block-size",
+      "128",
+      "--dtype",
+      "bfloat16",
+      "--max-model-len",
+      "8192",
+      "--distributed_executor_backend",
+      "mp",
+      "--enable_chunked_prefill",
+      "--enforce-eager",
+      "--max-num-batched-tokens",
+      "2048",
+      "--max-num-seqs",
+      "256",
+    ]
+  tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+  pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
 svcmonitor:
-  enabled: false  
-
+  enabled: false
 
 global:
   http_proxy: ""
@@ -222,4 +340,3 @@ global:
 
   # Prometheus Helm install release name for serviceMonitor
   prometheusRelease: observability
-
