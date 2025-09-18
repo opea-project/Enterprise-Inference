@@ -118,6 +118,10 @@
         values:
           kubeEtcd:
             enabled: false
+            image:
+              repository: docker.io/bitnamilegacy/etcd
+              tag: 16.3.0-debian-12-r23"
+              pullPolicy: IfNotPresent
           prometheus:
             prometheusSpec:
               retention: 15d

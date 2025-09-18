@@ -1274,7 +1274,7 @@ deploy_from_huggingface() {
     echo "${YELLOW}NOTICE: The model deployment name will be used as the release identifier for deployment. It must be unique, meaningful, and follow Kubernetes naming conventions — lowercase letters, numbers, and hyphens only. Capital letters or special characters are not allowed. ${NC}"
     read -p "Enter Deployment Name for the Model: " huggingface_model_deployment_name
     echo "${YELLOW}NOTICE: Ensure the Tensor Parallel size value corresponds to the number of available Gaudi cards. Providing an incorrect value may result in the model being in a not ready state. ${NC}" 
-    if [ "$cpu_or_gpu" = "g" ]; then
+     if [ "$cpu_or_gpu" = "g" ] || [ $cpu_or_gpu = "gaudi2" ] || [ $cpu_or_gpu = "gaudi3" ] ; then
         read -p "Enter the Tensor Parallel size:" -r huggingface_tensor_parellel_size        
         if ! [[ "$huggingface_tensor_parellel_size" =~ ^[0-9]+$ ]]; then
             echo "Invalid input: Tensor Parallel size must be a positive integer."

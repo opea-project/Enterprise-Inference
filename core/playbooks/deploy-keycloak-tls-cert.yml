@@ -143,6 +143,11 @@
               - hosts:
                   - "{{ secret_name }}"
                 secretName: "{{ secret_name }}"           
+          image:
+            registry: docker.io
+            repository: bitnamilegacy/keycloak
+            tag: 25.0.2-debian-12-r2
+            pullPolicy: IfNotPresent
           tolerations:
             - key: "node-role.kubernetes.io/control-plane"
               operator: "Exists"
@@ -170,6 +175,13 @@
                       matchLabels:
                         app: keycloak
                     topologyKey: "kubernetes.io/hostname"
+          postgresql:
+            enabled: true
+            image:
+              registry: docker.io
+              repository: bitnamilegacy/postgresql
+              tag: 16.3.0-debian-12-r23
+              pullPolicy: IfNotPresent
     - name: Verify Keycloak StatefulSet readiness
       community.kubernetes.k8s_info:
         kind: StatefulSet
