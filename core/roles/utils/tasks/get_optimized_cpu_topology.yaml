@@ -1,0 +1,594 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Enhanced CPU topology and socket detection for optimal NRI balloon policy
+  kubernetes.core.k8s:
+    state: present
+    namespace: kube-system
+    definition:
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: node-topology-optimizer
+        namespace: kube-system
+      spec:
+        selector:
+          matchLabels:
+            app: node-topology-optimizer
+        template:
+          metadata:
+            labels:
+              app: node-topology-optimizer
+          spec:
+            # For single-node clusters, run on any schedulable node
+            # For multi-node clusters, prefer worker nodes
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    preference:
+                      matchExpressions:
+                        - key: node-role.kubernetes.io/worker
+                          operator: Exists
+                  - weight: 50
+                    preference:
+                      matchExpressions:
+                        - key: node-role.kubernetes.io/control-plane
+                          operator: DoesNotExist
+            tolerations:
+              - operator: Exists # Allow scheduling on any node including master
+            securityContext:
+              fsGroup: 2000
+              runAsGroup: 3000
+              runAsNonRoot: true
+              runAsUser: 1000
+              seccompProfile:
+                type: RuntimeDefault
+            containers:
+              - name: ubuntu
+                image: ubuntu
+                command: ["sleep", "infinity"]
+            restartPolicy: Always
+  tags:
+    - install
+
+- name: Wait for node-topology-optimizer pods to be ready (single/multi-node support)
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: kube-system
+    label_selectors:
+      - app=node-topology-optimizer
+  register: optimizer_pods_info
+  until: optimizer_pods_info.resources | length > 0 and (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | list | length > 0)
+  retries: 10
+  delay: 5
+  tags:
+    - install
+
+- name: Get available nodes and their roles for smart selection
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+  register: all_nodes_info
+  tags:
+    - install
+
+- name: Identify worker nodes and schedulable nodes
+  ansible.builtin.set_fact:
+    worker_nodes: "{{ all_nodes_info.resources | selectattr('metadata.labels.node-role.kubernetes.io/worker', 'defined') | map(attribute='metadata.name') | list }}"
+    schedulable_nodes: "{{ all_nodes_info.resources | rejectattr('spec.taints', 'defined') | map(attribute='metadata.name') | list }}"
+    all_node_names: "{{ all_nodes_info.resources | map(attribute='metadata.name') | list }}"
+    running_optimizer_nodes: "{{ optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | map(attribute='spec.nodeName') | list }}"
+  tags:
+    - install
+
+- name: Debug node information for troubleshooting
+  ansible.builtin.debug:
+    msg:
+      - "Debug: Node selection information"
+      - "All nodes: {{ all_node_names }}"
+      - "Worker nodes: {{ worker_nodes }}"
+      - "Schedulable nodes: {{ schedulable_nodes }}"
+      - "Running optimizer nodes: {{ running_optimizer_nodes }}"
+      - "Target node (if predefined): {{ target_node | default('not defined') }}"
+  tags:
+    - install
+
+- name: Initialize target node variable
+  ansible.builtin.set_fact:
+    target_worker_node: ""
+  tags:
+    - install
+
+- name: Use predefined target node if available
+  ansible.builtin.set_fact:
+    target_worker_node: "{{ target_node }}"
+  when:
+    - target_node is defined
+    - target_node != ""
+    - target_node != "None"
+    - target_node != none
+  tags:
+    - install
+
+- name: Select first worker node if available
+  ansible.builtin.set_fact:
+    target_worker_node: "{{ worker_nodes[0] }}"
+  when:
+    - target_worker_node == ""
+    - worker_nodes is defined
+    - worker_nodes | length > 0
+  tags:
+    - install
+
+- name: Select first schedulable node if no workers
+  ansible.builtin.set_fact:
+    target_worker_node: "{{ schedulable_nodes[0] }}"
+  when:
+    - target_worker_node == ""
+    - schedulable_nodes is defined
+    - schedulable_nodes | length > 0
+  tags:
+    - install
+
+- name: Select first available node as fallback
+  ansible.builtin.set_fact:
+    target_worker_node: "{{ all_node_names[0] }}"
+  when:
+    - target_worker_node == ""
+    - all_node_names is defined
+    - all_node_names | length > 0
+  tags:
+    - install
+
+- name: Use hardcoded master as final fallback
+  ansible.builtin.set_fact:
+    target_worker_node: "master1"
+  when: target_worker_node == ""
+  tags:
+    - install
+
+- name: Confirm automatic node selection
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Automatic Node Selection for Model Deployment"
+      - "==================================================================="
+      - "Selected Node: {{ target_worker_node }}"
+      - "Selection Type: {{ 'Worker Node' if target_worker_node in worker_nodes else 'Control Plane Node' }}"
+      - "Total Nodes Available: {{ all_node_names | length }}"
+      - "Worker Nodes Available: {{ worker_nodes | length }}"
+      - ""
+      - "✅ Balloon policy will be created on: {{ target_worker_node }}"
+      - "✅ Model will be deployed on the same node for optimal performance"
+  tags:
+    - install
+
+- name: Validate target node selection
+  ansible.builtin.fail:
+    msg: "Failed to select a valid target node. Cluster appears to have no available nodes."
+  when: target_worker_node is not defined or target_worker_node == '' or target_worker_node == 'None'
+  tags:
+    - install
+
+- name: Get optimizer pod on target worker node
+  ansible.builtin.set_fact:
+    optimizer_pod_name: "{{ (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | selectattr('spec.nodeName', 'equalto', target_worker_node) | list | first | default({})).metadata.name | default('') }}"
+  tags:
+    - install
+
+- name: Handle case where no optimizer pod is on target node
+  ansible.builtin.set_fact:
+    optimizer_pod_name: "{{ (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | list | first | default({})).metadata.name | default('') }}"
+    target_worker_node: "{{ (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | list | first | default({})).spec.nodeName | default('') }}"
+  when: optimizer_pod_name == '' and (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | list | length > 0)
+  tags:
+    - install
+
+- name: Validate optimizer pod availability
+  ansible.builtin.fail:
+    msg: "No running optimizer pods found. The node-topology-optimizer DaemonSet may not be ready yet."
+  when: optimizer_pod_name == '' or target_worker_node == ''
+  tags:
+    - install
+
+- name: Display selected node for topology detection
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "CPU Topology Detection Target"
+      - "==================================================================="
+      - "Cluster Type: {{ 'Single-Node' if worker_nodes | length == 0 else 'Multi-Node (' + (worker_nodes | length | string) + ' workers)' }}"
+      - "Target Node: {{ target_worker_node }}"
+      - "Node Type: {{ 'Worker Node' if target_worker_node in worker_nodes else 'Schedulable Node' }}"
+      - "Optimizer Pod: {{ optimizer_pod_name }}"
+  tags:
+    - install
+
+- name: Get detailed CPU information
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "lscpu"
+  register: detailed_cpu_info
+  tags:
+    - install
+
+- name: Get total number of sockets
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "lscpu | grep 'Socket(s):' | awk '{print $2}'"
+  register: total_sockets
+  tags:
+    - install
+
+- name: Get total number of NUMA nodes
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "lscpu | grep 'NUMA node(s):' | awk '{print $3}'"
+  register: total_numa_nodes
+  tags:
+    - install
+
+- name: Calculate NUMA nodes per socket
+  ansible.builtin.set_fact:
+    numa_nodes_per_socket: "{{ (total_numa_nodes.stdout | int) // (total_sockets.stdout | int) }}"
+  tags:
+    - install
+
+- name: Get accurate CPU counts per NUMA node
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: >-
+      bash -c '
+      total_numa_cpus=0;
+      declare -a socket_totals;
+      numa_per_socket={{ numa_nodes_per_socket }};
+      total_sockets={{ total_sockets.stdout | int }};
+      total_numa={{ total_numa_nodes.stdout | int }};
+
+      for s in $(seq 0 $((total_sockets - 1))); do
+        socket_totals[$s]=0;
+      done;
+
+      for i in $(seq 0 $((total_numa - 1))); do
+        numa_cpus=$(lscpu | grep "NUMA node$i CPU(s):" | cut -d: -f2 | xargs);
+        if [[ "$numa_cpus" != "" ]]; then
+          cpu_count=0;
+          for range in $(echo $numa_cpus | tr "," " "); do
+            if [[ $range == *-* ]]; then
+              start=${range%-*};
+              end=${range#*-};
+              count=$((end - start + 1));
+              cpu_count=$((cpu_count + count));
+            else
+              cpu_count=$((cpu_count + 1));
+            fi;
+          done;
+
+          echo "NUMA_$i=$cpu_count";
+          total_numa_cpus=$((total_numa_cpus + cpu_count));
+
+          socket_id=$((i / numa_per_socket));
+          socket_totals[$socket_id]=$((socket_totals[$socket_id] + cpu_count));
+        fi;
+      done;
+
+      for s in $(seq 0 $((total_sockets - 1))); do
+        echo "SOCKET_$s=${socket_totals[$s]}";
+      done;
+
+      echo "TOTAL_CPUS=$total_numa_cpus";
+      echo "CPUS_PER_NUMA=$((total_numa_cpus / total_numa))";
+      '
+  register: accurate_cpu_counts
+  tags:
+    - install
+
+- name: Parse accurate CPU topology results
+  ansible.builtin.set_fact:
+    numa_cpu_counts: >-
+      {%- set numa_counts = {} -%}
+      {%- for line in accurate_cpu_counts.stdout_lines -%}
+        {%- if line.startswith('NUMA_') -%}
+          {%- set parts = line.split('=') -%}
+          {%- set numa_id = parts[0].replace('NUMA_', '') | int -%}
+          {%- set cpu_count = parts[1] | int -%}
+          {%- set _ = numa_counts.update({numa_id: cpu_count}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ numa_counts }}
+    socket_cpu_totals: >-
+      {%- set socket_totals = {} -%}
+      {%- for line in accurate_cpu_counts.stdout_lines -%}
+        {%- if line.startswith('SOCKET_') -%}
+          {%- set parts = line.split('=') -%}
+          {%- set socket_id = parts[0].replace('SOCKET_', '') | int -%}
+          {%- set cpu_count = parts[1] | int -%}
+          {%- set _ = socket_totals.update({socket_id: cpu_count}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ socket_totals }}
+    total_cpu_count: >-
+      {%- for line in accurate_cpu_counts.stdout_lines -%}
+        {%- if line.startswith('TOTAL_CPUS=') -%}
+          {{ line.split('=')[1] | int }}
+        {%- endif -%}
+      {%- endfor -%}
+    cpus_per_numa_node: >-
+      {%- for line in accurate_cpu_counts.stdout_lines -%}
+        {%- if line.startswith('CPUS_PER_NUMA=') -%}
+          {{ line.split('=')[1] | int }}
+        {%- endif -%}
+      {%- endfor -%}
+  tags:
+    - install
+
+- name: Set CPUs per socket from accurate calculation
+  ansible.builtin.set_fact:
+    cpus_per_socket: "{{ socket_cpu_totals[0] | default(0) | int }}"
+  tags:
+    - install
+
+- name: Gather NUMA node meminfo from target node
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "for n in /sys/devices/system/node/node*/meminfo; do node=$(basename $(dirname $n)); size_kb=$(grep MemTotal $n | awk '{print $4}'); free_kb=$(grep MemFree $n | awk '{print $4}'); echo \"$node $size_kb $free_kb\"; done"
+  register: numa_info
+  tags:
+    - install
+
+- name: Parse sysfs NUMA memory info
+  set_fact:
+    numa_memory: "{{ numa_memory_parsed | from_yaml }}"
+  vars:
+    numa_memory_parsed: |
+      {%- set result = {} -%}
+      {%- for line in numa_info.stdout_lines -%}
+        {%- set parts = line.split() -%}
+        {%- set node = parts[0].replace("node","") | int -%}
+        {%- set size_kb = parts[1] | int -%}
+        {%- set free_kb = parts[2] | int -%}
+        {%- set _ = result.update({node: {'size_kb': size_kb, 'free_kb': free_kb}}) -%}
+      {%- endfor -%}
+      {{ result }}
+  tags:
+    - install
+
+- name: Aggregate memory per socket dynamically
+  set_fact:
+    socket_memory_totals: "{{ socket_memory_parsed | from_yaml }}"
+  vars:
+    socket_memory_parsed: |
+      {%- set result = {} -%}
+      {%- for node, mem in numa_memory.items() -%}
+        {%- set socket = (node | int) // (numa_nodes_per_socket | int) -%}
+        {%- set totals = result.get(socket, {'size_kb': 0, 'free_kb': 0}) -%}
+        {%- set totals = {
+              'size_kb': totals.size_kb + mem.size_kb,
+              'free_kb': totals.free_kb + mem.free_kb
+            } -%}
+        {%- set _ = result.update({socket: totals}) -%}
+      {%- endfor -%}
+      {{ result }}
+  tags:
+    - install
+
+
+- name: Calculate usable memory per socket (leave 18% free)
+  set_fact:
+    usable_memory_per_socket: "{{ usable_memory_parsed | to_json | from_json }}"
+  vars:
+    usable_memory_parsed: |
+      {%- set result = {} -%}
+      {%- for socket_id, mem in socket_memory_totals.items() -%}
+        {%- set free_gb = (mem.free_kb / 1048576) -%}   # KB → GB
+        {%- set usable_gb = (free_gb * 0.82) | round(0, 'floor') -%}
+        {%- set _ = result.update({ socket_id: usable_gb | int }) -%}
+      {%- endfor -%}
+      {{ result }}
+  tags:
+    - install
+
+- name: Calculate optimal balloon configuration for socket-based allocation
+  ansible.builtin.set_fact:
+    optimal_balloon_config:
+      target_worker_node: "{{ target_worker_node }}"
+      total_sockets: "{{ total_sockets.stdout | int }}"
+      total_numa_nodes: "{{ total_numa_nodes.stdout | int }}"
+      numa_nodes_per_socket: "{{ numa_nodes_per_socket | int }}"
+      cpus_per_numa_node: "{{ cpus_per_numa_node | int }}"
+      cpus_per_socket: "{{ cpus_per_socket | int }}"
+      total_cpu_count: "{{ total_cpu_count | int }}"
+      recommended_balloons: "{{ total_sockets.stdout | int }}" # One balloon per socket
+      numa_cpu_distribution: "{{ numa_cpu_counts }}"
+      socket_cpu_distribution: "{{ socket_cpu_totals }}"
+      socket_memory_distribution: "{{ socket_memory_totals }}"
+      usable_memory_per_socket: "{{ usable_memory_per_socket }}"
+  when:
+    - target_worker_node is defined and target_worker_node != ''
+    - total_sockets.stdout is defined and total_sockets.stdout != ''
+    - total_numa_nodes.stdout is defined and total_numa_nodes.stdout != ''
+  tags:
+    - install
+
+- name: Show NUMA memory information
+  debug:
+    msg: |
+      === NUMA Memory Information from Target Node: {{ target_worker_node }} ===
+      {% for node, mem in numa_memory.items() %}
+      NUMA Node {{ node }}:
+        Total Memory: {{ (mem.size_kb / 1048576) | round(2) }} GB
+        Free Memory: {{ (mem.free_kb / 1048576) | round(2) }} GB
+        Used Memory: {{ ((mem.size_kb - mem.free_kb) / 1048576) | round(2) }} GB
+        Free Percentage: {{ ((mem.free_kb / mem.size_kb) * 100) | round(2) }}%
+      {% endfor %}
+  tags:
+    - install
+
+- name: Show socket memory information
+  debug:
+    msg: |
+      === Socket Memory Aggregation ===
+      {% for socket_id, mem in socket_memory_totals.items() %}
+      Socket {{ socket_id }}:
+        Total Memory: {{ (mem.size_kb / 1048576) | round(2) }} GB
+        Free Memory: {{ (mem.free_kb / 1048576) | round(2) }} GB
+        Used Memory: {{ ((mem.size_kb - mem.free_kb) / 1048576) | round(2) }} GB
+        Free Percentage: {{ ((mem.free_kb / mem.size_kb) * 100) | round(2) }}%
+      {% endfor %}
+  tags:
+    - install
+
+- name: Show usable memory per socket
+  debug:
+    msg: |
+      === Usable Memory Per Socket ({{ 18 }}% reserved for system use) ===
+      {% set usable_mem = optimal_balloon_config.usable_memory_per_socket if optimal_balloon_config.usable_memory_per_socket is mapping else {} %}
+      {% for socket_id, mem in usable_mem.items() %}
+      Socket {{ socket_id }}: {{ mem }} GB usable for model deployment
+      {% endfor %}
+      {% if usable_mem.keys() | length == 0 %}
+      Warning: No usable memory data available. Please check memory detection.
+      {% endif %}
+  tags:
+    - install
+
+- name: Set fallback configuration if topology detection failed
+  ansible.builtin.set_fact:
+    optimal_balloon_config:
+      target_worker_node: "{{ target_worker_node | default(all_node_names[0]) }}"
+      total_sockets: 1
+      total_numa_nodes: 1
+      numa_nodes_per_socket: 1
+      cpus_per_numa_node: 2
+      cpus_per_socket: 2
+      total_cpu_count: 2
+      recommended_balloons: 1
+      numa_cpu_distribution: { 0: 2 }
+      socket_cpu_distribution: { 0: 2 }
+  when: optimal_balloon_config is not defined
+  tags:
+    - install
+
+- name: Determine parallelism strategy based on NUMA nodes per socket
+  ansible.builtin.set_fact:
+    parallelism_config:
+      strategy: >-
+        {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
+        {%- if numa_per_socket in [2, 4] -%}
+        tensor_parallel
+        {%- elif numa_per_socket in [3, 6] -%}
+        pipeline_parallel
+        {%- else -%}
+        tensor_parallel
+        {%- endif -%}
+      tensor_parallel_size: >-
+        {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
+        {%- if numa_per_socket in [2, 4] -%}
+        {{ numa_per_socket }}
+        {%- else -%}
+        1
+        {%- endif -%}
+      pipeline_parallel_size: >-
+        {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
+        {%- if numa_per_socket in [3, 6] -%}
+        {{ numa_per_socket }}
+        {%- else -%}
+        1
+        {%- endif -%}
+  tags:
+    - install
+
+- name: Update balloon configuration with parallelism strategy
+  ansible.builtin.set_fact:
+    optimal_balloon_config: "{{ optimal_balloon_config | combine(parallelism_config) }}"
+  tags:
+    - install
+
+- name: Check for AMX support
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "lscpu | grep -i amx"
+  register: amx_check
+  ignore_errors: true
+  tags:
+    - install
+
+- name: Check for AVX-512 support
+  kubernetes.core.k8s_exec:
+    pod: "{{ optimizer_pod_name }}"
+    container: ubuntu
+    namespace: kube-system
+    command: bash -c "lscpu | grep -i avx512"
+  register: avx512_check
+  ignore_errors: true
+  tags:
+    - install
+
+- name: Display comprehensive CPU topology configuration
+  ansible.builtin.debug:
+    msg: |
+      ===================================================================
+      CPU Topology Detection Results
+      ===================================================================
+      Target Worker Node: {{ optimal_balloon_config.target_worker_node }}
+      Total Sockets: {{ optimal_balloon_config.total_sockets }}
+      Total NUMA Nodes: {{ optimal_balloon_config.total_numa_nodes }}
+      NUMA Nodes per Socket: {{ optimal_balloon_config.numa_nodes_per_socket }}
+      Total CPUs: {{ optimal_balloon_config.total_cpu_count }}
+      CPUs per NUMA Node: {{ optimal_balloon_config.cpus_per_numa_node }}
+      CPUs per Socket: {{ optimal_balloon_config.cpus_per_socket }}
+
+      === NUMA CPU Distribution ===
+      {% for numa_id, cpu_count in optimal_balloon_config.numa_cpu_distribution.items() %}
+      NUMA {{ numa_id }}: {{ cpu_count }} CPUs
+      {% endfor %}
+
+      === Socket CPU Distribution ===
+      {% for socket_id, cpu_count in optimal_balloon_config.socket_cpu_distribution.items() %}
+      Socket {{ socket_id }}: {{ cpu_count }} CPUs
+      {% endfor %}
+
+      === CPU Features ===
+      AMX: {{ 'SUPPORTED' if amx_check.rc == 0 else 'NOT AVAILABLE' }}
+      AVX-512: {{ 'SUPPORTED' if avx512_check.rc == 0 else 'NOT AVAILABLE' }}
+
+      === Parallelism Strategy ===
+      Strategy: {{ optimal_balloon_config.strategy }}
+      Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size }}
+      Pipeline Parallel Size: {{ optimal_balloon_config.pipeline_parallel_size }}
+      ===================================================================
+  tags:
+    - install
+
+- name: Delete node-topology-optimizer daemonset
+  kubernetes.core.k8s:
+    state: absent
+    kind: DaemonSet
+    name: node-topology-optimizer
+    namespace: kube-system
+  tags:
+    - install
+
+# Export topology configuration for use in other roles
+- name: Export CPU topology configuration
+  ansible.builtin.set_fact:
+    cpu_topology_config: "{{ optimal_balloon_config }}"
+    parallelism_config: "{{ parallelism_config | default({'strategy': 'tensor_parallel', 'tensor_parallel_size': 1, 'pipeline_parallel_size': 1}) }}"
+    amx_supported: "{{ amx_check.rc == 0 if amx_check is defined else false }}"
+    avx512_supported: "{{ avx512_check.rc == 0 if avx512_check is defined else false }}"
+  tags:
+    - install

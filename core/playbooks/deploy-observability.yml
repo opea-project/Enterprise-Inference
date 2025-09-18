@@ -2,42 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy Observability
-  hosts: kube_control_plane
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-    helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"    
-    remote_helm_charts_base: "/tmp/helm-charts"    
-    deploy_logging: "no"
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
-  environment: "{{ proxy_disable_env | default({}) }}"  
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_observability.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+  roles:
+    - role: inference-tools
   tasks:
-    - name: Ensure Python pip module is installed
-      ansible.builtin.package:
-        name: python3-pip
-        state: present
-      become: true
-      tags: always
-    - name: Install Kubernetes Python SDK
-      ansible.builtin.pip:
-        name: kubernetes
-        state: present
-        executable: /usr/bin/pip3
-      become: true
-      tags: always
-    - name: Install Deployment Client
-      ansible.builtin.shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        executable: /bin/bash
-      become: true
-      tags: always            
-    - name: Ensure jq is Installed
-      ansible.builtin.package:
-        name: jq
-        state: present
-      become: true
-      tags: always   
     - name: Create kubernetes namespace for Observability
       community.kubernetes.k8s:
         name: observability
@@ -55,20 +30,20 @@
       ansible.builtin.copy:
         src: "{{ helm_charts_base }}/observability/"
         dest: "{{ remote_helm_charts_base }}/"
-        mode: '0755'
+        mode: "0755"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
-        remote_src: no          
+        remote_src: no
       tags: always
     - name: Verify Observability repository
       ansible.builtin.command: helm repo list
       register: helm_repo_list_observability
       failed_when: false
-      changed_when: false      
+      changed_when: false
       tags: always
     - name: Synchronize Observability repositories
       ansible.builtin.shell: helm repo update
-      when: helm_repo_list_observability.stdout != ""     
+      when: helm_repo_list_observability.stdout != ""
       tags: always
     - name: Create Config for Gaudi Grafana Dashboard
       run_once: true
@@ -82,7 +57,6 @@
       args:
         executable: /bin/bash
 
-
     - name: Create Config for Gaudi Cluster Utilization Dashboard
       tags: deploy_observability
       run_once: true
@@ -94,7 +68,7 @@
         kubectl label configmap habana-cluster-dashboard-configmap grafana_dashboard=1 -n observability --overwrite
       args:
         executable: /bin/bash
-      
+
     - name: Create Config for Xeon Grafana Dashboard
       tags: deploy_observability
       run_once: true
@@ -114,7 +88,7 @@
         chart_ref: prometheus-community/kube-prometheus-stack
         release_namespace: observability
         create_namespace: true
-        chart_version: "69.7.3"
+        chart_version: "72.5.1"
         values:
           kubeEtcd:
             enabled: false
@@ -131,7 +105,7 @@
                     accessModes: ["ReadWriteOnce"]
                     resources:
                       requests:
-                        storage: 10Gi                    
+                        storage: 10Gi
               replicas: 2
               replicaAutoScaling:
                 enabled: true
@@ -148,7 +122,7 @@
                               operator: In
                               values:
                                 - prometheus
-                        topologyKey: kubernetes.io/hostname         
+                        topologyKey: kubernetes.io/hostname
           alertmanager:
             alertmanagerSpec:
               storage:
@@ -157,23 +131,23 @@
                     accessModes: ["ReadWriteOnce"]
                     resources:
                       requests:
-                        storage: 2Gi                     
-          grafana:                                 
+                        storage: 2Gi
+          grafana:
             sidecar:
               dashboards:
                 enabled: true
                 label: grafana_dashboard
-                folder: /tmp/dashboards 
+                folder: /tmp/dashboards
             persistence:
-                enabled: true
-                accessModes:
-                  - ReadWriteOnce
-                size: 10Gi                
-            grafana.ini:                                                                            
+              enabled: true
+              accessModes:
+                - ReadWriteOnce
+              size: 10Gi
+            grafana.ini:
               users:
-                default_theme: light                
-              server:                
-                root_url: "%(protocol)s://%(domain)s:%(http_port)s/observability"                
+                default_theme: light
+              server:
+                root_url: "%(protocol)s://%(domain)s:%(http_port)s/observability"
                 serve_from_sub_path: true
                 domain: "{{ secret_name }}"
       register: prometheus_install
@@ -190,13 +164,13 @@
           kind: Secret
           metadata:
             name: "{{ secret_name }}"
-            namespace: observability  # Change this to the desired namespace if not default
+            namespace: observability # Change this to the desired namespace if not default
           type: kubernetes.io/tls
           data:
             tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
             tls.key: "{{ lookup('file', key_file) | b64encode }}"
-      register: kubectl_output      
-    
+      register: kubectl_output
+
     - name: Create Grafana observability ingress
       tags: deploy_observability
       community.kubernetes.k8s:
@@ -206,48 +180,48 @@
           kind: Ingress
           metadata:
             annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: HTTP  # Assuming Grafana is served over HTTP              
+              nginx.ingress.kubernetes.io/backend-protocol: HTTP # Assuming Grafana is served over HTTP
             name: observability-grafana-ingress
-            namespace: observability  # Change this to the namespace where Grafana is deployed
+            namespace: observability # Change this to the namespace where Grafana is deployed
           spec:
             ingressClassName: nginx
             rules:
-            - host: "{{ secret_name }}"  # Replace with your desired hostname for Grafana
-              http:
-                paths:
-                - backend:
-                    service:
-                      name: observability-grafana
-                      port:
-                        number: 80  
-                  path: /observability(/|$)(.*)
-                  pathType: ImplementationSpecific
+              - host: "{{ secret_name }}" # Replace with your desired hostname for Grafana
+                http:
+                  paths:
+                    - backend:
+                        service:
+                          name: observability-grafana
+                          port:
+                            number: 80
+                      path: /observability(/|$)(.*)
+                      pathType: ImplementationSpecific
             tls:
-            - hosts:
-              - "{{ secret_name }}"
-              secretName: "{{ secret_name }}" 
+              - hosts:
+                  - "{{ secret_name }}"
+                secretName: "{{ secret_name }}"
     - name: Add Bitnami Helm repository
       tags: deploy_logging
       community.kubernetes.helm_repository:
         name: bitnami
         repo_url: https://charts.bitnami.com/bitnami
       when: deploy_logging == "yes"
-    
+
     - name: Check if Helm repositories exist Observability
       ansible.builtin.command: helm repo list
       register: helm_repo_list_observability
       failed_when: false
-      changed_when: false   
-      when: deploy_logging == "yes"   
+      changed_when: false
+      when: deploy_logging == "yes"
       tags: deploy_logging
-    
+
     - name: Update Helm repositories
       ansible.builtin.shell: helm repo update
       when:
         - deploy_logging == "yes"
         - helm_repo_list_observability.stdout != ""
       tags: deploy_logging
-    
+
     - name: Install Elasticsearch System
       community.kubernetes.helm:
         name: logging-elasticsearch
@@ -261,7 +235,7 @@
       run_once: true
       when: deploy_logging == "yes"
       tags: deploy_logging
-    
+
     - name: Create Fluentbit Group
       group:
         name: fluentbit
@@ -284,7 +258,7 @@
         mode: 0750
       loop:
         - /var/log/pods
-        - /var/log/containers    
+        - /var/log/containers
       when: deploy_logging == "yes"
       tags: deploy_logging
 
@@ -292,7 +266,7 @@
       ansible.builtin.copy:
         src: "{{ helm_charts_base }}/"
         dest: "{{ remote_helm_charts_base }}/"
-        mode: '0755'
+        mode: "0755"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         remote_src: no
@@ -317,7 +291,7 @@
             apiGroup: rbac.authorization.k8s.io
       when: deploy_logging == "yes"
       tags: deploy_logging
-    
+
     - name: Install Fluent Bit
       community.kubernetes.helm:
         name: logging-fluentbit
@@ -346,6 +320,76 @@
       when: deploy_logging == "yes"
       tags: deploy_logging
 
+    - name: Add Grafana Helm repo (Loki)
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.helm_repository:
+        name: grafana
+        repo_url: https://grafana.github.io/helm-charts
+
+    - name: Add OpenTelemetry Helm repo
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.helm_repository:
+        name: open-telemetry
+        repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
+
+    - name: Transfer Dependency Files
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base }}/"
+        dest: "{{ remote_helm_charts_base }}/"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: no
+      tags: always
+
+    - name: Build chart dependencies for logs-stack chart
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: helm dependency build logs-stack
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      become: false
+
+    - name: Install/Upgrade logs-stack chart with AWS settings
+      when: aws_access_key is defined and aws_access_key | length > 0
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: >
+          helm upgrade --install logs-stack ./logs-stack
+          --namespace observability
+          -f {{ remote_helm_charts_base }}/observability/logs-stack/aws-s3-values.yaml
+          --set loki.loki.storage_config.aws.region={{ aws_region }}
+          --set loki.loki.storage_config.aws.bucketnames={{ aws_bucket }}
+          --set loki.loki.storage_config.aws.access_key_id={{ aws_access_key }}
+          --set loki.loki.storage_config.aws.secret_access_key={{ aws_secret_key }}
+          --set loki.loki.storage.bucketNames.chunks={{ aws_bucket }}
+          --set loki.loki.storage.bucketNames.admin={{ aws_bucket }}
+          --set loki.loki.storage.bucketNames.ruler={{ aws_bucket }}
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      register: logs_install
+      until: logs_install is successful
+      retries: 5
+      delay: 10
+
+    - name: Install/Upgrade logs-stack chart with Minio settings
+      when: aws_access_key is not defined or aws_access_key | length == 0
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: >
+          helm upgrade --install logs-stack ./logs-stack
+          --namespace observability
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      register: logs_install
+      until: logs_install is successful
+      retries: 5
+      delay: 10
 
     - name: Check if Gaudi Nodes are Available
       shell: "kubectl get nodes -l habana.ai/device.family=gaudi --no-headers | wc -l"
@@ -362,19 +406,16 @@
       ansible.builtin.copy:
         src: "{{ helm_charts_base }}/observability/habana-exporter"
         dest: "{{ remote_helm_charts_base }}/"
-        mode: '0755'
+        mode: "0755"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         remote_src: no
-      when: gaudi_available     
-      tags: deploy_observability  
-              
+      when: gaudi_available
+      tags: deploy_observability
+
     - name: Apply Habana Metrics Service Monitor
       community.kubernetes.k8s:
-        state: present        
+        state: present
         src: "{{ remote_helm_charts_base }}/habana-exporter/habana-metrics.yml"
       when: gaudi_available
       tags: deploy_observability
-      
-
-    

@@ -25,9 +25,8 @@ spec:
     plugins:
     - name: openid-connect
       enable: true
+      secretRef: {{ include "tei.fullname" . }}-secret
       config:
-        client_id: {{ .Values.oidc.client_id }}
-        client_secret: {{ .Values.oidc.client_secret }}
         discovery: {{ .Values.oidc.discovery }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
         introspection_endpoint_auth_method: client_secret_basic

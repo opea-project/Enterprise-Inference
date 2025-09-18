@@ -1,0 +1,15 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v2
+name: genaigateway
+version: 0.1.0
+description: A Helm chart for deploying litellm gateway
+dependencies:
+  - name: postgresql
+    version: ">=13.3.0"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled
+  - name: redis
+    version: ">=18.0.0"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis.enabled

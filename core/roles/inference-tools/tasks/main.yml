@@ -1,0 +1,28 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Ensure Python pip module is installed
+  ansible.builtin.package:
+    name: python3-pip
+    state: present
+  become: true
+  tags: always
+- name: Install Kubernetes Python SDK
+  ansible.builtin.pip:
+    name: kubernetes
+    state: present
+  become: true
+  tags: always
+- name: Install Deployment Client
+  ansible.builtin.shell: |
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    executable: /bin/bash
+  become: true
+  tags: always
+- name: Ensure jq is installed
+  ansible.builtin.package:
+    name: jq
+    state: present
+  become: true
+  tags: always

@@ -14,6 +14,109 @@ To configure your environment with the necessary variables for connecting to Key
 Please replace the placeholder values with your actual configuration details, which has been configured in `inference-config.cfg` file under the `core/` directory during deployment.
 
 
+
+
+### Accessing Models Deployed with GenAI Gateway
+
+##### Logging in to GenAI Gateway
+To access models via GenAI Gateway:
+```
+https://<<cluster_url>>
+```
+
+##### Logging in to GenAI Gateway Trace
+```
+https://trace.<<cluster_url>>
+```
+
+##### GenAI Gateway Login Credentials
+please reference the vault.yml file under core/inventory/metadata/vault.yml 
+litellm username is "admin"
+litellm_master_key corresponds to litellm password
+langfuse_login corresponds to langfuse username
+langfuse_password corresponds to langfuse password
+
+> **Note:**  
+> To enable tracing and monitoring via GenAI Gateway Trace, ensure you have configured a subdomain named `trace.<cluster_url>` that points to the same master node as your main inference cluster. This subdomain is required for GenAI Gateway Trace to function correctly and should be set up in your DNS records before 
+proceeding.
+
+##### Models Endpoints
+```bash
+curl --location 'https://<<cluster-url>>/v1/chat/completions' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <<master-key>>' \
+--data '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello!"
+        }
+    ]
+}'
+```
+
+#### Creating TLS Certificates and Kubernetes Secret for GenAI Gateway Trace Subdomain
+
+To secure the `trace.<cluster_url>` subdomain with TLS, follow these steps to generate certificates and create a Kubernetes TLS secret:
+
+##### 1. Generate TLS Certificates
+
+You can use OpenSSL to create a self-signed certificate for the subdomain:
+
+```bash
+# Replace <cluster_url> with your actual cluster domain
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout trace.<cluster_url>.key \
+    -out trace.<cluster_url>.crt \
+    -subj "/CN=trace.<cluster_url>/O=AI Inference"
+```
+
+This will generate `trace.<cluster_url>.crt` (certificate) and `trace.<cluster_url>.key` (private key).
+
+##### 2. Create Kubernetes TLS Secret
+
+Use `kubectl` to create a TLS secret for the subdomain:
+
+```bash
+kubectl create secret tls trace.<cluster_url> \
+    --cert=trace.<cluster_url>.crt \
+    --key=trace.<cluster_url>.key \
+    -n <namespace>
+```
+
+Replace `<namespace>` with the namespace where your inference services are deployed.
+
+##### 3. Reference the Secret in Your Ingress or Gateway Configuration
+
+Update your Kubernetes Ingress or Gateway manifest to reference the `genai-trace-tls` secret for the `trace.<cluster_url>` host.
+
+> **Note:**  
+> For production, use certificates from a trusted Certificate Authority (CA) instead of self-signed certificates.
+---
+
+
+##### Models Endpoints
+Please find the reference Model endpoint for llama8b
+```bash
+curl --location 'https://<<cluster-url>>/v1/chat/completions' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <<master-key>>' \
+--data '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello!"
+        }
+    ]
+}'
+```
+
+
+
+
+
 #### Accessing Models Deployed with Keycloak and APISIX
 
 ##### Fetching the client Secret
@@ -50,10 +153,10 @@ With the obtained access token, we can proceed to make an Inference API call to 
 ##### Models Endpoints
 `````
 For Inferencing with Llama-3-8b:
-curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Llama-3-70b:
-curl -k ${BASE_URL}/Meta-Llama-3.1-70B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-70B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/Llama-3.1-70B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-70B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Codellama-34b:
 curl -k ${BASE_URL}/CodeLlama-34b-Instruct-hf/v1/completions -X POST -d '{"model": "codellama/CodeLlama-34b-Instruct-hf", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
@@ -80,7 +183,7 @@ For Inferencing with Deepseek R1 Distill Llama 8b:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Llama-3-8b-CPU
-curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Deepseek R1 Distill Qwen 32b CPU:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"

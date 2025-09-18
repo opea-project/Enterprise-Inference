@@ -2,30 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy Ingress NGINX using Helm
-  hosts: kube_control_plane
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
-  environment: "{{ proxy_disable_env | default({}) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  roles:
+    - role: inference-tools
   tasks:
-    - name: Ensure Python pip module is installed
-      ansible.builtin.package:
-        name: python3-pip
-        state: present
-      become: true
-    - name: Install Kubernetes Python SDK
-      ansible.builtin.pip:
-        name: kubernetes
-        state: present
-        executable: /usr/bin/pip3
-      become: true
-    - name: Install Deployment Client
-      ansible.builtin.shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        executable: /bin/bash
-      become: true
     - name: Add the Ingress-NGINX Helm repository
       community.kubernetes.helm_repository:
         name: ingress-nginx
@@ -33,14 +18,13 @@
         state: present
     - name: Validate if the Helm repositories are configured correctly
       ansible.builtin.command: helm repo list
-      register: helm_repo_list    
+      register: helm_repo_list
       failed_when: false
-      changed_when: false  
+      changed_when: false
     - name: Update Helm repositories to fetch the latest charts
-      ansible.builtin.shell: helm repo update      
-      when: helm_repo_list.stdout != ""    
-    
-            
+      ansible.builtin.shell: helm repo update
+      when: helm_repo_list.stdout != ""
+
     - name: Retrieving the Number of Inference Infrastructure Nodes
       ansible.builtin.shell: kubectl get nodes --selector=node-role.kubernetes.io/inference-infra=true -o jsonpath='{.items[*].metadata.name}' | wc -w
       register: inference_node_count
@@ -52,28 +36,27 @@
       changed_when: false
       when: inference_node_count.stdout | int == 0
 
-    - name: Determine Replica Node 
+    - name: Determine Replica Node
       set_fact:
         inference_infra_replica_count: >-
-          {{ 
+          {{
             inference_node_count.stdout | int if inference_node_count.stdout | int > 0
             else (control_plane_node_count.stdout | int if control_plane_node_count is defined and control_plane_node_count.stdout | int > 0
             else 1)
           }}
-        
+
     - name: Display the Number of Nodes on which Ingress is deployed
-      debug:        
-        msg: "Number of Nodes on which Ingress is deployed: {{ inference_infra_replica_count }}"  
-      run_once: true        
-    
-    
+      debug:
+        msg: "Number of Nodes on which Ingress is deployed: {{ inference_infra_replica_count }}"
+      run_once: true
+
     - name: Deploy Ingress Nginx Controller
       community.kubernetes.helm:
         name: ingress-nginx
         chart_ref: ingress-nginx/ingress-nginx
         release_namespace: ingress-nginx
         create_namespace: true
-        chart_version: 4.12.0
+        chart_version: 4.12.2
         state: present
         values:
           controller:
@@ -111,11 +94,11 @@
                       labelSelector:
                         matchLabels:
                           app: ingress-nginx
-                      topologyKey: "kubernetes.io/hostname"                     
-      run_once: true   
+                      topologyKey: "kubernetes.io/hostname"
+      run_once: true
     - name: Pause to Allow Controller to Initialize
       pause:
-        seconds: 10    
+        seconds: 10
     - name: Wait for all ingress-nginx pods to be in a running and ready state
       shell: |
         kubectl get pods -n ingress-nginx -o json | jq -r '
@@ -126,7 +109,7 @@
       until: pod_status.stdout == "0" and pod_status.rc == 0
       retries: 160
       delay: 10
-      failed_when: pod_status.rc != 0 and pod_status.stdout != "0"           
+      failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
     - name: Ingress Controller Deployment status
       debug:
         msg: "All Ingress NGINX Controller pods are running and ready."

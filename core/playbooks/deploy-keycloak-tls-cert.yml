@@ -2,42 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Create Keycloak TLS secret
-  hosts: kube_control_plane
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-    helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
-    remote_home_dir: "{{ lookup('env', 'PWD') }}/scripts"
-    remote_helm_charts_base: "/tmp/helm-charts"
-    ingress_file: "all_models_apisix_ingres_nginx.yaml"
-    keycloak_url: "https://{{ secret_name }}"
-    deploy_keycloak: "no"
-    deploy_apisix: "no"
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
-  environment: "{{ proxy_disable_env | default({}) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_keycloak_apisix.yml"
+  roles:
+    - role: inference-tools
   tasks:
-    - name: Ensure Python pip module is installed
-      ansible.builtin.package:
-        name: python3-pip
-        state: present
-      become: true
-    - name: Install Kubernetes Python SDK
-      ansible.builtin.pip:
-        name: kubernetes
-        state: present
-        executable: /usr/bin/pip3
-      become: true
-    - name: Install Deployment Client
-      ansible.builtin.shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        executable: /bin/bash
-      become: true            
-    - name: Ensure jq is Installed
-      ansible.builtin.package:
-        name: jq
-        state: present
-      become: true
     - name: Create Namespace for APISIX
       kubernetes.core.k8s:
         state: present
@@ -45,10 +19,10 @@
           apiVersion: v1
           kind: Namespace
           metadata:
-            name: auth-apisix      
+            name: auth-apisix
     - name: Output variable values
       debug:
-        var: cert_file, key_file, secret_name    
+        var: cert_file, key_file, secret_name
     - name: Create TLS secret for Keycloak
       community.kubernetes.k8s:
         state: present
@@ -57,7 +31,7 @@
           kind: Secret
           metadata:
             name: "{{ secret_name }}"
-            namespace: default  # Change this to the desired namespace if not default
+            namespace: default # Change this to the desired namespace if not default
           type: kubernetes.io/tls
           data:
             tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
@@ -71,16 +45,16 @@
           kind: Secret
           metadata:
             name: "{{ secret_name }}"
-            namespace: auth-apisix  # Change this to the desired namespace if not default
+            namespace: auth-apisix # Change this to the desired namespace if not default
           type: kubernetes.io/tls
           data:
             tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
             tls.key: "{{ lookup('file', key_file) | b64encode }}"
-      register: kubectl_output    
+      register: kubectl_output
       when: deploy_apisix == "yes"
     - name: Display the output
       debug:
-        msg: "Secret {{ secret_name }} created."            
+        msg: "Secret {{ secret_name }} created."
     - name: Retrieve number of Inference Infrastructure Nodes
       ansible.builtin.shell: kubectl get nodes --selector=node-role.kubernetes.io/inference-infra=true --no-headers | wc -l
       register: inference_node_count
@@ -90,9 +64,16 @@
         inference_infra_replica_count: "{{ inference_node_count.stdout | int if inference_node_count.stdout | int > 0 else 1 }}"
     - name: Display the number of Inference Infrastructure Nodes
       debug:
-        msg: "Number of inference-infra node configured: {{ inference_infra_replica_count }}"  
+        msg: "Number of inference-infra node configured: {{ inference_infra_replica_count }}"
       run_once: true
       when: deploy_keycloak == "yes"
+    - name: Delete genai-gateway-ingress resource
+      kubernetes.core.k8s:
+        state: absent
+        kind: Ingress
+        name: genai-gateway-ingress
+        namespace: genai-gateway
+
     - name: Deploy Keycloak System
       run_once: true
       register: helm_output
@@ -100,23 +81,23 @@
       community.kubernetes.helm:
         name: keycloak
         chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak
-        release_namespace: default  # Set the namespace where Keycloak will be installed
+        release_namespace: default # Set the namespace where Keycloak will be installed
         create_namespace: true
-        chart_version: "22.1.0"        
+        chart_version: "22.1.0"
         values:
           production: true
-          proxy: edge          
+          proxy: edge
           replicaCount: "{{ inference_infra_replica_count | int }}"
           extraEnvVars:
-          - name: KC_CACHE
-            value: ispn
-          - name: KC_CACHE_STACK
-            value: kubernetes
+            - name: KC_CACHE
+              value: ispn
+            - name: KC_CACHE_STACK
+              value: kubernetes
           auth:
             adminUser: "{{ keycloak_admin_user }}"
             adminPassword: "{{ keycloak_admin_password }}"
           metrics:
-            enabled: true                      
+            enabled: true
           autoscaling:
             enabled: true
             minReplicas: "{{ inference_infra_replica_count | int }}"
@@ -129,7 +110,7 @@
               - type: Resource
                 resource:
                   name: memory
-                  targetAverageUtilization: 60 
+                  targetAverageUtilization: 60
           ingress:
             enabled: true
             hostname: "{{ secret_name }}"
@@ -208,28 +189,38 @@
       retries: 60
       delay: 5
       when: deploy_keycloak == "yes"
-    - name: Copy dependency files to Deployment Nodes
-      ansible.builtin.copy:
-        src: "{{ helm_charts_base }}/"
-        dest: "{{ remote_helm_charts_base }}/"
-        mode: '0755'
+
+    - name: Ensure Remote Directory Exists
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}"
+        state: directory
+        mode: "0755"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
-        remote_src: no  
-    - name: Copy dependency Realm Creation
-      ansible.builtin.copy:
-        src: "{{ remote_home_dir }}/"
-        dest: "{{ remote_helm_charts_base }}/"
-        mode: '0755'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        remote_src: no
+      tags: always
+    - name: Sync dependency files to Deployment Nodes
+      ansible.posix.synchronize:
+        src: "{{ item.src }}/"
+        dest: "{{ item.dest }}/"
+        recursive: yes
+        delete: no
+        mode: push
+      loop:
+        - {
+            src: "{{ helm_charts_base }}",
+            dest: "{{ remote_helm_charts_base }}/",
+          }
+        - {
+            src: "{{ remote_home_dir }}",
+            dest: "{{ remote_helm_charts_base }}/",
+          }
+      tags: always
     - name: Ensure Keycloak Realm Creation script is executable
       file:
         path: "{{ remote_helm_charts_base }}/keycloak-realmcreation.sh"
-        mode: '0755'
+        mode: "0755"
         owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"                      
+        group: "{{ ansible_user }}"
     - name: Synchronize dependencies for APISIX
       ansible.builtin.command: helm dependency update "{{ remote_helm_charts_base }}/apisix-helm/"
       register: helm_dependency_update
@@ -242,17 +233,32 @@
         update_repo_cache: yes
         release_namespace: auth-apisix
       run_once: true
-      when: deploy_apisix == "yes"            
+      when: deploy_apisix == "yes"
     - name: Deploy APISIX System
       command: >
-          helm upgrade --install auth-apisix {{ remote_helm_charts_base }}/apisix-helm/
-          --values {{ remote_helm_charts_base }}/apisix-helm/values.yaml
-          --set apisix.replicaCount={{ inference_infra_replica_count }}
-          --set apisix.ingress-controller.replicaCount={{ inference_infra_replica_count }} 
-          --set apisix.etcd.replicaCount={{ inference_infra_replica_count }}          
-          --namespace auth-apisix --create-namespace          
+        helm upgrade --install auth-apisix {{ remote_helm_charts_base }}/apisix-helm/
+        --values {{ remote_helm_charts_base }}/apisix-helm/values.yaml
+        --set apisix.replicaCount={{ inference_infra_replica_count }}
+        --set apisix.ingress-controller.replicaCount={{ inference_infra_replica_count }}
+        --set apisix.etcd.replicaCount={{ inference_infra_replica_count }}
+        --namespace auth-apisix --create-namespace
       when: deploy_apisix == "yes"
-      run_once: true    
+      run_once: true
+    - name: Wait for APISIX pods to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: auth-apisix
+        label_selectors:
+          - app.kubernetes.io/instance=auth-apisix
+      register: apisix_pods
+      until:
+        - apisix_pods.resources | length > 0
+        - apisix_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length == apisix_pods.resources | length
+        - apisix_pods.resources | map(attribute='status.containerStatuses') | flatten | selectattr('ready', 'equalto', true) | list | length == (apisix_pods.resources | map(attribute='status.containerStatuses') | flatten | list | length)
+      retries: 60
+      delay: 10
+      changed_when: false
+      when: deploy_apisix == "yes"
     - name: Print Model List to be Deployed
       debug:
         var: model_name_list
@@ -277,11 +283,15 @@
       run_once: true
       register: keycloak_ingress_register_msg_in
       failed_when: keycloak_ingress_register_msg_in.rc != 0
-      when: deploy_keycloak == "yes"                  
+      when: deploy_keycloak == "yes"
     - name: Execute the Keycloak Realm Creation Script
       command: "{{ remote_helm_charts_base }}/keycloak-realmcreation.sh {{ secret_name }} {{ keycloak_admin_user }} {{ keycloak_admin_password }} {{ keycloak_client_id }}"
       register: script_output
       run_once: true
+      environment:
+        http_proxy: ""
+        https_proxy: ""
+        no_proxy: ""
       when: deploy_keycloak == "yes"
     - name: Set client_secret fact
       set_fact:
@@ -298,7 +308,7 @@
       when: deploy_keycloak == "yes"
     - name: Print the script output
       debug:
-        msg: "{{ script_output.stdout }}"    
+        msg: "{{ script_output.stdout }}"
       run_once: true
       when: deploy_keycloak == "yes"
     - name: Remove any existing deployment directory

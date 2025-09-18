@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Intel Corporation
+# Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: apps/v1
@@ -41,6 +41,8 @@ spec:
                 name: {{ .Values.global.extraEnvConfig }}
                 optional: true
             {{- end }}
+            - secretRef:
+                name: {{ include "teirerank.fullname" . }}-secret
           securityContext:
             {{- if .Values.global.modelUseHostPath }}
             {}
@@ -82,7 +84,7 @@ spec:
         - name: model-volume
           {{- if .Values.pvc.enabled }}
           persistentVolumeClaim:
-            claimName: name: {{ include "teirerank.fullname" . }}-pvc
+            claimName: {{ include "teirerank.fullname" . }}-pvc
           {{- else if .Values.global.modelUseHostPath }}
           hostPath:
             path: {{ .Values.global.modelUseHostPath }}

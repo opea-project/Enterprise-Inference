@@ -1,4 +1,6 @@
 ---
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 # Kubernetes dashboard
 # RBAC required. see docs/getting-started.md for access details.
 dashboard_enabled: true
@@ -7,8 +9,8 @@ dashboard_enabled: true
 helm_enabled: false
 
 # Registry deployment
-registry_enabled: false
-# registry_namespace: kube-system
+registry_enabled: true
+registry_namespace: kube-system
 # registry_storage_class: ""
 # registry_disk_size: "10Gi"
 
@@ -96,10 +98,18 @@ rbd_provisioner_enabled: false
 # rbd_provisioner_storage_class: rbd
 # rbd_provisioner_reclaim_policy: Delete
 
+# Gateway API CRDs
+gateway_api_enabled: true
+# gateway_api_experimental_channel: false
+
 # Nginx ingress controller deployment
 ingress_nginx_enabled: false
 # ingress_nginx_host_network: false
 # ingress_nginx_service_type: LoadBalancer
+# ingress_nginx_service_annotations:
+#   example.io/loadbalancerIPs: 1.2.3.4
+# ingress_nginx_service_nodeport_http: 30080
+# ingress_nginx_service_nodeport_https: 30081
 ingress_publish_status_address: ""
 # ingress_nginx_nodeselector:
 #   kubernetes.io/os: "linux"

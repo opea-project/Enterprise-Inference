@@ -1,6 +1,7 @@
 # Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 {{- if .Values.apisix.enabled }}
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) | splitList "/" | last }}
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
@@ -13,11 +14,11 @@ spec:
       hosts:
       - {{ .Values.ingress.host }}
       paths:
-      # - /{{ .Values.LLM_MODEL_ID | splitList "/" | last }}/*
+      # - /{{ $modelName }}/*
       {{- if not .Values.accelDevice }}
-      - /{{ .Values.LLM_MODEL_ID | splitList "/" | last }}-vllmcpu/*
+      - /{{ $modelName }}-vllmcpu/*
       {{- else }}
-      - /{{ .Values.LLM_MODEL_ID | splitList "/" | last }}/*
+      - /{{ $modelName }}/*
       {{- end }}
     backends:
     - serviceName: {{ include "vllm.fullname" . }}-service
@@ -25,9 +26,8 @@ spec:
     plugins:
     - name: openid-connect
       enable: true
+      secretRef: {{ include "vllm.fullname" . }}-secret
       config:
-        client_id: {{ .Values.oidc.client_id }}
-        client_secret: {{ .Values.oidc.client_secret }}
         discovery: {{ .Values.oidc.discovery }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
         introspection_endpoint_auth_method: client_secret_basic
@@ -39,12 +39,12 @@ spec:
       config:
         regex_uri:
           {{- if not .Values.accelDevice }}
-          - ^/{{ .Values.LLM_MODEL_ID | splitList "/" | last }}-vllmcpu/(.*)
+          - ^/{{ $modelName }}-vllmcpu/(.*)
           {{- else }}
-          - ^/{{ .Values.LLM_MODEL_ID | splitList "/" | last }}/(.*)
+          - ^/{{ $modelName }}/(.*)
           {{- end }}
           - /$1
-          # - ^/{{ .Values.LLM_MODEL_ID | splitList "/" | last }}/(.*)
+          # - ^/{{ $modelName }}/(.*)
           # - /$1
         headers:
           Content-Type: application/json
