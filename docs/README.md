@@ -1,14 +1,12 @@
-# TLDR;
-# Getting Started
-To setup prerequisites and quickstart deployment of Intel® AI for Enterprise Inference on a single node follow steps here [**Quick Start Guide**](./single-node-deployment.md)
+# Quick Start
+To set up prerequisities and quickly deploy Intel® AI for Enterprise Inference on a single node, follow the steps in the [**Single Node Deployment Guide**](./single-node-deployment.md). Otherwise, proceed to the section below for all deployment options.
 
 > 🚀 **New**: Automated Gaudi firmware and driver management! See [Gaudi Prerequisites](./gaudi-prerequisites.md) for automated setup scripts.
 
-
-# Intel® AI for Enterprise Inference Cluster Setup
+# Complete Intel® AI for Enterprise Inference Cluster Setup
 
 ## Prerequisites
-- Review [System Requirements](./prerequisites.md)
+Complete all [prerequisites](./prerequisites.md).
 ---
 ## Deployment Options
 
@@ -27,8 +25,8 @@ To setup prerequisites and quickstart deployment of Intel® AI for Enterprise In
 ## Configuration Files
 Two files are required before deployment:
 
-- `inventory/hosts.yaml` – Cluster inventory and topology ([Single-Node Sample](./examples/single-node/hosts.yaml), [Multi-Node Guide](./examples/multi-node/hosts.yaml))
-- `inference-config.cfg` – Component-level deployment config ([Sample](./configuring-inference-config-cfg-file.md))
+- `inventory/hosts.yaml` – Cluster inventory and topology for [single node](./examples/single-node/hosts.yaml) and [multi-node](./examples/multi-node/hosts.yaml))
+- `inference-config.cfg` – Component-level deployment config [example](./configuring-inference-config-cfg-file.md)
 ---
 ## Deployment Command
 Run the following script to deploy the inference platform:
@@ -37,6 +35,6 @@ bash inference-stack-deploy.sh
 ```
 ---
 ## Post-Deployment
+Follow the steps highlighted in the [Getting Started Example](./getting-started-example.md) to test inference. To access all deployed models, refer to this [guide](./accessing-deployed-models.md).
 
-- [Access Deployed Models](./accessing-deployed-models.md)
-- [Observability & Monitoring](./observability.md)
+[Observability & Monitoring](./observability.md) is also supported.
