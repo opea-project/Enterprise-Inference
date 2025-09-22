@@ -12,7 +12,6 @@ patterns/**/*.terraform.lock.hcl
 # control as they are data points which are potentially sensitive and subject
 # to change depending on the environment.
 # Ignore all .tfvars files anywhere
-*.tfvars
 **/*.tfvars
 
 

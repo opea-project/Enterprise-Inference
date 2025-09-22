@@ -82,14 +82,19 @@ resource_group = "Default"  # or your custom resource group
 models = "2"  # Options: "1" (8B), "12" (70B), or "11" (405B)
 hugging_face_token = "hf_your_token_here"
 
+# Required: Deployment Mode Configuration
+deployment_mode = "single-node"  # Options: "single-node" or "multi-node"
+# For multi-node deployments, specify the number of worker nodes:
+# IMPORTANT: Use odd numbers (1, 3, 5, 7) for proper Ceph storage cluster operation
+worker_gaudi_count = 3  # Number of Gaudi worker nodes (must be 1, 3, 5, or 7)
+
 # Required: ssh_allowed_cidr
 # For Production = Use company network range
 # For Development/Testing = 0.0.0.0/0
 ssh_allowed_cidr = "0.0.0.0/0"
 
-# Required: Keycloak Admin Configuration
-keycloak_admin_user = "admin"      # Default: "admin"
-keycloak_admin_password = ""  # Enter the password for Keycloak login
+# Required: GenAI Gateway Authentication
+vault_pass_code = ""  # Pass code for GenAI Gateway authentication and encryption/decryption
 
 # Optional: TLS Configuration  
 # For Development/Testing: Leave cluster_url as "api.example.com" and keep default certificate values
@@ -168,7 +173,7 @@ After selecting your option, click **"Add"** in the bottom right.
 ### Step 4: Configure Security & Architecture
 You'll be taken to the deployment configuration page. First, in the **Security** section, add your IBM Cloud API key, then click **"Next"**.
 
-On the **Configure architecture** page, edit all required inputs (turn on **Advanced** to access optional inputs). Enter the values from your [Prerequisites Guide](./standard-prerequisites.md): SSH key (must exist in IBM Cloud), SSH private key (paste content), IBM Cloud region, instance zone, cluster_url, model selection, Hugging Face token, resource group, Keycloak admin user, Keycloak admin password, full chain certificate, and certificate key. The Standard pattern creates all infrastructure automatically, so you won't need to specify VPC, subnet, or security group names.
+On the **Configure architecture** page, edit all required inputs (turn on **Advanced** to access optional inputs). Enter the values from your [Prerequisites Guide](./standard-prerequisites.md): SSH key (must exist in IBM Cloud), SSH private key (paste content), IBM Cloud region, instance zone, cluster_url, model selection, Hugging Face token, resource group, vault pass code, full chain certificate, and certificate key. The Standard pattern creates all infrastructure automatically, so you won't need to specify VPC, subnet, or security group names.
 
 > **Note:** For development/testing, leave cluster URL as `api.example.com` and certificates as default values. Only change cluster URL to your registered domain name for production deployments, and only then provide your actual TLS certificate and private key.
 
@@ -208,6 +213,29 @@ Once deployment completes:
 2. SSH to your instance using the floating IP: `ssh -i ~/.ssh/your-key ubuntu@YOUR_FLOATING_IP`
 3. Verify services are running with `kubectl get pods -A`
 
+## Deployment Architecture Options
+
+### Single-Node Deployment
+In single-node mode, all components (control plane, workloads, and storage) run on a single Intel® Gaudi® 3 AI accelerator server. This is ideal for:
+- Development and testing environments
+- Proof of concepts
+- Smaller workloads
+- Cost-conscious deployments
+
+### Multi-Node Deployment
+In multi-node mode, the deployment creates a distributed architecture with:
+- **Control Plane Nodes**: 1 or 3 Intel® Xeon® processor nodes for Kubernetes control plane (3 nodes for HA)
+- **Worker Nodes**: 1, 3, 5, or 7 Intel® Gaudi® 3 AI accelerator nodes for AI inference workloads
+  - Each Gaudi node includes 8 NVMe devices used for Ceph distributed storage
+  - **Important**: Must use odd numbers (1, 3, 5, 7) of worker nodes for proper Ceph storage cluster quorum
+  - With 3 worker nodes and 8 NVMe devices each, you'll have 24 OSD (Object Storage Daemon) pods
+
+Multi-node deployment is ideal for:
+- Production environments requiring high availability
+- Large-scale inference workloads
+- Distributed storage requirements
+- Workload isolation and scaling
+
 ## What Gets Created
 
 The Standard pattern automatically provisions:
@@ -228,8 +256,7 @@ The Standard pattern automatically provisions:
 - **Intel® Gaudi® 3 AI accelerator operators:** Hardware management
 - **NGINX Ingress:** Traffic routing
 - **Model Serving:** vLLM inference server
-- **Authentication:** Keycloak identity management
-- **API Gateway:** APISIX for API management
+- **GenAI Gateway:** Unified API gateway with LiteLLM for model orchestration and Langfuse for tracing
 - **Monitoring:** Observability stack
 
 ## Next Steps
@@ -238,7 +265,7 @@ The Standard pattern automatically provisions:
 
 Once deployment is complete, you can start making inference requests to your deployed model.
 
-#### Example: Inferencing with Llama-3-8B
+#### Example: Inferencing with Llama-3.1-8B
 
 1. **SSH to your instance and verify services:**
 ```bash
@@ -249,49 +276,62 @@ ssh -i ~/.ssh/your-key ubuntu@YOUR_FLOATING_IP
 kubectl get pods -A
 ```
 
-2. **Obtain Keycloak client secret:**
-```bash
-# Run the client secret fetch script on your instance
-keycloak-fetch-client-secret.sh <cluster-url> <keycloak-username> <keycloak-password> <keycloak-client-id>
+> **Interpretation:**  
+> Review the output to ensure all pods have a `STATUS` of `Running` or `Completed`.  
+> If you see any pods with `Error`, `CrashLoopBackOff`, or other non-running statuses, some services may not have started correctly and may require troubleshooting.
+2. **Obtain the GenAI Gateway API key for LiteLLM:**
 
-# Expected output:
-# Logged in successfully
-# Client secret: keycloak-client-secret
+There are two ways to get the API key to make inference requests:
+
+**Method 1: Quick Test (Using Master Key)**
+```bash
+# Navigate to the metadata directory
+cd Enterprise-Inference/core/inventory/metadata
+
+# View the vault file to get the master key
+cat vault.yml | grep litellm_master_key
+# Copy the value shown for litellm_master_key - this is your API key
 ```
 
-3. **Set up environment variables:**
+**Method 2: Generate Custom API Keys (Production)**
 ```bash
-# The Keycloak cluster URL configured during deployment
-export BASE_URL=https://api.example.com
+# The GenAI Gateway URL is available from deployment outputs
+# Access the UI at: https://<your-cluster-url>/ui
 
-# Default realm (unless changed during deployment)
-export KEYCLOAK_REALM=master
-
-# Client ID configured during deployment in keycloak_client_id field
-export KEYCLOAK_CLIENT_ID=<your_keycloak_client_id>
-
-# Client secret obtained from step 2
-export KEYCLOAK_CLIENT_SECRET=<your_keycloak_client_secret>
+# To generate a new API key:
+# 1. Navigate to the GenAI Gateway UI
+# 2. Click on "API Keys" in the sidebar
+# 3. Click "Create New Key"
+# 4. Set optional parameters (budget, duration, models)
+# 5. Copy the generated key - it won't be shown again
 ```
 
-4. **Obtain access token:**
+3. **Make inference requests:**
 ```bash
-export TOKEN=$(curl -k -X POST $BASE_URL/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" \
-  | jq -r .access_token)
+# Using the API key obtained from either method above
+curl --location 'https://<cluster-url>/v1/chat/completions' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <master-key>' \
+--data '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello!"
+        }
+    ]
+}'
 ```
 
-5. **Make inference requests:**
-```bash
-# Make inference request with the obtained token
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{
-  "model": "meta-llama/Llama-3.1-8B-Instruct",
-  "prompt": "What is Deep Learning?", 
-  "max_tokens": 25, 
-  "temperature": 0
-}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
-```
+**Note:** The model endpoint and model information are available from Terraform outputs:
+- `genAI_gateway_url` - The GenAI Gateway UI URL
+- `model_endpoint` - The API endpoint for model inference (e.g., `https://<cluster-url>/v1/chat/completions`)
+- `model_id` - The deployed model identifier (e.g., `meta-llama/Llama-3.1-8B-Instruct`)
+
+These outputs can be found in:
+- Terraform output printed after deployment completion
+- Running `terraform output` in the deployment directory
+- IBM Cloud Deployable Architecture UI outputs section or logs (if deployed via UI)
 
 #### Complete Model Access Documentation
 

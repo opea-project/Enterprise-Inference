@@ -3,7 +3,7 @@
         {
             "label": "Intel® AI for Enterprise Inference",
             "name": "da-enterprise-inference",
-            "version": "1.0.0",
+            "version": "1.2.0",
             "product_kind": "solution",
 			"tags": [
               "opea",
@@ -15,8 +15,8 @@
               "intel_gaudi",
               "enterprise-inference"
             ],
-	    "short_description": "Intel® AI for Enterprise Inference (Enterprise Inference) is aimed to streamline the deployment and management of inference services on Intel® hardware.",
-            "long_description": "This solution leverages Terraform to automate the deployment of virtual machines on IBM Cloud, specifically tailored for AI workloads using Intel® Gaudi® 3 AI accelerators. It installs all necessary Intel Gaudi 3 AI accelerator-specific operators and deploys large language models (LLMs) on single node K8S cluster using Intel® AI for Enterprise Inference framework from the Open Platform for Enterprise AI (OPEA). By integrating cutting-edge AI infrastructure with cloud automation, this solution provides a streamlined approach to deploying and managing machine learning models in a scalable and efficient manner. Deploy this to automate the process of VM spin up, manage installation of Intel Gaudi 3 AI accelerator operators and LLM models on K8S cluster using Terraform referring to OPEA's Intel® AI for Enterprise Inference framework.\n\n**Prerequisites:**\n- Review the [Getting Started Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/third_party/IBM/docs/getting-started.md) for deployment instructions\n- Consult the [Sizing Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/third_party/IBM/docs/sizing-guide.md) to understand Intel® Gaudi® 3 AI Accelerator capabilities and choose the optimal configuration for your AI models",
+	        "short_description": "Intel® AI for Enterprise Inference (Enterprise Inference) is aimed to streamline the deployment and management of inference services on Intel® hardware.",
+			"long_description": "This solution automates the provisioning of virtual machines on IBM Cloud using Terraform, optimized for AI workloads powered by Intel® Gaudi® 3 AI accelerators. It deploys a Kubernetes cluster that supports both single-node and multi-node configurations. The multi-node setup includes three control plane nodes for orchestration and cluster management, along with worker nodes equipped with Intel® Gaudi® 3 for high-performance AI inference.The deployment integrates the Intel® AI for Enterprise Inference framework from the Open Platform for Enterprise AI (OPEA), enabling scalable deployment of Large Language Models (LLMs) across various configurations. It also includes key enterprise-grade features such as GenAI Gateway for secure and scalable access to generative AI models, Token Telemetry for detailed tracking and analysis of token usage across inference workloads, and Observability for real-time monitoring of system performance, resource utilization, and model behavior.By combining cutting-edge AI infrastructure with cloud automation, this solution provides a streamlined and efficient approach to deploying and managing machine learning models at scale.\n\n**Prerequisites:**\n- Review the [Getting Started Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/third_party/IBM/docs/getting-started.md) for deployment instructions\n- Consult the [Sizing Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/third_party/IBM/docs/sizing-guide.md) to understand Intel® Gaudi® 3 AI Accelerator capabilities and choose the optimal configuration for your AI models",
             "features": [
 			  {
                 "title": "Optimized AI Deployment",
@@ -219,19 +219,53 @@
 			                "description": "The contents of the TLS private key (PEM format)",
 			                "required": true
                         },
-						{
-                            "key": "keycloak_admin_user",
+                        {
+                            "key": "deployment_mode",
                             "type": "string",
-                            "default_value": "admin",
-                            "description": "Keycloak admin user name",
-							"required": true
+                            "display_name": "Deployment Mode",
+                            "default_value": "single-node",
+                            "description": "Deployment mode for the infrastructure (single-node or multi-node)",
+                            "required": true,
+                            "options": [
+                                {
+                                    "displayname": "Single Node",
+                                    "value": "single-node"
+                                },
+                                {
+                                    "displayname": "Multi Node",
+                                    "value": "multi-node"
+                                }
+                            ]
                         },
                         {
-                            "key": "keycloak_admin_password",
-                            "type": "multiline_secure_value",
-                            "default_value": "",
-                            "description": "Keycloak admin password",
-							"required": true
+                            "key": "control_plane_count",
+			                "type": "number",
+                            "display_name": "Control plane nodes count",
+                            "default_value": "3",
+			                "description": "Number of control plane nodes (1 for single or 3 for HA) - only used in multi-node mode",
+			                "required": true
+                        },
+                        {
+                            "key": "worker_gaudi_count",
+			                "type": "number",
+                            "display_name": "Worker nodes count",
+                            "default_value": "1",
+			                "description": "Number of Gaudi worker nodes for inference - only used in multi-node mode",
+			                "required": true
+                        },
+						{
+                            "key": "control_plane_names",
+			                "type": "list(string)",
+                            "display_name": "Control plane names",
+                            "default_value": "[]",
+			                "description": "Custom names for control plane nodes. If not provided, defaults to 'inference-control-plane-01', etc."
+                        },
+						{
+                            "key": "worker_gaudi_names",
+			                "type": "list(string)",
+                            "display_name": "Gaudi worker names",
+                            "default_value": "[]",
+			                "description": "Custom names for Gaudi worker nodes. If not provided, defaults to 'inference-workload-gaudi-node-01', etc."
                         },
 			            {
                             "key": "image",
@@ -257,17 +291,18 @@
                             "default_value": "~/certs/key.pem",
                             "description": "The path to the key file"
                         },
-                        {
-                            "key": "keycloak_client_id",
-                            "type": "string",
-                            "default_value": "ibm-app",
-                            "description": "Keycloak client id"
-                        },
 						{
                             "key": "cpu_or_gpu",
                             "type": "string",
                             "default_value": "gaudi3",
                             "description": "This variable specifies where the model should be running"
+                        },
+                        {
+                            "key": "vault_pass_code",
+                            "type": "multiline_secure_value",
+                            "default_value": "",
+                            "description": "Enter the master vault pass code",
+							"required": true
                         },
                         {
                             "key": "deploy_kubernetes_fresh",
@@ -282,16 +317,22 @@
                             "description": "This variable specfies whether to deploy NGNIX ingress controller or not"
                         },
                         {
+                            "key": "deploy_genai_gateway",
+                            "type": "string",
+                            "default_value": "yes",
+                            "description": "This variable specfies whether we need to deploy Gen AI Gateway"
+                        },
+                        {
+                            "key": "deploy_observability",
+                            "type": "string",
+                            "default_value": "no",
+                            "description": "This variable specfies whether we need to run observability"
+                        },
+                        {
                             "key": "deploy_llm_models",
                             "type": "string",
                             "default_value": "no",
                             "description": "This variable specfies whether we need to deploy LLM models"
-                        },
-                        {
-                            "key": "deploy_keycloak_apisix",
-                            "type": "string",
-                            "default_value": "yes",
-                            "description": "This variable specfies whether we need to run keycloak and Apisix components"
                         }
                     ]
                 },
@@ -431,7 +472,7 @@
 							"type": "resource_group"
                             }
                         }, 
-			{
+			            {
                             "key": "user_cert",
 			                "type": "multiline_secure_value",
                             "display_name": "Full chain Certificate",
@@ -439,7 +480,7 @@
 			                "description": "The contents of the TLS certificate (PEM format)",
 			                "required": true
                         },
-			{
+			            {
                             "key": "user_key",
 			                "type": "multiline_secure_value",
                             "display_name": "Certificate key",
@@ -448,37 +489,52 @@
 			                "required": true
                         },
 						{
-                            "key": "keycloak_admin_user",
+                            "key": "ssh_allowed_cidr",
                             "type": "string",
-                            "default_value": "admin",
-                            "description": "Keycloak admin user name",
+                            "default_value": "\"\"",
+                            "description": "CIDR block(s) allowed for SSH, HTTP, and HTTPS access. Enter a single CIDR or comma-separated list like: 198.0.0.0/8,192.0.0.0/8,169.0.0.0/8. Change to your organization's IP range for better security. For development/testing use 0.0.0.0/0",
 							"required": true
                         },
                         {
-                            "key": "keycloak_admin_password",
+                            "key": "deployment_mode",
+                            "type": "string",
+                            "display_name": "Deployment Mode",
+                            "default_value": "single-node",
+                            "description": "Deployment mode for the infrastructure (single-node or multi-node)",
+                            "required": true,
+                            "options": [
+                                {
+                                    "displayname": "Single Node",
+                                    "value": "single-node"
+                                },
+                                {
+                                    "displayname": "Multi Node",
+                                    "value": "multi-node"
+                                }
+                            ]
+                        },
+                        {
+                            "key": "control_plane_count",
+			                "type": "number",
+                            "display_name": "Control plane nodes count",
+                            "default_value": "3",
+			                "description": "Number of control plane nodes (1 for single or 3 for HA) - only used in multi-node mode",
+			                "required": true
+                        },
+                        {
+                            "key": "worker_gaudi_count",
+			                "type": "number",
+                            "display_name": "Worker nodes count",
+                            "default_value": "1",
+			                "description": "Number of Gaudi worker nodes for inference - only used in multi-node mode",
+			                "required": true
+                        },
+                        {
+                            "key": "vault_pass_code",
                             "type": "multiline_secure_value",
                             "default_value": "",
-                            "description": "Keycloak admin password",
+                            "description": "Enter the master vault pass code",
 							"required": true
-                        },
-						{
-                            "key": "ssh_allowed_cidr",
-                            "type": "string",
-                            "default_value": "0.0.0.0/0",
-                            "description": "CIDR block allowed for SSH access. Change to your organization's IP range for better security and for non-developement deployments",
-							"required": true
-                        },
-						{
-                            "key": "image",
-                            "type": "string",
-                            "default_value": "gaudi3-os-u22-01-21-0",
-                            "description": "This variable image name to be used for IAAS bringup on VSI instance"
-                        },
-						{
-                            "key": "cpu_or_gpu",
-                            "type": "string",
-                            "default_value": "gaudi3",
-                            "description": "This variable specifies where the model should be running"
                         }
 						
 		            ]

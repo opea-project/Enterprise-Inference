@@ -30,9 +30,18 @@ variable "instance_zone" {
 }
 
 variable "ssh_allowed_cidr" {
-  description = "CIDR block allowed for SSH access. Use your organization's IP range for better security."
-  type        = string
-  default     = "0.0.0.0/0"
+  description = "CIDR block(s) allowed for SSH, HTTP, and HTTPS access. Can be a single string or list of strings. Use your organization's IP range for better security."
+  type        = any
+  default     = "127.0.0.1/32"
+
+  validation {
+    condition = (
+      can(tolist(var.ssh_allowed_cidr)) ? length(tolist(var.ssh_allowed_cidr)) > 0 : (
+        var.ssh_allowed_cidr != "" && var.ssh_allowed_cidr != "\"\""
+      )
+    )
+    error_message = "The ssh_allowed_cidr variable must not be empty. Please provide at least one CIDR block (e.g., '0.0.0.0/0' for development/testing or your organization's IP range for production)."
+  }
 }
 
 variable "ibmcloud_api_key" {
@@ -44,7 +53,7 @@ variable "ibmcloud_api_key" {
 variable "cluster_url" {
   description = "The URL of the cluster"
   type        = string
-  default     = ""
+  default     = "api.example.com"
 }
 variable "cert_path" {
   description = "The path to the certificate file"
@@ -68,22 +77,7 @@ variable "user_key" {
 variable "image" {
   description = "IBM Cloud instance image"
   type        = string
-  default     = ""
-}
-variable "keycloak_client_id" {
-  description = "Keycloak client id"
-  type        = string
-  default     = "ibm-app"
-}
-variable "keycloak_admin_user" {
-  description = "Keycloak admin user name"
-  type        = string
-  default     = ""
-}
-variable "keycloak_admin_password" {
-  description = "Keycloak admin password"
-  type        = string
-  default     = ""
+  default     = "gaudi3-os-u22-01-21-0"
 }
 variable "hugging_face_token" {
   description = "This variable specifies the hf token."
@@ -101,6 +95,12 @@ variable "cpu_or_gpu" {
   type        = string
   default     = "gaudi3"
 }
+variable "vault_pass_code" {
+  description = "Vault Pass code for Encryption/Decryption"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
 variable "deploy_kubernetes_fresh" {
   description = "This variable specfies whether to deploy Kubernetes cluster freshly"
   type        = string
@@ -111,18 +111,91 @@ variable "deploy_ingress_controller" {
   type        = string
   default     = "yes"
 }
+variable "deploy_keycloak_apisix" {
+  description = "This variable specfies whether we need to run keycloak and Apisix components"
+  type        = string
+  default     = "no"
+}
 variable "deploy_llm_models" {
   description = "This variable specfies whether we need to deploy LLM models"
   type        = string
   default     = "no"
 }
-variable "deploy_keycloak_apisix" {
-  description = "This variable specfies whether we need to run keycloak and Apisix components"
+variable "deploy_genai_gateway" {
+  description = "This variable specfies whether we need to deploy Gen AI Gateway"
   type        = string
   default     = "yes"
 }
 variable "deploy_observability" {
   description = "This variable specfies whether we need to run observability"
   type        = string
-  default     = "yes"
+  default     = "no"
+}
+variable "deploy_istio" {
+  description = "This variable specfies whether we need to Istio related service mesh components"
+  type        = string
+  default     = "no"
+}
+variable "deployment_mode" {
+  description = "Deployment mode for the infrastructure (single-node or multi-node)"
+  type        = string
+  default     = "single-node"
+  validation {
+    condition     = contains(["single-node", "multi-node"], var.deployment_mode)
+    error_message = "deployment_mode must be either 'single-node' or 'multi-node'"
+  }
+}
+variable "control_plane_count" {
+  description = "Number of control plane nodes (1 for single or 3 for HA) - only used in multi-node mode"
+  type        = number
+  default     = 3
+  validation {
+    condition     = contains([1, 3], var.control_plane_count)
+    error_message = "control_plane_count must be either 1 (single) or 3 (HA)"
+  }
+}
+variable "worker_gaudi_count" {
+  description = "Number of Gaudi worker nodes for inference - only used in multi-node mode"
+  type        = number
+  default     = 3
+  validation {
+    condition     = var.worker_gaudi_count >= 0 && var.worker_gaudi_count <= 10
+    error_message = "worker_gaudi_count must be between 0 and 10"
+  }
+}
+
+variable "xeon_image" {
+  description = "IBM Cloud instance image for Xeon/CPU nodes in multi-node deployment"
+  type        = string
+  default     = "ibm-ubuntu-22-04-5-minimal-amd64-2"  # Default Ubuntu image for CPU nodes
+}
+
+variable "gaudi_image" {
+  description = "IBM Cloud instance image for Gaudi nodes in multi-node deployment"
+  type        = string
+  default     = "gaudi3-os-u22-01-21-0"  # Default Gaudi image
+}
+
+variable "control_plane_names" {
+  description = "Optional custom names for control plane nodes. If not provided, defaults to 'inference-control-plane-01', etc."
+  type        = list(string)
+  default     = []
+}
+
+variable "worker_gaudi_names" {
+  description = "Optional custom names for Gaudi worker nodes. If not provided, defaults to 'inference-workload-gaudi-node-01', etc."
+  type        = list(string)
+  default     = []
+}
+
+variable "instance_profile" {
+  description = "IBM Cloud instance profile for single-node deployment and worker nodes in multi-node deployment"
+  type        = string
+  default     = "gx3d-160x1792x8gaudi3"
+}
+
+variable "control_plane_instance_profile" {
+  description = "IBM Cloud instance profile for control plane nodes in multi-node deployment"
+  type        = string
+  default     = "cx2d-32x64"
 }

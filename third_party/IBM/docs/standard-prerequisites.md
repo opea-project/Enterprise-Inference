@@ -102,7 +102,7 @@ ibmcloud resource groups
 > **Note:** In terraform.tfvars, this is referred to as `hf_token`
 
 ### 7. Model Selection (models)
-**What it is:** Which AI model you want to deploy  
+**What it is:** Which AI model you want to deploy
 
 | Model Name | Num Cards | Disk | Model ID |
 |------------|-----------|------|----------|
@@ -110,14 +110,103 @@ ibmcloud resource groups
 | meta-llama/Llama-3.3-70B-Instruct | 4 | 150GB | 12 |
 | meta-llama/Llama-3.1-405B-Instruct | 8 | 900GB | 11 |
 
-**For CLI deployment:** Use the Model ID as a string value (`"1"`, `"12"`, or `"11"`) in your terraform.tfvars file.  
+**For CLI deployment:** Use the Model ID as a string value (`"1"`, `"12"`, or `"11"`) in your terraform.tfvars file.
 **For UI deployment:** Select from the dropdown - the values will be mapped automatically.
 
 > **Note:** After deployment is complete, you can SSH into the node to deploy additional models not listed above or undeploy existing models as needed.
 
+### 8. Deployment Mode Configuration
+
+**deployment_mode**
+**What it is:** Choose between single-node or multi-node architecture
+**Default:** `single-node`
+**Options:**
+- `single-node`: All components on one server (ideal for dev/test)
+- `multi-node`: Distributed architecture with separate control plane and workers (ideal for production)
+
+**worker_gaudi_count (for multi-node only)**
+**What it is:** Number of Intel® Gaudi® 3 AI accelerator worker nodes
+**Default:** `3`
+**Valid values:** `1`, `3`, `5`, or `7`
+
+> **Important:** Must use odd numbers for proper Ceph distributed storage cluster operation. Each Gaudi worker node includes 8 NVMe devices that are used as OSDs (Object Storage Daemons) in the Ceph cluster. For example, 3 worker nodes provide 24 OSD pods for distributed storage.
+
+**Example configuration:**
+```hcl
+deployment_mode = "multi-node"
+worker_gaudi_count = 3  # Creates 3 Gaudi worker nodes with 24 total OSDs
+```
+
+### 9. GenAI Gateway Authentication
+
+**vault_pass_code**
+**What it is:** Pass code for GenAI Gateway authentication and encryption/decryption of sensitive data
+**Default:** Empty string
+**Purpose:** Authenticates API requests to GenAI Gateway and secures sensitive configuration data
+
 ## Optional Prerequisites
 
-### 8. Cluster URL (cluster_url)
+### 10. Multi-Node Deployment Configuration (Advanced)
+
+The following variables are optional and only apply when using `deployment_mode = "multi-node"`:
+
+**control_plane_count**
+
+**What it is:** Number of control plane nodes for Kubernetes cluster
+
+**Default:** `3`
+
+**Valid values:** `1` (single control plane) or `3` (high availability)
+
+**Purpose:** Controls the number of Intel® Xeon® processor nodes that will run the Kubernetes control plane
+
+**xeon_image**
+
+**What it is:** IBM Cloud instance image for control plane nodes
+
+**Default:** `ibm-ubuntu-22-04-5-minimal-amd64-2`
+
+**Purpose:** Operating system image for Intel® Xeon® processor control plane nodes
+
+**gaudi_image**
+
+**What it is:** IBM Cloud instance image for Gaudi worker nodes
+
+**Default:** `gaudi3-os-u22-01-21-0`
+
+**Purpose:** Operating system image for Intel® Gaudi® 3 AI accelerator worker nodes
+
+**control_plane_instance_profile**
+
+**What it is:** IBM Cloud instance profile for control plane nodes
+
+**Default:** `cx2d-32x64`
+
+**Purpose:** Compute profile for Intel® Xeon® processor control plane nodes (CPU and memory specifications)
+
+**control_plane_names**
+
+**What it is:** Optional custom names for control plane nodes
+
+**Default:** Auto-generated (`inference-control-plane-01`, `inference-control-plane-02`, etc.)
+
+**Type:** List of strings
+
+**Example:** `["my-control-01", "my-control-02", "my-control-03"]`
+
+**worker_gaudi_names**
+
+**What it is:** Optional custom names for Gaudi worker nodes
+
+**Default:** Auto-generated (`inference-workload-gaudi-node-01`, `inference-workload-gaudi-node-02`, etc.)
+
+**Type:** List of strings
+
+**Example:** `["my-gaudi-worker-01", "my-gaudi-worker-02", "my-gaudi-worker-03"]`
+
+> **Note:** These variables are only used when `deployment_mode = "multi-node"`. For single-node deployments, these settings are ignored.
+
+### 11. Cluster URL (cluster_url)
 **What it is:** The domain name for your cluster API endpoint  
 **How to configure:**
 - **For Development/Testing:** Use `api.example.com` (default)
@@ -127,20 +216,7 @@ ibmcloud resource groups
 - Development: `api.example.com`
 - Production: `ai.yourcompany.com`
 
-### 9. Keycloak Admin Credentials
-
-#### keycloak_admin_user
-**What it is:** Admin username for Keycloak identity management  
-**Default:** `admin`  
-**Purpose:** Administrative access to Keycloak console
-
-#### keycloak_admin_password
-**What it is:** Admin password for Keycloak identity management   
-**Purpose:** Administrative access to Keycloak console
-
-> **Security Note:** Use strong, unique credentials for production deployments!
-
-### 10. TLS Configuration (user_cert, user_key)
+### 12. TLS Configuration (user_cert, user_key)
 
 **For Development/Testing:** You can skip certificates completely when using the default `api.example.com` cluster URL. The deployment will work without providing actual certificate values.
 
@@ -155,8 +231,8 @@ ibmcloud resource groups
 For detailed instructions on domain configuration and certificate setup, see: [Production Environment Setup](https://github.com/opea-project/Enterprise-Inference/blob/main/docs/prerequisites.md#production-environment)
 
 
-### 11. Image (image)
-**What it is:** The operating system image for your instance  
+### 13. Image (image)
+**What it is:** The operating system image for your instance
 **Default:** Automatically selected based on region
 **How to specify:** Usually leave empty to use default Ubuntu 22.04 image
 
@@ -165,7 +241,7 @@ For detailed instructions on domain configuration and certificate setup, see: [P
 ibmcloud is images --visibility public | grep ubuntu
 ```
 
-### 12. ssh_allowed_cidr
+### 14. ssh_allowed_cidr
 0.0.0.0/0 - This is okay for development, but for production, you should strictly define var.ssh_allowed_cidr to a trusted IP range (e.g., your office or VPN IPs)
 
 ## Development/Testing Note
@@ -193,8 +269,7 @@ The Standard pattern automatically provisions:
 - **Intel® Gaudi® 3 AI accelerator operators:** Hardware management and optimization
 - **NGINX Ingress:** Traffic routing and load balancing
 - **Model Serving:** vLLM inference server with your selected model
-- **Authentication:** Keycloak identity management
-- **API Gateway:** APISIX for API management
+- **GenAI Gateway:** Unified API gateway with LiteLLM for model orchestration and Langfuse for tracing
 - **Monitoring:** Observability stack
 
 ## Account Requirements Verification

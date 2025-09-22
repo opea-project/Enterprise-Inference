@@ -14,6 +14,13 @@ Before deploying Intel AI for Enterprise Inference, it's important to understand
 - AI Model Hosting Requirements to help you choose the optimal configuration
 - Performance metrics for different model sizes and use cases
 
+## Deployment Architecture
+
+Intel AI for Enterprise Inference supports both single-node and multi-node deployment architectures:
+
+- **Single-node deployment**: All components run on a single Intel® Gaudi® 3 AI accelerator server - ideal for development, testing, and smaller workloads
+- **Multi-node deployment**: Distributed architecture with separate control plane and worker nodes - ideal for production, high availability, and scaling
+
 ## Deployment Patterns
 
 Intel AI for Enterprise Inference provides two deployment patterns to accommodate different infrastructure requirements and organizational preferences.
