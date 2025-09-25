@@ -85,6 +85,13 @@
         create_namespace: true
         chart_version: "22.1.0"
         values:
+          image:
+            repository: bitnamilegacy/keycloak
+            tag: 25.0.2-debian-12-r2
+          postgresql:
+            image:
+              repository: bitnamilegacy/postgresql
+              tag: 16.3.0-debian-12-r23
           production: true
           proxy: edge
           replicaCount: "{{ inference_infra_replica_count | int }}"

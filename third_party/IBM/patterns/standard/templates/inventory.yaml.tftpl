@@ -1,0 +1,48 @@
+all:
+  hosts:
+%{ for i in range(control_plane_count) ~}
+    ${control_plane_names[i]}:
+      ansible_host: ${control_plane_ips[i]}
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ${ssh_private_key_path}
+%{ endfor ~}
+%{ for i in range(worker_gaudi_count) ~}
+    ${worker_gaudi_names[i]}:
+      devices: [nvme0n1, nvme1n1, nvme2n1, nvme3n1, nvme4n1, nvme5n1, nvme6n1, nvme7n1]
+      ansible_host: ${worker_gaudi_ips[i]}
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ${ssh_private_key_path}
+      node_labels:
+        node-role.kubernetes.io/inference-gaudi: "true"
+%{ endfor ~}
+  children:
+    kube_control_plane:
+      hosts:
+%{ for i in range(control_plane_count) ~}
+        ${control_plane_names[i]}:
+%{ endfor ~}
+    kube_node:
+      hosts:
+%{ for i in range(control_plane_count) ~}
+        ${control_plane_names[i]}:
+%{ endfor ~}
+%{ for i in range(worker_gaudi_count) ~}
+        ${worker_gaudi_names[i]}:
+%{ endfor ~}
+    etcd:
+      hosts:
+%{ for i in range(control_plane_count) ~}
+        ${control_plane_names[i]}:
+%{ endfor ~}
+    kube_inference_gaudi:
+      hosts:
+%{ for i in range(worker_gaudi_count) ~}
+        ${worker_gaudi_names[i]}:
+%{ endfor ~}
+    k8s_cluster:
+      children:
+        kube_control_plane:
+        kube_node:
+        kube_inference_gaudi:
+    calico_rr:
+      hosts: {}
