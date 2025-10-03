@@ -17,7 +17,7 @@ cd Enterprise-Inference
 cp -f docs/examples/single-node/inference-config.cfg core/inference-config.cfg
 ```
 
-Modify `inference-config.cfg` if needed. Ensure the `cluster_url` field is set to the DNS used, and the certificate and key files are pointed to correctly. The keycloak fields and deployment options can be left unchanged.
+Modify `inference-config.cfg` if needed. Ensure the `cluster_url` field is set to the DNS used, and the certificate and key files are pointed to correctly. The keycloak fields and deployment options can be left unchanged. For systems behind a proxy, refer to the [proxy guide](./running-behind-proxy.md).
 
 ### Step 2: Update `hosts.yaml` File
 Copy the single node preset hosts config file to the working directory:
@@ -34,7 +34,7 @@ Now run the automation using the configured files.
 cd core
 chmod +x inference-stack-deploy.sh
 ```
- Export the Hugging Face token as an environment variable by replacing "Your_Hugging_Face_Token_ID" with actual Hugging Face Token. 
+ Export the Hugging Face token as an environment variable by replacing "Your_Hugging_Face_Token_ID" with actual Hugging Face Token. Alternatively, set `hugging-face-token` to the token value inside `inference-config.cfg`.
 ```bash
 export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
 ```
@@ -63,17 +63,10 @@ This will deploy the setup automatically. If any issues are encountered, double-
 ### Step 4: Testing Inference
 On the node run the following commands to test if Intel® AI for Enterprise Inference is successfully deployed:
 
+Generate a token. This will also set the environment variable `TOKEN` used in the next step.
 ```bash
-export USER=api-admin
-export PASSWORD='changeme!!'
-export BASE_URL=https://api.example.com
-export KEYCLOAK_REALM=master
-export KEYCLOAK_CLIENT_ID=api
-export KEYCLOAK_CLIENT_SECRET=$(bash scripts/keycloak-fetch-client-secret.sh api.example.com api-admin 'changeme!!' api | awk -F': ' '/Client secret:/ {print $2}')
-export TOKEN=$(curl -k -X POST $BASE_URL/token  -H 'Content-Type: application/x-www-form-urlencoded' -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" | jq -r .access_token)
+source scripts/generate-token.sh
 ```
-
-> **Note** Change `USER` back to the original value.
 
 To test on CPU only:
 ```bash

@@ -7,7 +7,7 @@ This example lists out steps to test inference using a deployed model.
 1. At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference on-prem or on a CSP. If not, follow the [deployment guide](./README.md) or refer to all [offerings](http://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/enterprise-inference.html) to set up a server.  
 2. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
 
-### Method 1: Check APISIX Routes
+### Method 1 (If APISIX and Keycloak are deployed): Check APISIX Routes
   This works only if APISIX and Keycloak are deployed. Otherwise, refer to [Method 2](#method-2-run-inference-script) below.
   
   Run this command to see the list of models deployed:
@@ -16,10 +16,9 @@ This example lists out steps to test inference using a deployed model.
   ```
 
 ### Method 2: Run Inference Script
-  a) Run `inference-stack-deploy.sh` with the `--cpu-or-gpu` option:
+  a) Run `inference-stack-deploy.sh`:
   ```bash
-  export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
-  ./inference-stack-deploy.sh --cpu-or-gpu "gpu"
+  ./inference-stack-deploy.sh
   ``` 
   b) Select `Option 3: Update Deployed Inference Cluster` to go into the `Update Existing Cluster` menu. 
   c) Select `Option 2: Manage LLM Models` to go into the `Manage LLM Models` menu. 
@@ -32,13 +31,7 @@ This example lists out steps to test inference using a deployed model.
 Run the commands below to generate an API token used to access the node or cluster. The `BASE_URL` needs to be set to the domain used in the setup process.
 
 ```bash
-export USER=api-admin
-export PASSWORD='changeme!!'
-export BASE_URL=https://api.example.com
-export KEYCLOAK_REALM=master
-export KEYCLOAK_CLIENT_ID=api
-export KEYCLOAK_CLIENT_SECRET=$(bash scripts/keycloak-fetch-client-secret.sh api.example.com api-admin 'changeme!!' api | awk -F': ' '/Client secret:/ {print $2}')
-export TOKEN=$(curl -k -X POST $BASE_URL/token  -H 'Content-Type: application/x-www-form-urlencoded' -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" | jq -r .access_token)
+source scripts/generate-token.sh
 ```
 
 Save the token for later use.
@@ -61,30 +54,42 @@ export OPENAI_API_KEY="contents_of_TOKEN"
 ```
 
 ## Run Inference 
-Create a script `inference.py` with these contents. Change the model if needed. The list of models will only work if the remote server is deployed with LiteLLM. Otherwise, only the specified model from the `BASE_URL` will be shown.
+Create a script `inference.py` with these contents. Change the model if needed. The commented out code that lists the models will only work if the remote server is deployed with LiteLLM. Otherwise, only the specified model from the `BASE_URL` will be shown. If the SSL certificate is self-signed, an HTTP client is created with input argument `verify=false` to bypass it.
+
 ```python
 from openai import OpenAI
 import os
- 
+import httpx
+
+# Create a custom HTTP client with SSL verification disabled and custom headers
+http_client = httpx.Client(
+    verify=False,
+    headers={
+        "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+        "Content-Type": "application/json"
+    }
+)
+
 client = OpenAI(
-    api_key=os.environ["OPENAI_API_KEY"],  # This is the default and can be omitted
-    base_url= os.environ["BASE_URL"]
+    base_url=os.environ["BASE_URL"],
+    http_client=http_client
 )
 
 # For remote servers using LiteLLM only: list out available models from endpoint
-models = client.models.list()
-print("Available models: %s" %models)
- 
+#models = client.models.list()
+#print("Available models: %s" %models)
+
 # Run inference with model
 print("Running inference with selected model:")
 completion = client.chat.completions.create(
   model="meta-llama/Llama-3.1-8B-Instruct",
   messages=[
     {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello!"}
+    {"role": "user", "content": "Hello"}
   ])
 
 print(completion.choices[0].message)
+
 ```
 
 Run the script. The output should be the response to the query.
