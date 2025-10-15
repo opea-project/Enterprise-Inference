@@ -44,6 +44,9 @@ apisix:
                   app: auth-apisix
               topologyKey: "kubernetes.io/hostname"
   etcd:
+    image:
+      repository: bitnamilegacy/etcd
+      tag: 3.5.10-debian-11-r2
     auth:    
       tls:        
         enabled: false        

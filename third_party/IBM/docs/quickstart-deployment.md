@@ -19,6 +19,85 @@ You can deploy using two methods:
 
 - **Terraform CLI** - Command-line deployment using infrastructure-as-code principles. This method provides maximum control, enables automation, and integrates well with CI/CD pipelines for experienced users.
 
+## UI Deployment
+
+### Step 1: Access the Catalog
+1. Log into [IBM Cloud Console](https://cloud.ibm.com)
+2. Go to "Catalog" → "Community registry"
+3. Search for "Intel AI for Enterprise Inference"
+4. Click the tile
+
+### Step 2: Select Quickstart Variation
+1. On the variations page, select "QuickStart"
+2. Click "Add to project" in the bottom right (highlighted in yellow below)
+
+![Add to Project](assets/quickstart/add_to_project.png)
+
+### Step 3: Configure Project
+
+#### Option A: Create New Project
+1. Select "Create new"
+2. Fill in the project details:
+   - **Name:** Your project name (e.g., "enterprise-inference-project")
+   - **Description:** Brief description of your project
+   - **Configuration name:** Name for this configuration (e.g., "quickstart-config")
+   - **Region:** Select from dropdown
+   - **Resource group:** Select from dropdown
+
+> **Note:** For Intel® Gaudi® 3 AI accelerator deployments, ensure you select a region with Gaudi availability: `us-east`, `us-south`, or `eu-de`
+
+**OR**
+
+#### Option B: Add to Existing Project
+1. Select "Add to existing"
+2. **Select a project:** Choose from dropdown
+3. **Configuration name:** Enter a name for this configuration
+
+After selecting your option, click **"Add"** in the bottom right.
+
+### Step 4: Configure Security & Architecture
+You'll be taken to the deployment configuration page. First, in the **Security** section, add your IBM Cloud API key, then click **"Next"**.
+
+On the **Configure architecture** page, edit all required inputs (turn on **Advanced** to access optional inputs). Enter the values from your [Prerequisites Guide](./quickstart-prerequisites.md): SSH key (must exist in IBM Cloud), SSH private key (paste content), IBM Cloud region, instance zone, cluster_url, model selection, Hugging Face token, instance name, VPC name, security group name, public gateway name, subnet name, resource group, vault pass code, full chain certificate, and certificate key.
+
+> **Note:** For development/testing, leave cluster URL as `api.example.com` and certificates as default values. Only change cluster URL to your registered domain name for production deployments, and only then provide your actual TLS certificate and private key.
+
+### Step 5: Save and Deploy
+1. Click "Save" in the top-right to save your configuration
+2. Click "Validate" to check your configuration - you'll see "Validating changes..." and "Generating plan..." which takes 2-3 minutes
+3. Once you see "Validation successful", enter a comment and click "Approve" to enable the Deploy button
+4. Click "Deploy" in the bottom-right 
+5. Monitor "Deploying changes..." progress and click "View logs" to see detailed deployment logs (deployment takes ~40 minutes for quickstart variation)
+
+![Deployment Progress](assets/quickstart/in_progress.png)
+
+6. Once deployment completes, you'll see "Deployment successful" with "Changes deployed successfully" 
+
+![Deployment Successful](assets/quickstart/deployed_successfully.png)
+
+7. Click on "Changes deployed successfully" (highlighted in yellow) to view deployment details
+
+![Deployment Details](assets/quickstart/click_for_logs.png)
+
+8. Click on the "Logs" tab to view complete deployment logs
+
+### Step 6: View Deployment Outputs
+To view deployment outputs including instance IP and model endpoints:
+1. Click **Navigation Menu** (☰) in the top-left
+2. Select **Projects**
+3. Choose your project from the list
+4. Click on **Configurations**
+5. Click on your deployment name
+6. You'll see all deployment outputs including **floating_ip** and model endpoints in a clean interface
+
+![Output Section](assets/quickstart/output_section.png)
+
+### Step 7: Access Your Deployment
+Once deployment completes:
+1. Note the **floating_ip** and **reserved_ip** from the deployment outputs
+2. SSH to your instance using the floating IP: `ssh -i ~/.ssh/your-key ubuntu@YOUR_FLOATING_IP`
+3. Verify services are running with `kubectl get pods -A`
+
 ## CLI Deployment
 
 ### Step 1: Get the Code
@@ -86,9 +165,14 @@ ssh_private_key = file("~/.ssh/ibm-inference-key")
 models = "2"  # Options: "1" (8B), "12" (70B), or "11" (405B)
 hugging_face_token = "hf_your_token_here"
 
-# Required: Keycloak Admin Configuration
-keycloak_admin_user = "admin"      # Default: "admin"
-keycloak_admin_password = ""  # Enter the password for Keycloak login
+# Required: Deployment Mode Configuration
+deployment_mode = "single-node"  # Options: "single-node" or "multi-node"
+# For multi-node deployments, specify the number of worker nodes:
+# IMPORTANT: Use odd numbers (1, 3, 5, 7) for proper Ceph storage cluster operation
+worker_gaudi_count = 3  # Number of Gaudi worker nodes (must be 1, 3, 5, or 7)
+
+# Required: GenAI Gateway Authentication
+vault_pass_code = ""  # Pass code for GenAI Gateway authentication and encryption/decryption
 
 # Optional: TLS Configuration  
 # For Development/Testing: Leave cluster_url as "api.example.com" and keep default certificate values
@@ -112,9 +196,6 @@ terraform apply -auto-approve
 # Save the outputs
 terraform output > deployment-info.txt
 ```
-
-![Terraform Deployment Progress](assets/quickstart/cli-progress.png)
-
 ### Step 4: Verify
 ```bash
 # Get your instance IP
@@ -126,152 +207,101 @@ ssh -i ~/.ssh/ibm-inference-key ubuntu@$INSTANCE_IP
 # Check if everything is running
 kubectl get pods -A
 ```
+## Deployment Architecture Options
 
-## UI Deployment
+### Single-Node Deployment
+In single-node mode, all components (control plane, workloads, and storage) run on a single Intel® Gaudi® 3 AI accelerator server. This is ideal for:
+- Development and testing environments
+- Proof of concepts
+- Smaller workloads
+- Cost-conscious deployments
 
-### Step 1: Access the Catalog
-1. Log into [IBM Cloud Console](https://cloud.ibm.com)
-2. Go to "Catalog" → "Community registry"
-3. Search for "Intel AI for Enterprise Inference"
-4. Click the tile
+### Multi-Node Deployment
+In multi-node mode, the deployment creates a distributed architecture with:
+- **Control Plane Nodes**: 1 or 3 Intel® Xeon® processor nodes for Kubernetes control plane (3 nodes for HA)
+- **Worker Nodes**: 1, 3, 5, or 7 Intel® Gaudi® 3 AI accelerator nodes for AI inference workloads
+  - Each Gaudi node includes 8 NVMe devices used for Ceph distributed storage
+  - **Important**: Must use odd numbers (1, 3, 5, 7) of worker nodes for proper Ceph storage cluster quorum
+  - With 3 worker nodes and 8 NVMe devices each, you'll have 24 OSD (Object Storage Daemon) pods
 
-### Step 2: Select Quickstart Variation
-1. On the variations page, select "QuickStart"
-2. Click "Add to project" in the bottom right (highlighted in yellow below)
-
-![Add to Project](assets/quickstart/add_to_project.png)
-
-### Step 3: Configure Project
-
-#### Option A: Create New Project
-1. Select "Create new"
-2. Fill in the project details:
-   - **Name:** Your project name (e.g., "enterprise-inference-project")
-   - **Description:** Brief description of your project
-   - **Configuration name:** Name for this configuration (e.g., "quickstart-config")
-   - **Region:** Select from dropdown
-   - **Resource group:** Select from dropdown
-
-> **Note:** For Intel® Gaudi® 3 AI accelerator deployments, ensure you select a region with Gaudi availability: `us-east`, `us-south`, or `eu-de`
-
-**OR**
-
-#### Option B: Add to Existing Project
-1. Select "Add to existing"
-2. **Select a project:** Choose from dropdown
-3. **Configuration name:** Enter a name for this configuration
-
-After selecting your option, click **"Add"** in the bottom right.
-
-### Step 4: Configure Security & Architecture
-You'll be taken to the deployment configuration page. First, in the **Security** section, add your IBM Cloud API key, then click **"Next"**.
-
-On the **Configure architecture** page, edit all required inputs (turn on **Advanced** to access optional inputs). Enter the values from your [Prerequisites Guide](./quickstart-prerequisites.md): SSH key (must exist in IBM Cloud), SSH private key (paste content), IBM Cloud region, instance zone, cluster_url, model selection, Hugging Face token, instance name, VPC name, security group name, public gateway name, subnet name, resource group, Keycloak admin user, Keycloak admin password, full chain certificate, and certificate key.
-
-> **Note:** For development/testing, leave cluster URL as `api.example.com` and certificates as default values. Only change cluster URL to your registered domain name for production deployments, and only then provide your actual TLS certificate and private key.
-
-### Step 5: Save and Deploy
-1. Click "Save" in the top-right to save your configuration
-2. Click "Validate" to check your configuration - you'll see "Validating changes..." and "Generating plan..." which takes 2-3 minutes
-3. Once you see "Validation successful", enter a comment and click "Approve" to enable the Deploy button
-4. Click "Deploy" in the bottom-right 
-5. Monitor "Deploying changes..." progress and click "View logs" to see detailed deployment logs (deployment takes ~40 minutes for quickstart variation)
-
-![Deployment Progress](assets/quickstart/in_progress.png)
-
-6. Once deployment completes, you'll see "Deployment successful" with "Changes deployed successfully" 
-
-![Deployment Successful](assets/quickstart/deployed_successfully.png)
-
-7. Click on "Changes deployed successfully" (highlighted in yellow) to view deployment details
-
-![Deployment Details](assets/quickstart/click_for_logs.png)
-
-8. Click on the "Logs" tab to view complete deployment logs
-
-### Step 6: View Deployment Outputs
-To view deployment outputs including instance IP and model endpoints:
-1. Click **Navigation Menu** (☰) in the top-left
-2. Select **Projects**
-3. Choose your project from the list
-4. Click on **Configurations**
-5. Click on your deployment name
-6. You'll see all deployment outputs including **floating_ip** and model endpoints in a clean interface
-
-![Output Section](assets/quickstart/output_section.png)
-
-### Step 7: Access Your Deployment
-Once deployment completes:
-1. Note the **floating_ip** and **reserved_ip** from the deployment outputs
-2. SSH to your instance using the floating IP: `ssh -i ~/.ssh/your-key ubuntu@YOUR_FLOATING_IP`
-3. Verify services are running with `kubectl get pods -A`
+Multi-node deployment is ideal for:
+- Production environments requiring high availability
+- Large-scale inference workloads
+- Distributed storage requirements
+- Workload isolation and scaling
 
 ## Next Steps
 
-### Accessing Deployed Model
+### Scale model replicas
 
-Once deployment is complete, you can start making inference requests to your deployed model.
-
-#### Example: Inferencing with Llama-3-8B
-
-1. **SSH to your instance and verify services:**
+**SSH to your instance and verify services:**
 ```bash
 # SSH to your instance
 ssh -i ~/.ssh/your-key ubuntu@YOUR_FLOATING_IP
 
 # Check that all services are running
 kubectl get pods -A
-```
 
-2. **Obtain Keycloak client secret:**
+# For multi-node we can scale and distribute accross the worker nodes,
+# use the below command and change the replicas count based on the available Gaudi cards.
+Review the [Getting started Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/docs/README.md) for more details on Gaudi cards information.
+kubectl get deployment
+kubectl scale deployment vllm-llama-8b --replicas=8
+```
+### User Key management using GenAI Gateway (Litellm)
+There are two ways to get the API key to make inference requests:
+
+**Method 1: Quick Test (Using Master Key)**
 ```bash
-# Run the client secret fetch script on your instance
-keycloak-fetch-client-secret.sh <cluster-url> <keycloak-username> <keycloak-password> <keycloak-client-id>
+# Navigate to the metadata directory
+cd Enterprise-Inference/core/inventory/metadata
 
-# Expected output:
-# Logged in successfully
-# Client secret: keycloak-client-secret
+# View the vault file to get the master key
+grep litellm_master_key vault.yml
+# Copy the value shown for litellm_master_key - this is your API key
 ```
 
-3. **Set up environment variables:**
+**Method 2: Generate Custom API Keys (Production)**
 ```bash
-# The Keycloak cluster URL configured during deployment
-export BASE_URL=https://api.example.com
+# The GenAI Gateway URL is available from deployment outputs
+# Access the UI at: https://<your-cluster-url>/ui
 
-# Default realm (unless changed during deployment)
-export KEYCLOAK_REALM=master
-
-# Client ID configured during deployment in keycloak_client_id field
-export KEYCLOAK_CLIENT_ID=<your_keycloak_client_id>
-
-# Client secret obtained from step 2
-export KEYCLOAK_CLIENT_SECRET=<your_keycloak_client_secret>
+# To generate a new API key:
+# 1. Navigate to the GenAI Gateway UI
+# 2. Click on "API Keys" in the sidebar
+# 3. Click "Create New Key"
+# 4. Set optional parameters (budget, duration, models)
+# 5. Copy the generated key - it won't be shown again
 ```
 
-4. **Obtain access token:**
+**Make inference requests:**
 ```bash
-export TOKEN=$(curl -k -X POST $BASE_URL/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" \
-  | jq -r .access_token)
+# Using the API key obtained from either method above
+curl --location 'https://<cluster-url>/v1/chat/completions' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <master-key>' \
+--data '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello!"
+        }
+    ]
+}'
 ```
-
-5. **Make inference requests:**
-```bash
-# Make inference request with the obtained token
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{
-  "model": "meta-llama/Llama-3.1-8B-Instruct",
-  "prompt": "What is Deep Learning?", 
-  "max_tokens": 25, 
-  "temperature": 0
-}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
-```
-
-#### Complete Model Access Documentation
-
-For detailed instructions on accessing all supported models, authentication setup, and advanced usage patterns, visit:
-
+### Accessing the model
 **[Accessing Deployed Models Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/docs/accessing-deployed-models.md)**
+
+**Note:** The model endpoint and model information are available from Terraform outputs:
+- `genAI_gateway_url` - The GenAI Gateway UI URL
+- `model_endpoint` - The API endpoint for model inference (e.g., `https://<cluster-url>/v1/chat/completions`)
+- `model_id` - The deployed model identifier (e.g., `meta-llama/Llama-3.1-8B-Instruct`)
+
+These outputs can be found in:
+- Terraform output printed after deployment completion
+- Running `terraform output` in the deployment directory
+- IBM Cloud Deployable Architecture UI outputs section or logs (if deployed via UI)
 
 ## Cleanup and Troubleshooting
 
