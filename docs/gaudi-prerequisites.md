@@ -49,6 +49,17 @@ You'll see something like:
 ii  habanalabs-container-runtime  1.20.0-543  HABANA container runtime
 ```
 
+#### Step 4: Check if IOMMU Passthrough Needs to be Enabled
+**Important:** If OS Ubuntu 24.04/22.04.5 with Linux kernel 6.8 is used, _IOMMU Passthrough must be enabled_ to prevent garbled output during LLM inference.
+
+To check if it is already enabled:
+```bash
+cat /proc/cmdline
+```
+Look for *iommu=pt* and *intel_iommu=on* in the output.
+
+Otherwise, follow these [instructions](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#enable-iommu-passthrough) to enable IOMMU Passthrough.
+
 #### Updating Your System (Automated)
 
 The platform now includes an automated firmware and driver update script that handles the complete upgrade process safely and efficiently.
