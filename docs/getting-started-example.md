@@ -4,8 +4,9 @@ This example lists out steps to test inference using a deployed model.
 
 ## Prerequisites
 
-1. At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference on-prem or on a CSP. If not, follow the [deployment guide](./README.md) or refer to all [offerings](http://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/enterprise-inference.html) to set up a server.  
-2. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
+1. At this point, it is assumed the node or cluster is deployed with Intel® AI for Enterprise Inference on-prem or on a CSP. If not, follow the [deployment guide](./README.md) or refer to all [offerings](http://www.intel.com/content/www/us/en/developer/topic-technology/artificial-intelligence/enterprise-inference.html) to set up a server.
+2. Navigate to the Enterprise-Inference/core folder.
+3. Have a list of deployed models on the node or cluster. To see the list, log on to the node or cluster and follow these instructions:
 
 ### Method 1 (If APISIX and Keycloak are deployed): Check APISIX Routes
   This works only if APISIX and Keycloak are deployed. Otherwise, refer to [Method 2](#method-2-run-inference-script) below.
