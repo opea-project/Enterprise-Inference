@@ -236,18 +236,18 @@ read_config_file() {
             export no_proxy
         fi
         
-        
         case "$cpu_or_gpu" in
             "c" | "cpu")
             cpu_or_gpu="c"
             deploy_habana_ai_operator="no"
             ;;
             "g" | "gpu" | "gaudi2" | "gaudi3")
-            if [[ "$cpu_or_gpu" == "gaudi2" || "$cpu_or_gpu" == "gpu" || "$cpu_or_gpu" == "g" ]]; then
-                gaudi_platform="gaudi2"
-                
-            elif [[ "$cpu_or_gpu" == "gaudi3" ]]; then
-                gaudi_platform="gaudi3"
+            if [[ "$gaudi_platform" == "" ]]; then
+                if [[ "$cpu_or_gpu" == "gaudi2" || "$cpu_or_gpu" == "gpu" || "$cpu_or_gpu" == "g" ]]; then
+                    gaudi_platform="gaudi2"
+                elif [[ "$cpu_or_gpu" == "gaudi3" ]]; then
+                    gaudi_platform="gaudi3"
+                fi
             fi
             cpu_or_gpu="g"
             deploy_habana_ai_operator="yes"            
