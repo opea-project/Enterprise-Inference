@@ -1,0 +1,13 @@
+apiVersion: v2
+name: openwebui
+description: Wrapper chat for Open WebUI
+type: application
+version: 0.1.0
+appVersion: "main"
+
+dependencies:
+  - name: open-webui 
+    alis: openwebui
+    version: ">=0.1.0"
+    repository: "https://helm.openwebui.com"
+    condition: openwebui.enabled
