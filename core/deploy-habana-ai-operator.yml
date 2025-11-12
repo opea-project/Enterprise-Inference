@@ -1,4 +1,0 @@
-# Copyright (C) 2024-2025 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-- name: Setup Habana AI Operator
-  ansible.builtin.import_playbook: playbooks/deploy-habana-ai-operator.yml

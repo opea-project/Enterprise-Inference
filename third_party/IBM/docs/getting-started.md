@@ -68,11 +68,13 @@ Infrastructure Assessment:
 
 The following large language models are supported for deployment:
 
-| Model Name | Cards Required       | Storage | Model   ID |
-|------------|----------------------|---------|----------  |
-| meta-llama/Llama-3.1-8B-Instruct  | 1 	  | 20GB  | 1  |
-| meta-llama/Llama-3.3-70B-Instruct | 4       | 150GB | 12 |
-| meta-llama/Llama-3.1-405B-Instruct| 8       | 900GB | 11 |
+| Model Name 								| Cards Required       		| Storage | Model ID |
+|-------------------------------------------|---------------------------|---------|----------|
+| meta-llama/Llama-3.1-8B-Instruct  		| 1 	  					| 20GB    | 1  		 |
+| meta-llama/Llama-3.1-405B-Instruct 		| 8       					| 900GB   | 3		 |
+| meta-llama/Llama-3.3-70B-Instruct			| 4       					| 150GB   | 4 		 |
+| meta-llama/Llama-4-Scout-17B-16E-Instruct | 4       					| 200GB   | 5 		 |
+| Qwen/Qwen2.5-32B-Instruct					| 1       					| 70GB    | 6 		 |
 
 > **Note:** Additional models can be deployed or existing models can be removed after initial deployment by accessing the deployment instance.
 

@@ -250,7 +250,7 @@
         - name: Deploy the inference-config.cfg file
           template:
             src: templates/inference-config.cfg.j2
-            dest: "{{ einf_path }}/core/inference-config.cfg"
+            dest: "{{ einf_path }}/core/inventory/inference-config.cfg"
             mode: "0644"
         - name: Deploy the hosts.yaml file
           template:

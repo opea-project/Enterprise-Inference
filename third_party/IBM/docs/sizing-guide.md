@@ -34,11 +34,14 @@ More details in the [Intel® Gaudi® 3 AI Accelerator White Paper](https://www.i
 
 The CPU on the Gaudi 3 servers may feature 5th Gen Intel® Xeon® processors with up to 64 cores, along with 8 Habana Processing Units (HPUs), generally also has more than 8TB of storage on the device packs a powerful package for AI processing. Efficient usage of the infrastructure is important for a better return on investment. In the table below we provide a view of resources needed for hosting models of various sizes.
 
-| Model Size | Example Models | HPUs needed for hosting |
-|------------|----------------|------------------------|
-| 1B-32B | meta-llama/Llama-3.1-8B-Instruct | 1 HPU card (i.e.) 1/8th of a Gaudi server |
-| 64-180B | meta-llama/Llama-3.3-70B-Instruct | 4 HPU cards (i.e.) 1/2 of a Gaudi server |
-| 180B-405B | meta-llama/Llama-3.1-405B-Instruct | 8 HPU cards (i.e.) Full Gaudi Server |
+| Model Size | Example Models 							| HPUs needed for hosting 					|
+|------------|------------------------------------------|-------------------------------------------|
+| 1B-32B 	 | meta-llama/Llama-3.1-8B-Instruct 		| 1 HPU card (i.e.) 1/8th of a Gaudi server |
+| 180B-405B  | meta-llama/Llama-3.1-405B-Instruct 		| 8 HPU cards (i.e.) Full Gaudi Server 		|
+| 64-180B 	 | meta-llama/Llama-3.3-70B-Instruct 		| 4 HPU cards (i.e.) 1/2 of a Gaudi server  |
+| 200-205B   | meta-llama/Llama-4-Scout-17B-16E-Instruct| 4 HPU cards (i.e.) 1/2 of a Gaudi server	|
+| 70B-75B    | Qwen/Qwen2.5-32B-Instruct 				| 1 HPU cards (i.e.) 1/8th of a Gaudi server|
+
 
 ## Performance Metrics
 

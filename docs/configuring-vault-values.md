@@ -50,7 +50,7 @@ ansible-vault encrypt inventory/metadata/vault.yml
 You can customize the vault password by updating the configuration in:
 
 ```
-core/inference-config.cfg
+core/inventory/inference-config.cfg
 ```
 
 Look for the key:

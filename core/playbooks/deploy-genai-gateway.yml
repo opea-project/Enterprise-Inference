@@ -117,15 +117,41 @@
       delay: 10
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
       run_once: true
-    - name: Update GenAI Gateway Trace (Langfuse) Helm Dependencies
+    
+    - name: Add GenAI Gateway Trace Repository
       command: >
-        helm dependency update {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse
-      register: langfuse_deps
+        helm repo add langfuse https://langfuse.github.io/langfuse-k8s
       run_once: true
+    - name: Update GenAI Gateway Trace Repositories
+      command: >
+        helm repo update
+      run_once: true
+                   
+    - name: Create TLS secret for GenAI Gateway
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "trace-{{ secret_name }}"
+            namespace: genai-gateway
+          type: kubernetes.io/tls
+          data:
+            tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
+            tls.key: "{{ lookup('file', key_file) | b64encode }}"
+      register: kubectl_output
+      run_once: true
+    - name: TLS Create
+      debug:
+        msg: "Secret trace-{{ secret_name }} created."
+      run_once: true
+    
     - name: Install GenAI Gateway Trace System
       command: >
-        helm upgrade --install genai-gateway-trace {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse
+        helm upgrade --install genai-gateway-trace langfuse/langfuse
         --namespace genai-gateway
+        --version {{ genai_gateway_trace_chart_version | default('1.5.1') }}
         --set fullnameOverride=genai-gateway-trace
         --set nameOverride=genai-gateway-trace
         --set clickhouse.auth.username={{ clickhouse_username }} \
@@ -144,12 +170,12 @@
         --set langfuse.ingress.enabled=true \
         --set langfuse.ingress.className=nginx \
         --set langfuse.ingress.tls.enabled="true" \
-        --set langfuse.ingress.hosts[0].host="trace.{{ secret_name }}" \
-        --set langfuse.ingress.tls.secretName="trace.{{ secret_name }}" \
-        --set langfuse.nextauth.url="https://trace.{{ secret_name }}" \
+        --set langfuse.ingress.hosts[0].host="trace-{{ secret_name }}" \
+        --set langfuse.ingress.tls.secretName="trace-{{ secret_name }}" \
+        --set langfuse.nextauth.url="https://trace-{{ secret_name }}" \
         --set langfuse.nextauth.secret.value={{ clickhouse_password }} \
         -f {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse/values.yaml
-      run_once: true
+      run_once: true            
     - name: Wait for All GenAI Gateway Trace Pods to be Ready
       shell: |
         kubectl get pods -n genai-gateway -l app.kubernetes.io/instance=genai-gateway-trace -o json | jq -r '

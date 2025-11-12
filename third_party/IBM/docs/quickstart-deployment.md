@@ -162,7 +162,7 @@ ssh_key = "my-inference-key"
 ssh_private_key = file("~/.ssh/ibm-inference-key")
 
 # Required: Model (CLI format: use string value from table below)
-models = "2"  # Options: "1" (8B), "12" (70B), or "11" (405B)
+models = "2"  # Options: "1" (8B), "3" (405B), "4" (70B), "5" (Llama-4-Scout-17B), or "6" (Qwen2.5-32B)
 hugging_face_token = "hf_your_token_here"
 
 # Required: Deployment Mode Configuration

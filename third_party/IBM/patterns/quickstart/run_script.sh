@@ -59,7 +59,7 @@ if [[ "$1" == "install-habana-runtime" ]]; then
   export NEEDRESTART_MODE=a
   export NEEDRESTART_SUSPEND=1
   
-  if sudo DEBIAN_FRONTEND=noninteractive apt install -y habanalabs-container-runtime=1.21.0-555; then
+  if sudo DEBIAN_FRONTEND=noninteractive apt install -y habanalabs-container-runtime=1.22.1-6; then
     echo "[$(date)] habanalabs-container-runtime installation successful on $(hostname)"
   else
     echo "[$(date)] WARNING: habanalabs-container-runtime installation failed on $(hostname), continuing..."
@@ -79,12 +79,18 @@ if [[ "$1" == "model-deploy" ]]; then
   if [[ "$2" == "1" ]]; then
     kubectl scale deployment vllm-llama-8b --replicas=8
     echo "[$(date)] Scaled vllm-llama-8b to 8 replicas"
-  elif [[ "$2" == "12" ]]; then
+  elif [[ "$2" == "3" ]]; then
+    kubectl scale deployment vllm-llama3-405b  --replicas=1
+    echo "[$(date)] Scaled vllm-llama3-405b to 1 replicas"
+  elif [[ "$2" == "4" ]]; then
     kubectl scale deployment vllm-llama-3-3-70b --replicas=2
     echo "[$(date)] Scaled vllm-llama-3-3-70b to 2 replicas"
-  elif [[ "$2" == "11" ]]; then
-    kubectl scale deployment vllm-llama3-405b --replicas=1
-    echo "[$(date)] Scaled vllm-llama3-405b to 1 replica"
+  elif [[ "$2" == "5" ]]; then
+    kubectl scale deployment vllm-llama-4-scout-17b --replicas=2
+    echo "[$(date)] Scaled vllm-llama-4-scout-17b to 2 replicas"
+  elif [[ "$2" == "6" ]]; then
+    kubectl scale deployment vllm-qwen-2-5-32b --replicas=8
+    echo "[$(date)] Scaled vllm-qwen-2-5-32b to 8 replicas"
   else
     echo "Unsupported model selected: $2"
   fi
@@ -159,7 +165,7 @@ else
   # For multi-node, use the Terraform-generated inventory
   cp -f /tmp/multi_node_hosts.yaml core/inventory/hosts.yaml
 fi
-cp -f /home/ubuntu/inference-config.cfg core/inference-config.cfg
+cp -f /home/ubuntu/inference-config.cfg core/inventory/inference-config.cfg
 
 echo "[$(date)] Vault secrets generated successfully"
 chmod +x core/inference-stack-deploy.sh

@@ -56,7 +56,7 @@
         chart_ref: ingress-nginx/ingress-nginx
         release_namespace: ingress-nginx
         create_namespace: true
-        chart_version: 4.12.2
+        chart_version: "{{ ingress_controller | default('4.12.2') }}"
         state: present
         values:
           controller:

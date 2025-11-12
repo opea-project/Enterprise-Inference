@@ -1,0 +1,521 @@
+# Setup Bastion Node with Dependencies for Remote Kubernetes Cluster Management
+# This playbook installs all necessary tools for managing a remote Kubernetes cluster
+# from a bastion/jump host using kubeconfig files.
+
+- name: Setup Bastion Node Dependencies
+  hosts: kube_control_plane
+  gather_facts: yes
+  connection: local
+  become: yes
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user | default(ansible_env.USER) | default('ubuntu') }}/.kube/config"
+  vars:
+    # Version variables for better control and updates
+    kubectl_version: "v1.29.0"
+    helm_version: "v3.14.0"
+    yq_version: "v4.40.5"
+    # Use current user or default to ubuntu for consistency with project
+    setup_user: "{{ ansible_user | default(ansible_env.USER) | default('ubuntu') }}"
+    
+  tasks:
+    - name: Display bastion setup information
+      debug:
+        msg:
+          - "=== BASTION NODE SETUP ==="
+          - "Setting up dependencies for remote Kubernetes cluster management"
+          - "This includes kubectl, helm, ansible, vault, and supporting tools"
+          - "=========================="
+      tags: always
+
+    # Package Manager Updates and Base Dependencies
+    - name: Update package manager cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: base_packages
+
+    - name: Install base system dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - gnupg
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - lsb-release
+          - unzip
+          - tar
+          - git
+          - jq
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
+      tags: base_packages
+
+    # Python Dependencies
+    - name: Install Python packages required for Kubernetes operations
+      pip:
+        name:
+          - kubernetes
+          - pyyaml
+          - jsonpatch
+          - requests
+          - urllib3
+        state: present
+        executable: pip3
+      tags: python_packages
+
+    # Kubectl Installation
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /tmp/kubectl
+        mode: '0755'
+      tags: kubectl
+
+    - name: Install kubectl
+      copy:
+        src: /tmp/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+        remote_src: yes
+      tags: kubectl
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+      register: kubectl_version_output
+      changed_when: false
+      tags: kubectl
+
+    - name: Display kubectl version
+      debug:
+        var: kubectl_version_output.stdout
+      tags: kubectl
+
+    # Helm Installation
+    - name: Download Helm installation script
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm-3.sh
+        mode: '0755'
+      tags: helm
+
+    - name: Install Helm
+      shell: |
+        export HELM_INSTALL_DIR=/usr/local/bin
+        /tmp/get-helm-3.sh --version {{ helm_version }}
+      args:
+        creates: /usr/local/bin/helm
+      tags: helm
+
+    - name: Verify Helm installation
+      command: helm version --short
+      register: helm_version_output
+      changed_when: false
+      tags: helm
+
+    - name: Display Helm version
+      debug:
+        var: helm_version_output.stdout
+      tags: helm
+
+    # Ansible Installation and Configuration
+    - name: Install Ansible via pip
+      pip:
+        name: 
+          - ansible
+          - ansible-core
+        state: present
+        executable: pip3
+      tags: ansible
+
+    - name: Install Ansible collections for Kubernetes
+      ansible.builtin.shell: |
+        ansible-galaxy collection install {{ item }} --force
+      loop:
+        - kubernetes.core
+        - community.kubernetes
+        - community.general
+        - ansible.posix
+      tags: ansible_collections
+
+    # Verify ansible-vault is available (comes with Ansible)
+    - name: Verify ansible-vault installation
+      command: ansible-vault --version
+      register: ansible_vault_version_output
+      changed_when: false
+      tags: ansible
+
+    - name: Display ansible-vault version
+      debug:
+        var: ansible_vault_version_output.stdout
+      tags: ansible
+
+    # Additional Kubernetes Tools
+    - name: Install yq for YAML processing
+      get_url:
+        url: "https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_amd64"
+        dest: /usr/local/bin/yq
+        mode: '0755'
+      tags: additional_tools
+
+    - name: Install kubectx and kubens for context switching
+      get_url:
+        url: "{{ item.url }}"
+        dest: "/usr/local/bin/{{ item.name }}"
+        mode: '0755'
+      loop:
+        - name: kubectx
+          url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx
+        - name: kubens
+          url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubens
+      tags: additional_tools
+
+    # Network connectivity verification
+    - name: Verify internet connectivity for downloading tools
+      uri:
+        url: https://www.google.com
+        method: HEAD
+        timeout: 10
+      register: connectivity_check
+      ignore_errors: yes
+      tags: network_check
+
+    - name: Display connectivity status
+      debug:
+        msg: "{{ 'Internet connectivity verified' if connectivity_check.status == 200 else 'Warning: Limited internet connectivity detected' }}"
+      tags: network_check
+
+    # Kubeconfig Management
+    - name: Create .kube directory for kubeconfig files
+      file:
+        path: /home/{{ setup_user }}/.kube
+        state: directory
+        owner: "{{ setup_user }}"
+        group: "{{ setup_user }}"
+        mode: '0755'
+      become_user: "{{ setup_user }}"
+      tags: kubeconfig
+
+    - name: Check if kubeconfig file exists
+      stat:
+        path: /home/{{ setup_user }}/.kube/config
+      register: kubeconfig_check
+      become_user: "{{ setup_user }}"
+      tags: kubeconfig
+
+    - name: Display kubeconfig status
+      debug:
+        msg: 
+          - "{{ 'Kubeconfig file found at ~/.kube/config' if kubeconfig_check.stat.exists else 'No kubeconfig file found at ~/.kube/config' }}"
+          - "{{ 'Ready to connect to remote cluster' if kubeconfig_check.stat.exists else 'Kubeconfig will be provided by the deployment script' }}"
+      tags: kubeconfig
+
+    - name: Ensure kubeconfig has insecure-skip-tls-verify set to true
+      shell: |
+        CLUSTER_NAME=$(kubectl config view -o jsonpath='{.contexts[?(@.name=="'"$(kubectl config current-context)"'")].context.cluster}')
+        kubectl config set-cluster "${CLUSTER_NAME}" --insecure-skip-tls-verify=true
+      become_user: "{{ setup_user }}"
+      environment:
+        KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+      when: kubeconfig_check.stat.exists
+      tags: kubeconfig
+
+    - name: Test kubectl connection if kubeconfig exists
+      command: kubectl get nodes --request-timeout=10s
+      register: kubectl_test
+      ignore_errors: yes
+      become_user: "{{ setup_user }}"
+      environment:
+        KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+      when: kubeconfig_check.stat.exists
+      tags: kubeconfig
+
+    # Cluster Platform Detection
+    - name: Detect cluster platform type
+      shell: |
+        if kubectl api-resources --api-group=route.openshift.io 2>/dev/null | grep -q '^routes'; then
+          echo "OpenShift/OKD"
+        elif kubectl version -o json 2>/dev/null | grep -qi "eks"; then
+          echo "Amazon EKS"
+        elif kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null | grep -qi "bottlerocket"; then
+          echo "Amazon EKS (Bottlerocket)"
+        elif kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null | grep -qi "amazon"; then
+          echo "Amazon EKS (Amazon Linux)"
+        elif kubectl version -o json 2>/dev/null | grep -qi "gke"; then
+          echo "Google GKE"
+        elif kubectl version -o json 2>/dev/null | grep -qi "aks"; then
+          echo "Azure AKS"
+        elif kubectl version -o json 2>/dev/null | jq -r '.serverVersion.gitVersion' 2>/dev/null | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' && \
+             ! kubectl version -o json 2>/dev/null | grep -qiE '(eks|gke|aks|openshift)'; then
+          echo "Vanilla Kubernetes"
+        else
+          echo "Unknown"
+        fi
+      register: cluster_platform_raw
+      become_user: "{{ setup_user }}"
+      environment:
+        KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+      when: kubeconfig_check.stat.exists and kubectl_test is defined and kubectl_test.rc == 0
+      ignore_errors: yes
+      tags: cluster_detection
+
+    - name: Set cluster platform facts
+      set_fact:
+        detected_platform: "{{ cluster_platform_raw.stdout | default('Unknown') }}"
+        is_openshift: "{{ cluster_platform_raw.stdout is defined and 'OpenShift' in cluster_platform_raw.stdout }}"
+        is_vanilla_k8s: "{{ cluster_platform_raw.stdout is defined and 'Vanilla Kubernetes' in cluster_platform_raw.stdout }}"
+        is_cloud_k8s: "{{ cluster_platform_raw.stdout is defined and cluster_platform_raw.stdout in ['Amazon EKS', 'Amazon EKS (Bottlerocket)', 'Amazon EKS (Amazon Linux)', 'Google GKE', 'Azure AKS'] }}"
+      when: kubeconfig_check.stat.exists and kubectl_test is defined and kubectl_test.rc == 0
+      tags: cluster_detection
+
+    - name: Display detected cluster platform
+      debug:
+        msg:
+          - "=== CLUSTER PLATFORM DETECTION ==="
+          - "Detected platform: {{ detected_platform }}"
+          - "OpenShift cluster: {{ is_openshift }}"
+          - "Vanilla Kubernetes: {{ is_vanilla_k8s }}"
+          - "Cloud Kubernetes: {{ is_cloud_k8s }}"
+          - "=================================="
+      when: kubeconfig_check.stat.exists and kubectl_test is defined and kubectl_test.rc == 0 and detected_platform is defined
+      tags: cluster_detection
+
+        # OpenShift CLI (oc) Installation
+    - name: Get OpenShift version for oc CLI download
+      shell: >
+        OCP_VERSION=$(kubectl get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null | cut -d'.' -f1,2) &&
+        if [ -n "$OCP_VERSION" ]; then
+          echo "$OCP_VERSION";
+        else
+          echo "4.14";
+        fi
+      register: openshift_version_raw
+      become_user: "{{ setup_user }}"
+      environment:
+        KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      ignore_errors: yes
+      tags: openshift_cli
+
+    - name: Set OpenShift version for oc download
+      set_fact:
+        oc_version: "{{ openshift_version_raw.stdout | default('4.14') }}"
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      tags: openshift_cli
+
+    - name: Display detected OpenShift version
+      debug:
+        msg: "Detected OpenShift version: {{ oc_version }} - Will download oc CLI from stable channel"
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      tags: openshift_cli
+
+    - name: Download OpenShift oc CLI (detected version)
+      get_url:
+        url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-{{ oc_version }}/openshift-client-linux.tar.gz"
+        dest: /tmp/openshift-client-linux.tar.gz
+        mode: '0644'
+        timeout: 120
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      register: oc_download
+      ignore_errors: yes
+      tags: openshift_cli
+
+    - name: Download OpenShift oc CLI (fallback to latest stable)
+      get_url:
+        url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz"
+        dest: /tmp/openshift-client-linux.tar.gz
+        mode: '0644'
+        timeout: 120
+      when: 
+        - kubeconfig_check.stat.exists 
+        - is_openshift is defined and is_openshift
+        - oc_download is failed
+      register: oc_download_fallback
+      ignore_errors: yes
+      tags: openshift_cli
+
+    - name: Set oc download status
+      set_fact:
+        oc_download_succeeded: "{{ (oc_download is succeeded) or (oc_download_fallback is defined and oc_download_fallback is succeeded) }}"
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      tags: openshift_cli
+
+    - name: Extract oc CLI binary
+      unarchive:
+        src: /tmp/openshift-client-linux.tar.gz
+        dest: /tmp/
+        remote_src: yes
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift and oc_download_succeeded is defined and oc_download_succeeded
+      tags: openshift_cli
+
+    - name: Install oc CLI to /usr/local/bin
+      copy:
+        src: /tmp/oc
+        dest: /usr/local/bin/oc
+        mode: '0755'
+        remote_src: yes
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift and oc_download_succeeded is defined and oc_download_succeeded
+      tags: openshift_cli
+
+    - name: Verify oc CLI installation
+      command: oc version --client
+      register: oc_version_output
+      changed_when: false
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift and oc_download_succeeded is defined and oc_download_succeeded
+      ignore_errors: yes
+      tags: openshift_cli
+
+    - name: Display oc CLI version
+      debug:
+        msg:
+          - "=== OPENSHIFT CLI INSTALLED ==="
+          - "{{ oc_version_output.stdout if oc_version_output is defined and oc_version_output.rc == 0 else 'oc CLI installation skipped or failed' }}"
+          - "==============================="
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift
+      tags: openshift_cli
+
+    - name: Clean up oc CLI temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/openshift-client-linux.tar.gz
+        - /tmp/oc
+        - /tmp/kubectl
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift and oc_download_succeeded is defined and oc_download_succeeded
+      tags: openshift_cli
+
+    - name: Add oc CLI aliases to bashrc for OpenShift
+      lineinfile:
+        path: /home/{{ setup_user }}/.bashrc
+        line: "{{ item }}"
+        create: yes
+        owner: "{{ setup_user }}"
+        group: "{{ setup_user }}"
+      loop:
+        - "# OpenShift CLI aliases"
+        - "alias oc-login='oc login'"
+        - "alias oc-projects='oc projects'"
+        - "alias oc-status='oc status'"
+        - "# oc autocompletion"
+        - "source <(oc completion bash)"
+      become_user: "{{ setup_user }}"
+      when: kubeconfig_check.stat.exists and is_openshift is defined and is_openshift and oc_download_succeeded is defined and oc_download_succeeded
+      tags: openshift_cli
+
+    - name: Verify KUBECONFIG environment variable is set
+      shell: |
+        source /etc/environment
+        echo "KUBECONFIG is set to: $KUBECONFIG"
+        kubectl version --client
+      args:
+        executable: /bin/bash
+      register: kubeconfig_verification
+      ignore_errors: yes
+      when: kubeconfig_check.stat.exists
+      tags: kubeconfig
+
+    - name: Display kubectl connection test results
+      debug:
+        msg: 
+          - "{{ 'Successfully connected to remote cluster!' if kubectl_test is defined and kubectl_test.rc == 0 else 'Could not connect to cluster - please verify kubeconfig' }}"
+          - "{{ kubectl_test.stdout_lines if kubectl_test is defined and kubectl_test.rc == 0 else kubectl_test.stderr if kubectl_test is defined else 'Kubeconfig not present - skipping connection test' }}"
+      when: kubeconfig_check.stat.exists
+      tags: kubeconfig
+
+    - name: Skip kubeconfig validation for unmanaged clusters
+      debug:
+        msg: "Kubeconfig validation skipped - will be provided during deployment"
+      when: not kubeconfig_check.stat.exists
+      tags: kubeconfig
+
+    - name: Add Kubernetes tools to PATH in bashrc
+      lineinfile:
+        path: /home/{{ setup_user }}/.bashrc
+        line: "{{ item }}"
+        create: yes
+        owner: "{{ setup_user }}"
+        group: "{{ setup_user }}"
+      loop:
+        - "# Kubernetes tools added by bastion setup"
+        - "export PATH=/usr/local/bin:$PATH"
+        - "# Set KUBECONFIG environment variable for Ansible and kubectl"
+        - "export KUBECONFIG=/home/{{ setup_user }}/.kube/config"
+        - "# Kubectl autocompletion"
+        - "source <(kubectl completion bash)"
+        - "# Helm autocompletion" 
+        - "source <(helm completion bash)"
+        - "# Aliases for convenience"
+        - "alias k=kubectl"
+        - "alias kgp='kubectl get pods'"
+        - "alias kgs='kubectl get services'"
+        - "alias kgn='kubectl get nodes'"
+      become_user: "{{ setup_user }}"
+      tags: environment
+
+    # Final verification and cleanup
+    - name: Clean up temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/kubectl
+        - /tmp/get-helm-3.sh
+        - /tmp/openshift-client-linux.tar.gz
+        - /tmp/oc
+      tags: cleanup
+
+    - name: Final verification - display installed tool versions
+      shell: |
+        echo "=== BASTION NODE SETUP COMPLETE ==="
+        echo "Installed versions:"
+        echo "kubectl: $(kubectl version --client 2>/dev/null || echo 'Not available')"
+        echo "helm: $(helm version --short 2>/dev/null || echo 'Not available')"
+        echo "ansible: $(ansible --version 2>/dev/null | head -n1 || echo 'Not available')"
+        echo "ansible-vault: $(ansible-vault --version 2>/dev/null | head -n1 || echo 'Not available')"
+        echo "yq: $(yq --version 2>/dev/null || echo 'Not available')"
+        {% if is_openshift is defined and is_openshift %}
+        echo "oc (OpenShift CLI): $(oc version --client 2>/dev/null || echo 'Not available')"
+        {% endif %}
+        echo ""
+        {% if detected_platform is defined %}
+        echo "Detected Cluster Platform: {{ detected_platform }}"
+        echo ""
+        {% endif %}
+        echo "Next steps:"
+        if [ -f "/home/{{ setup_user }}/.kube/config" ]; then
+          echo "[OK] Kubeconfig found at ~/.kube/config"
+          echo "[OK] KUBECONFIG environment variable set system-wide"
+          {% if is_openshift is defined and is_openshift %}
+          echo "[OK] OpenShift CLI (oc) installed and configured"
+          {% endif %}
+          echo "1. Logout and login again to load environment variables"
+          echo "2. Verify connection: kubectl get nodes"
+          {% if is_openshift is defined and is_openshift %}
+          echo "3. Test OpenShift: oc get projects"
+          echo "4. Test Helm: helm list --all-namespaces"
+          {% else %}
+          echo "3. Test Helm: helm list --all-namespaces"
+          {% endif %}
+          echo "{{ '5' if (is_openshift is defined and is_openshift) else '4' }}. All cluster operations will use the kubeconfig file (no SSH needed)"
+        else
+          echo "[WARNING] No kubeconfig found at ~/.kube/config"
+          echo "1. The deployment script will prompt for and copy the kubeconfig file"
+          echo "2. After deployment, verify connection: kubectl get nodes"
+          echo "3. Test Helm: helm list --all-namespaces"
+          echo "4. All cluster operations will use the kubeconfig file (no SSH needed)"
+        fi
+        echo "=================================="
+      args:
+        executable: /bin/bash
+      register: final_status
+      changed_when: false
+      tags: verification
+
+    - name: Display final status
+      debug:
+        var: final_status.stdout_lines
+      tags: verification

@@ -9,6 +9,27 @@
       - distribution
       - distribution_version
       - distribution_major_version
+
+  tags: always
+
+- name: Check for Ubuntu 24.04.2/22.04.5 with kernel 6.8
+  set_fact:
+    iommu_required: >-
+      {{
+        (ansible_distribution == "Ubuntu" and (ansible_distribution_version == "24.04.2" or ansible_distribution_version == "22.04.5") and ansible_kernel is search("^6\\.8\\."))
+      }}
+  tags: always
+
+- name: Warn about IOMMU passthrough requirement
+  debug:
+    msg: |
+      WARNING: IOMMU passthrough must be enabled for Ubuntu {{ ansible_distribution_version }} with Linux kernel {{ ansible_kernel }}.
+
+      To enable IOMMU passthrough:
+      1. Add GRUB_CMDLINE_LINUX_DEFAULT="iommu=pt intel_iommu=on" to /etc/default/grub.
+      2. Run sudo update-grub.
+      3. Reboot the system.
+  when: iommu_required
   tags: always
 
 - name: Validate supported OS version

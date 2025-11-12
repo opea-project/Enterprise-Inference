@@ -108,13 +108,23 @@ spec:
           startupProbe:
             {{- toYaml .Values.startupProbe | nindent 12 }}
           {{- end }}
+          {{- if or .Values.accelDevice .Values.cpu .Values.memory }}
           resources:
             {{- if not .Values.accelDevice }}
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- if or .Values.cpu .Values.memory }}
+            requests:
+              {{- if .Values.cpu }}
+              cpu: {{ .Values.cpu | quote }}
+              {{- end }}
+              {{- if .Values.memory }}
+              memory: {{ .Values.memory | quote }}
+              {{- end }}
+            {{- end }}
             {{- else }}
             limits:
               habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
             {{- end }}
+          {{- end }}
             
       volumes:
         - name: model-volume
