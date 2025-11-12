@@ -8,6 +8,21 @@ This guide helps verify and automatically install the latest firmware and driver
 - Internet connection
 - Root/sudo privileges
 
+### Enable IOMMU Passthrough
+
+Enabling IOMMU passthrough is required only for Ubuntu 24.04.2/22.04.5 with Linux kernel 6.8. Skip this section if a different OS or kernel version is used.
+
+To enable IOMMU passthrough:
+
+1. Add `GRUB_CMDLINE_LINUX_DEFAULT="iommu=pt intel_iommu=on"` to `/etc/default/grub`.
+2. Run `sudo update-grub`.
+3. Reboot the system.
+
+For more details, see the [Ubuntu documentation](https://bugs.launchpad.net/ubuntu/+source/linux-gcp-6.8/+bug/2085904).
+
+----
+
+
 #### Step 1: Check Firmware Version
 ```bash
 hl-smi -L | grep SPI
@@ -30,9 +45,9 @@ hl-smi
 You'll see something like:
 ```
 +-----------------------------------------------------------------------------+
-| HL-SMI Version:                              hl-1.20.0-fw-58.1.1.1          |
-| Driver Version:                                     1.20.0-bd87f71          |
-| Nic Driver Version:                                 1.20.0-e4fe12d          |
+| HL-SMI Version:                              hl-1.22.1-fw-61.4.2.1           |
+| Driver Version:                                    1.22.0-5f8fa9f            |
+| Nic Driver Version:                                 1.22.0-5f8fa9f           |
 |-------------------------------+----------------------+----------------------+
 ```
 ###### For visual assistance, refer to the following snapshot for Driver version:
@@ -46,8 +61,18 @@ dpkg -l | grep habanalabs-container-runtime
 ```
 You'll see something like:
 ```
-ii  habanalabs-container-runtime  1.20.0-543  HABANA container runtime
+ii  habanalabs-container-runtime 1.22.1-6  HABANA container runtime
 ```
+
+#### Step 4: Check if IOMMU Passthrough Needs to be Enabled
+> **Important:** If OS Ubuntu 24.04/22.04.5 with Linux kernel 6.8 is used, _IOMMU Passthrough must be enabled_ to prevent garbled output during LLM inference.
+To check if it is already enabled:
+```bash
+cat /proc/cmdline
+```
+Look for *iommu=pt* and *intel_iommu=on* in the output.
+
+Otherwise, follow these [instructions](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#enable-iommu-passthrough) to enable IOMMU Passthrough.
 
 #### Updating Your System (Automated)
 
@@ -61,8 +86,8 @@ Navigate to the scripts directory and run the automated firmware update script:
 cd core/scripts/
 chmod +x firmware-update.sh
 
-# Upgrade to a specific version (e.g., 1.21.1)
-./firmware-update.sh 1.21.1
+# Upgrade to a specific version (e.g., 1.22.0)
+./firmware-update.sh 1.22.0
 
 # Force downgrade if needed (e.g., from 1.21.1 to 1.20.0)  
 ./firmware-update.sh 1.20.0 --force

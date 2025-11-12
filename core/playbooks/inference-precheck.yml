@@ -6,6 +6,8 @@
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
   environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars:
+    brownfield_deployment: "{{ brownfield_deployment | default(false) }}"
   vars_files:
     - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
     - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"

@@ -134,6 +134,10 @@ loki:
             prefix: dnvrdev/loki_index_
             period: 24h
 
+    storage:
+      bucketNames:
+        chunks: loki-chunks
+
     compactor:
       working_directory: /tmp/retention
       compaction_interval: 10m

@@ -25,7 +25,7 @@ image:
   # Uncomment the following line to set desired image pull policy if needed, as one of Always, IfNotPresent, Never.
   # pullPolicy: ""
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.10.0"
+  tag: "v0.10.2"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -45,7 +45,7 @@ serviceAccount:
 podAnnotations: {}
 
 # CPU Balloon configuration for NRI resource policy
-cpu_balloon_annotation: ""
+#cpu_balloon_annotation: ""
 
 podSecurityContext:
   fsGroup: 1001
@@ -87,11 +87,7 @@ ingress:
   host: ""
   namespace: default
   secretname: ""
-
-#This is just a placeholder value. It will be dynamically replaced by the playbook
-cpu: 8
-memory: 8Gi
-
+  
 oidc:
   realm: master
   client_id: ""
@@ -99,17 +95,6 @@ oidc:
   discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
   introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
 
-resources:
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  requests:
-    cpu: "{{ .Values.cpu }}"
-    memory: "{{ .Values.memory }}"
 
 extraCmdArgs: []
 
@@ -195,122 +180,6 @@ max_num_seqs: "256"
 # Parallelism configuration (root level for global access)
 tensor_parallel_size: "2"
 pipeline_parallel_size: "1"
-
-modelConfigs:
-  "meta-llama/Llama-3.1-8B-Instruct":
-    configMapValues:
-      VLLM_CPU_KVCACHE_SPACE: "40"
-      VLLM_RPC_TIMEOUT: "100000"
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
-      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
-      VLLM_CPU_SGL_KERNEL: "1"
-    extraCmdArgs:
-      [
-        "--block-size",
-        "128",
-        "--dtype",
-        "bfloat16",
-        "--max-model-len",
-        "8192",
-        "--distributed_executor_backend",
-        "mp",
-        "--enable_chunked_prefill",
-        "--enforce-eager",
-        "--max-num-batched-tokens",
-        "2048",
-        "--max-num-seqs",
-        "256",
-        "--disable-log-requests",
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
-    configMapValues:
-      VLLM_CPU_KVCACHE_SPACE: "40"
-      VLLM_RPC_TIMEOUT: "100000"
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
-      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
-      VLLM_CPU_SGL_KERNEL: "1"
-    extraCmdArgs:
-      [
-        "--block-size",
-        "128",
-        "--dtype",
-        "bfloat16",
-        "--max-model-len",
-        "8192",
-        "--distributed_executor_backend",
-        "mp",
-        "--enable_chunked_prefill",
-        "--enforce-eager",
-        "--max-num-batched-tokens",
-        "2048",
-        "--max-num-seqs",
-        "256",
-        "--disable-log-requests",
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
-    configMapValues:
-      VLLM_CPU_KVCACHE_SPACE: "40"
-      VLLM_RPC_TIMEOUT: "100000"
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
-      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
-      VLLM_CPU_SGL_KERNEL: "1"
-    extraCmdArgs:
-      [
-        "--block-size",
-        "128",
-        "--dtype",
-        "bfloat16",
-        "--max-model-len",
-        "8192",
-        "--distributed_executor_backend",
-        "mp",
-        "--enable_chunked_prefill",
-        "--enforce-eager",
-        "--max-num-batched-tokens",
-        "2048",
-        "--max-num-seqs",
-        "256",
-        "--disable-log-requests",
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-defaultModelConfigs:
-  configMapValues:
-    VLLM_CPU_KVCACHE_SPACE: "40"
-    VLLM_RPC_TIMEOUT: "100000"
-    VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
-    VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
-    VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
-    VLLM_CPU_SGL_KERNEL: "1"
-  extraCmdArgs:
-    [
-      "--block-size",
-      "128",
-      "--dtype",
-      "bfloat16",
-      "--max-model-len",
-      "8192",
-      "--distributed_executor_backend",
-      "mp",
-      "--enable_chunked_prefill",
-      "--enforce-eager",
-      "--max-num-batched-tokens",
-      "2048",
-      "--max-num-seqs",
-      "256",
-    ]
-  tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-  pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
 svcmonitor:
   enabled: false

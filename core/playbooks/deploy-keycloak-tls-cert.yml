@@ -83,7 +83,7 @@
         chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak
         release_namespace: default # Set the namespace where Keycloak will be installed
         create_namespace: true
-        chart_version: "22.1.0"
+        chart_version: "{{ keycloak_chart_version|default('22.1.0') }}"
         values:
           image:
             repository: bitnamilegacy/keycloak

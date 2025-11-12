@@ -301,8 +301,12 @@ output "model_endpoint" {
 output "model_id" {
   description = "Model ID based on the models number from terraform.tfvars"
   value = var.models == "1" ? "meta-llama/Llama-3.1-8B-Instruct" : (
-    var.models == "11" ? "meta-llama/Llama-3.1-405B-Instruct" : (
-      var.models == "12" ? "meta-llama/Llama-3.3-70B-Instruct" : "Unknown model"
+    var.models == "3" ? "meta-llama/Llama-3.1-405B-Instruct" : (
+      var.models == "4" ? "meta-llama/Llama-3.3-70B-Instruct" : (
+        var.models == "5" ? "meta-llama/Llama-4-Scout-17B-16E-Instruct" : (
+          var.models == "6" ? "Qwen/Qwen2.5-32B-Instruct" : "Unknown model"
+        )
+      )
     )
   )
 }

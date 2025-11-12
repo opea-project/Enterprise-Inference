@@ -28,7 +28,7 @@ cd Enterprise-Inference
 Copy the multi-node example config into place:
 
 ```sh
-cp -f docs/examples/multi-node/inference-config.cfg core/inference-config.cfg
+cp -f docs/examples/multi-node/inference-config.cfg core/inventory/inference-config.cfg
 cp -f docs/examples/multi-node/hosts.yaml core/inventory/hosts.yaml
 ```
 
@@ -74,11 +74,18 @@ Replace `<MASTER_NODE_IP>` with your master node’s IP.
 ### On the Master Node
 
 Generate a self-signed SSL certificate:
-
-```sh
-mkdir -p ~/certs && cd ~/certs
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
 ```
+mkdir -p ~/certs && cd ~/certs && \
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+  -subj "/CN=api.example.com" \
+  -addext "subjectAltName = DNS:api.example.com, DNS:trace-api.example.com"
+```
+Note: the -addext option requires OpenSSL >= 1.1.1.
+
+Files produced:
+cert.pem — the self-signed certificate (contains SANs)
+key.pem — the private key
+Important DNS step: Please add trace-api.example.com to DNS and point it to the nodes where Ingress controller is deployed.
 
 Distribute `cert.pem` and `key.pem` to worker nodes as needed.
 

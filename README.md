@@ -39,7 +39,7 @@ For feature requests, bugs or questions about the project, [open an issue](https
 Intel® AI for Enterprise Inference is licensed under the [Apache License Version 2.0](LICENSE). Refer to the "[LICENSE](LICENSE)" file for the full license text and copyright notice.
 
 ## Security
-The [Security Policy](SECURITY.md) outlines our guidelines and procedures for ensuring the highest level of security and trust for our users who consume Intel® AI for Enterprise RAG.
+The [Security Policy](SECURITY.md) outlines our guidelines and procedures for ensuring the highest level of security and trust for our users who consume Intel® AI for Enterprise Inference.
 
 ## Trademark Information
 Intel, the Intel logo, Xeon, and Gaudi are trademarks of Intel Corporation or its subsidiaries.

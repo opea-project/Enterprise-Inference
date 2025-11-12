@@ -73,7 +73,7 @@ variable "xeon_image" {
 variable "gaudi_image" {
   description = "IBM Cloud instance image for Gaudi nodes in multi-node deployment"
   type        = string
-  default     = "gaudi3-os-u22-01-21-0"  # Default Gaudi image
+  default     = "gaudi3-os-u22-01-22-0"
 }
 variable "ssh_private_key" {
   default     = null

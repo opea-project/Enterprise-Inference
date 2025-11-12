@@ -12,7 +12,7 @@ max_model_len: 5120
 
 image:
   repository: opea/vllm-gaudi
-  tag: "1.3.1"
+  tag: "1.22.0"
   pullPolicy: IfNotPresent
 
 
@@ -42,309 +42,456 @@ modelConfigs:
   # Qwen/Qwen2.5-7B-Instruct
   "Qwen/Qwen2.5-7B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1.0
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 16256
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 140352
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.6
-      VLLM_GRAPH_RESERVED_MEM: 0.11
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.3
+      VLLM_GRAPH_RESERVED_MEM: 0.2
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32512
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
       VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.98","--max-num-seqs","64","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","64","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","hermes","--chat-template","/workspace/vllm/examples/tool_chat_template_hermes.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "1"
 
   # Qwen/Qwen2.5-14B-Instruct
   "Qwen/Qwen2.5-14B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1.0
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8128
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 41280
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.9
-      VLLM_GRAPH_RESERVED_MEM: 0.12
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.8
+      VLLM_GRAPH_RESERVED_MEM: 0.11
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32512
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
       VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","160","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","hermes","--chat-template","/workspace/vllm/examples/tool_chat_template_hermes.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "1"
 
   # Qwen/Qwen2.5-32B-Instruct
   "Qwen/Qwen2.5-32B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8128
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 16512
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
       VLLM_GRAPH_PROMPT_RATIO: 0.9
-      VLLM_GRAPH_RESERVED_MEM: 0.12
+      VLLM_GRAPH_RESERVED_MEM: 0.17
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32512
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
       VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","64","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests", "--tool-call-parser","hermes","--chat-template","/workspace/vllm/examples/tool_chat_template_hermes.jinja"]
     tensor_parallel_size: "1"
 
   # Qwen/Qwen2.5-72B-Instruct
   "Qwen/Qwen2.5-72B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 132096
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.14
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.3
+      VLLM_GRAPH_RESERVED_MEM: 0.26
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
       VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","512","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","hermes","--chat-template","/workspace/vllm/examples/tool_chat_template_hermes.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "4"
 
   # meta-llama/Llama-3.1-8B-Instruct
   "meta-llama/Llama-3.1-8B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1.0
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8128
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 74304
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.09
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.6
+      VLLM_GRAPH_RESERVED_MEM: 0.11
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32512
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","288","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
 
   # meta-llama/Llama-3.1-70B-Instruct
   "meta-llama/Llama-3.1-70B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 82560
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.13
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.14
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","320","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "4"
 
   # meta-llama/Llama-3.2-1B-Instruct
   "meta-llama/Llama-3.2-1B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 24768
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 165120
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.4
-      VLLM_GRAPH_RESERVED_MEM: 0.14
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.2
+      VLLM_GRAPH_RESERVED_MEM: 0.33
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","96","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","640","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.2_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
   # meta-llama/Llama-3.2-3B-Instruct
   "meta-llama/Llama-3.2-3B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 90816
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.7
-      VLLM_GRAPH_RESERVED_MEM: 0.07
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.11
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","352","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.2_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
 
   # meta-llama/Llama-3.3-70B-Instruct
   "meta-llama/Llama-3.3-70B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 82560
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.05
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.14
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","320","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.2_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    tensor_parallel_size: "4"
+
+  # meta-llama/Llama-4-Scout-17B-16E-Instruct
+  "meta-llama/Llama-4-Scout-17B-16E-Instruct":
+    configMapValues:
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: true
+      PT_HPU_LAZY_MODE: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 115584
+      VLLM_DECODE_BLOCK_BUCKET_STEP: 256
+      VLLM_DECODE_BS_BUCKET_STEP: 32
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.3
+      VLLM_GRAPH_RESERVED_MEM: 0.39
+      VLLM_PROMPT_BS_BUCKET_STEP: 32
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
+      VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","448","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama4_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama4_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "4"
 
   # mistralai/Mistral-7B-Instruct-v0.1
   "mistralai/Mistral-7B-Instruct-v0.1":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
-      PT_HPU_ENABLE_LAZY_COLLECTIVES: true
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8192
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 74304
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.09
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.6
+      VLLM_GRAPH_RESERVED_MEM: 0.11
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32768
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32768","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","288","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","mistral","--chat-template","/workspace/vllm/examples/tool_chat_template_mistral.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "1"
 
   # mistralai/Mistral-7B-Instruct-v0.2
   "mistralai/Mistral-7B-Instruct-v0.2":
     configMapValues:
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
+      PT_HPU_LAZY_MODE: 1
       HF_HUB_DISABLE_XET: 1
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 74304
+      VLLM_DECODE_BLOCK_BUCKET_STEP: 256
+      VLLM_DECODE_BS_BUCKET_STEP: 32
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.6
+      VLLM_GRAPH_RESERVED_MEM: 0.11
+      VLLM_PROMPT_BS_BUCKET_STEP: 32
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
+      VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","288","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","mistral","--chat-template","/workspace/vllm/examples/tool_chat_template_mistral.jinja", "--enable-auto-tool-choice"]
+    tensor_parallel_size: "1"
+
+  # mistralai/Mistral-7B-Instruct-v0.3
+  "mistralai/Mistral-7B-Instruct-v0.3":
+    configMapValues:
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8192
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 57792
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.09
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.07
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32768
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32768","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.99","--max-num-seqs","224","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","mistral","--chat-template","/workspace/vllm/examples/tool_chat_template_mistral.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "1"
-
+  
   # mistralai/Mixtral-8x7B-Instruct-v0.1
   "mistralai/Mixtral-8x7B-Instruct-v0.1":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1.0
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8128
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 82560
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.17
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.18
       VLLM_PROMPT_BS_BUCKET_STEP: 32
-      VLLM_PROMPT_SEQ_BUCKET_MAX: 32512
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","32512","--gpu-memory-util","0.97","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.97","--max-num-seqs","320","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests", "--tool-call-parser","mistral","--chat-template","/workspace/vllm/examples/tool_chat_template_mistral.jinja", "--enable-auto-tool-choice"]
     tensor_parallel_size: "2"
+
+  # mistralai/Mixtral-8x22B-Instruct-v0.1
+  "mistralai/Mixtral-8x22B-Instruct-v0.1":
+    configMapValues:
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: true
+      PT_HPU_LAZY_MODE: 1
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 57792
+      VLLM_DECODE_BLOCK_BUCKET_STEP: 256
+      VLLM_DECODE_BS_BUCKET_STEP: 32
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.7
+      VLLM_GRAPH_RESERVED_MEM: 0.28
+      VLLM_PROMPT_BS_BUCKET_STEP: 32
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
+      VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.97","--max-num-seqs","224","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests","--tool-call-parser","mistral","--chat-template","/workspace/vllm/examples/tool_chat_template_mistral.jinja", "--enable-auto-tool-choice" ]
+    tensor_parallel_size: "4"
 
   # deepseek-ai/DeepSeek-R1-Distill-Llama-8B
   "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
-      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 74304
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.09
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.6
+      VLLM_GRAPH_RESERVED_MEM: 0.11
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","288","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
   # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
   "deepseek-ai/DeepSeek-R1-Distill-Llama-70B":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_ENABLE_LAZY_COLLECTIVES: true
       PT_HPU_LAZY_MODE: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 82560
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.13
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.5
+      VLLM_GRAPH_RESERVED_MEM: 0.14
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","320","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--tool-call-parser","llama3_json","--chat-template","/workspace/vllm/examples/tool_chat_template_llama3.1_json.jinja", "--enable-auto-tool-choice", "--disable-log-requests"]
+    tensor_parallel_size: "4"
+
+  # deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+  "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
+    configMapValues:
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
+      PT_HPU_LAZY_MODE: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 16512
+      VLLM_DECODE_BLOCK_BUCKET_STEP: 256
+      VLLM_DECODE_BS_BUCKET_STEP: 32
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.9
+      VLLM_GRAPH_RESERVED_MEM: 0.17
+      VLLM_PROMPT_BS_BUCKET_STEP: 32
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
+      VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","64","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    tensor_parallel_size: "1"
+
+  # inceptionai/jais-adapted-70b-chat
+  "inceptionai/jais-adapted-70b-chat":
+    configMapValues:
+      EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: true
+      PT_HPU_LAZY_MODE: 1
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 49536
+      VLLM_DECODE_BLOCK_BUCKET_STEP: 256
+      VLLM_DECODE_BS_BUCKET_STEP: 32
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.6
+      VLLM_GRAPH_RESERVED_MEM: 0.5
+      VLLM_PROMPT_BS_BUCKET_STEP: 32
+      VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
+      VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
+      VLLM_SKIP_WARMUP: false
+      PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,2048"
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","192","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
     tensor_parallel_size: "4"
 
   # tiiuae/Falcon3-7B-Instruct
   "tiiuae/Falcon3-7B-Instruct":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
       PT_HPU_LAZY_MODE: 1
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
@@ -357,40 +504,45 @@ modelConfigs:
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
     extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
-  # tiiuae/Falcon3-10B-Instruct
-  "tiiuae/Falcon3-10B-Instruct":
+  # ALLaM-AI/ALLaM-7B-Instruct-preview
+  "ALLaM-AI/ALLaM-7B-Instruct-preview":
     configMapValues:
-      HF_HUB_DISABLE_XET: 1
       EXPERIMENTAL_WEIGHT_SHARING: 0
+      PT_HPU_ENABLE_LAZY_COLLECTIVES: false
       PT_HPU_LAZY_MODE: 1
       VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
-      VLLM_DECODE_BLOCK_BUCKET_MAX: 8256
+      VLLM_DECODE_BLOCK_BUCKET_MAX: 24768
       VLLM_DECODE_BLOCK_BUCKET_STEP: 256
       VLLM_DECODE_BS_BUCKET_STEP: 32
-      VLLM_DELAYED_SAMPLING: false
-      VLLM_GRAPH_PROMPT_RATIO: 0.8
-      VLLM_GRAPH_RESERVED_MEM: 0.07
+      VLLM_DELAYED_SAMPLING: true
+      VLLM_EXPONENTIAL_BUCKETING: false
+      VLLM_GRAPH_PROMPT_RATIO: 0.9
+      VLLM_GRAPH_RESERVED_MEM: 0.08
       VLLM_PROMPT_BS_BUCKET_STEP: 32
       VLLM_PROMPT_SEQ_BUCKET_MAX: 33024
       VLLM_PROMPT_SEQ_BUCKET_STEP: 256
+      VLLM_PROMPT_USE_FUSEDSDPA: 1
+      HF_HUB_DISABLE_XET: 1
       VLLM_SKIP_WARMUP: false
       PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","32","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
+    extraCmdArgs: ["--block-size","128","--dtype","bfloat16","--max-model-len","33024","--gpu-memory-util","0.98","--max-num-seqs","96","--max-num-prefill-seqs","16","--num_scheduler_steps","1","--use-padding-aware-scheduling", "--disable-log-requests"]
     tensor_parallel_size: "1"
 
 # Default arguments if the model ID is not found
 defaultModelConfigs:
   configMapValues:
-    LLM_MODEL_ID: ""
+    LLM_MODEL_ID: ""    
     HF_HUB_DISABLE_XET: 1
-    OMPI_MCA_btl_vader_single_copy_mechanism: none
-    PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
-    VLLM_CPU_KVCACHE_SPACE: "40"
+    # OMPI_MCA_btl_vader_single_copy_mechanism: none
+    # PT_HPU_ENABLE_LAZY_COLLECTIVES: "true"
+    # VLLM_CPU_KVCACHE_SPACE: "40"
+    PYTHONUNBUFFERED: "1"
     PT_HPU_RECIPE_CACHE_CONFIG: "/data/recipe_cache,false,1024"
-  extraCmdArgs: ["--block-size", "128", "--dtype", "bfloat16", "--max-model-len","5196"]
-  tensor_parallel_size: "1"
+  extraCmdArgs: []
+  # tensor_parallel_size: ""

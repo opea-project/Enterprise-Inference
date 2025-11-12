@@ -11,7 +11,7 @@ The access clients are summarized in the table. To quickly verify the models are
 
 ### Accessing Models from curl Client
 To configure your environment with the necessary variables for connecting to Keycloak, you will need to set the following environment variables.  
-Please replace the placeholder values with your actual configuration details, which has been configured in `inference-config.cfg` file under the `core/` directory during deployment.
+Please replace the placeholder values with your actual configuration details, which has been configured in `inference-config.cfg` file under the `core/inventory/` directory during deployment.
 
 
 
@@ -39,22 +39,6 @@ langfuse_password corresponds to langfuse password
 > **Note:**  
 > To enable tracing and monitoring via GenAI Gateway Trace, ensure you have configured a subdomain named `trace.<cluster_url>` that points to the same master node as your main inference cluster. This subdomain is required for GenAI Gateway Trace to function correctly and should be set up in your DNS records before 
 proceeding.
-
-##### Models Endpoints
-```bash
-curl --location 'https://<<cluster-url>>/v1/chat/completions' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <<master-key>>' \
---data '{
-    "model": "meta-llama/Llama-3.1-8B-Instruct",
-    "messages": [
-        {
-            "role": "user",
-            "content": "Hello!"
-        }
-    ]
-}'
-```
 
 #### Creating TLS Certificates and Kubernetes Secret for GenAI Gateway Trace Subdomain
 
@@ -93,8 +77,6 @@ Update your Kubernetes Ingress or Gateway manifest to reference the `genai-trace
 
 > **Note:**  
 > For production, use certificates from a trusted Certificate Authority (CA) instead of self-signed certificates.
----
-
 
 ##### Models Endpoints
 Please find the reference Model endpoint for llama8b
@@ -115,21 +97,21 @@ curl --location 'https://<<cluster-url>>/v1/chat/completions' \
 
 
 
-
+---
 
 #### Accessing Models Deployed with Keycloak and APISIX
 
 ##### Fetching the client Secret
 For fetching the Keycloak client secret from please run this script  [**keycloak-fetch-client-secret.sh**](../core/scripts/keycloak-fetch-client-secret.sh)
-`````
+```bash
 keycloak-fetch-client-secret.sh <cluster-url> <keycloak-username> <keycloak-password> <keycloak-client-id>
 Returns:
 Logged in successfully
 Client secret: keycloak-client-secret
-`````
+```
 Once you have the keycloak client secret, please refer below steps
 
-`````
+```bash
 ##### Environment Setup for accessing Models using Curl
                    
 #The Keycloak cluster URL was configured during deployment in the cluster_url field
@@ -148,50 +130,58 @@ export KEYCLOAK_CLIENT_SECRET=<your_keycloak_client_secret>
 export TOKEN=$(curl -k -X POST $BASE_URL/token  -H 'Content-Type: application/x-www-form-urlencoded' -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" | jq -r .access_token)
 
 With the obtained access token, we can proceed to make an Inference API call to the deployed Models.
-`````
+```
 
 ##### Models Endpoints
 `````
-For Inferencing with Llama-3-8b:
+For Inferencing with Llama 3.1 8B:
 curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Llama-3-70b:
+For Inferencing with Llama 3.1 70B:
 curl -k ${BASE_URL}/Llama-3.1-70B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-70B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Codellama-34b:
+For Inferencing with Codellama 34B:
 curl -k ${BASE_URL}/CodeLlama-34b-Instruct-hf/v1/completions -X POST -d '{"model": "codellama/CodeLlama-34b-Instruct-hf", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Mistral-7b:
+For Inferencing with Mistral 7B:
 curl -k ${BASE_URL}/Mistral-7B-Instruct-v0.3/v1/completions -X POST -d '{"model": "mistralai/Mistral-7B-Instruct-v0.3", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Mixtral-8x-7b:
+For Inferencing with Mixtral 8x7B:
 curl -k ${BASE_URL}/Mixtral-8x7B-Instruct-v0.1/v1/completions -X POST -d '{"model": "mistralai/Mixtral-8x7B-Instruct-v0.1", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Falcon3-7b:
+For Inferencing with Falcon3 7B:
 curl -k ${BASE_URL}/Falcon3-7B-Instruct/v1/completions -X POST -d '{"model": "tiiuae/Falcon3-7B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Tei:
-curl -k ${BASE_URL}/bge-base-en-v1.5/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/bge-base-en-v1.5/v1/completions -X POST -d '{"model": "BAAI/bge-base-en-v1.5", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Tei-reranking:
-curl -k ${BASE_URL}/bge-reranker-base/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/bge-reranker-base/v1/completions -X POST -d '{"model": "BAAI/bge-reranker-base", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Deepseek R1 Distill Qwen 32b:
+For Inferencing with Deepseek R1 Distill Qwen 32B:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Qwen-32B/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Deepseek R1 Distill Llama 8b:
+For Inferencing with Deepseek R1 Distill Llama 8B:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Llama-3-8b-CPU
+For Inferencing with Qwen/Qwen2.5-32B-Instruct:
+curl -k ${BASE_URL}/Qwen2.5-32B-Instruct/v1/completions -X POST -d '{"model": "Qwen/Qwen2.5-32B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+
+For Inferencing with meta-llama/Llama-4-Scout-17B-16E-Instruct:
+curl -k ${BASE_URL}/Llama-4-Scout-17B-16E-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-4-Scout-17B-16E-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+
+Xeon Based Model Deployment:
+
+For Inferencing with Llama 3.1 8B CPU
 curl -k ${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Deepseek R1 Distill Qwen 32b CPU:
+For Inferencing with Deepseek R1 Distill Qwen 32B CPU:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Qwen-32B-vllmcpu/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Deepseek R1 Distill Llama 8b CPU:
+For Inferencing with Deepseek R1 Distill Llama 8B CPU:
 curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions -X POST -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 
-`````
+```
 
 ###### For visual assistance, refer to the following example image of a curl request and response:
 
@@ -199,7 +189,7 @@ curl -k ${BASE_URL}/DeepSeek-R1-Distill-Llama-8B-vllmcpu/v1/completions -X POST 
 
 
 #### Accessing the model from Inference Cluster deployed without APISIX and Keycloak
-`````
+```bash
 When deploying models for inference without Keycloak and APISIX,
 The model inference API can be invoked directly without the necessity of including an additional bearer token header in the request.
 
@@ -209,6 +199,6 @@ An exemplary structure for making a request to the inference API is as follows:
 export BASE_URL=https://example.com
 
 For Inferencing with Llama-3-8b:
-curl -k ${BASE_URL}/Meta-Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json'
+curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json'
 
-`````
+```

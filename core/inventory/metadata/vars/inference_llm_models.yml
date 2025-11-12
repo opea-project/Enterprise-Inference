@@ -21,6 +21,7 @@ huggingface_model_id: 'false'
 hugging_face_model_deployment: 'false'
 huggingface_model_deployment_name: 'None'
 hugging_face_model_remove_name: 'false'
+balloon_policy_cpu: 'None'
 gaudi_values_file: "{{ remote_helm_charts_base }}/vllm/gaudi-values.yaml"
 huggingface_tensor_parellel_size: 'false'
 vllm_metrics_enabled: 'false'

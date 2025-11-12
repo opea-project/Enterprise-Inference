@@ -1,7 +1,7 @@
 # Copyright (C) 2024-2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
-- name: Deploy Inference LLM Models
+- name: Deploy/Remove Inference LLM Models
   hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
@@ -31,6 +31,7 @@
           - "Models to Deploy: {{ model_name_list }}"
       tags: always
       run_once: true
+      when: balloon_policy_cpu == "enabled"
 
     - name: Set default model parallelism configuration for CPU deployments
       ansible.builtin.set_fact:
@@ -81,7 +82,7 @@
               }
           tags: always
     - name: CPU Topology Detection and Optimization (for CPU deployments only)
-      when: cpu_playbook == 'true'
+      when: cpu_playbook == 'true' and balloon_policy_cpu == "enabled"
       run_once: true
       tags: always
       block:
@@ -189,7 +190,7 @@
               - "Is Single Node: {{ optimal_balloon_config.is_single_node }}"
               - "Reserved CPUs Percentage: {{ optimal_balloon_config.reserved_cpus_percentage }}%"
               - "Reserved CPUs Count: {{ optimal_balloon_config.reserved_cpus }} ({{ ((optimal_balloon_config.reserved_cpus | int / optimal_balloon_config.cpus_per_socket | int) * 100) | round(1) }}% actual)"
-              - "Workload CPUs (for values.yaml): {{ optimal_balloon_config.workload_cpus }}"
+              - "Workload CPUs (for xeon-values.yaml): {{ optimal_balloon_config.workload_cpus }}"
               - "Balloon CPUs: {{ optimal_balloon_config.balloon_cpus }}"
               - "Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size | default(1) }}"
               - "Pipeline Parallel Size: {{ optimal_balloon_config.pipeline_parallel_size | default(1) }}"
@@ -213,7 +214,7 @@
               - "==================================================================="
               - "WARNING: vLLM Helm Charts Directory Not Found"
               - "==================================================================="
-              - "Expected path: {{ remote_helm_charts_base }}/vllm/values.yaml"
+              - "Expected path: {{ remote_helm_charts_base }}/vllm/xeon-values.yaml"
               - "This means vLLM chart values cannot be automatically updated"
               - "Model deployment will continue but may not be optimized"
               - "==================================================================="
@@ -248,92 +249,21 @@
               Final memory for deployment: {{ optimal_memory_gb }} GB
               Min threshold: 8 GB, Max threshold: 256 GB
 
-        - name: Update vLLM Helm chart values with optimized CPU and memory settings
-          ansible.builtin.replace:
-            path: "{{ remote_helm_charts_base }}/vllm/values.yaml"
-            regexp: "{{ item.regexp }}"
-            replace: "{{ item.replace }}"
-          loop:
-            # Root-level values that templates reference
-            - {
-                regexp: '^cpu:\s*\d+',
-                replace: "cpu: {{ optimal_balloon_config.workload_cpus | default(8) }}",
-              }
-            - {
-                regexp: '^memory:\s*\d+Gi',
-                replace: "memory: {{ optimal_memory_gb | default(8) }}Gi",
-              }
-            - {
-                regexp: '^tensor_parallel_size:\s*".*"',
-                replace: 'tensor_parallel_size: "{{ optimal_balloon_config.tensor_parallel_size | default(1) }}"',
-              }
-            - {
-                regexp: '^pipeline_parallel_size:\s*".*"',
-                replace: 'pipeline_parallel_size: "{{ optimal_balloon_config.pipeline_parallel_size | default(1) }}"',
-              }
-            - {
-                regexp: 'cpu: "\{\{ \.Values\.cpu \}\}"',
-                replace: "cpu: {{ optimal_balloon_config.workload_cpus | default(8) }}",
-              }
-            - {
-                regexp: 'memory: "\{\{ \.Values\.memory \}\}"',
-                replace: "memory: {{ optimal_memory_gb | default(8) }}Gi",
-              }
-            # CPU optimization settings
-            - {
-                regexp: '^cpu_optimization_enabled:\s*false',
-                replace: "cpu_optimization_enabled: true",
-              }
-            - {
-                regexp: '^max_num_batched_tokens:\s*".*"',
-                replace: 'max_num_batched_tokens: "2048"',
-              }
-            - {
-                regexp: '^max_num_seqs:\s*".*"',
-                replace: 'max_num_seqs: "256"',
-              }
-            - {
-                regexp: '^VLLM_CPU_SGL_KERNEL:\s*".*"',
-                replace: 'VLLM_CPU_SGL_KERNEL: "1"',
-              }
-          when:
-            - optimal_balloon_config is defined
-            - vllm_charts_dir.stat.exists
-
-        - name: Validate updated values in Helm chart
-          ansible.builtin.shell: |
-            echo "=== Current values.yaml settings ==="
-            grep -E '^(cpu|memory|tensor_parallel_size|pipeline_parallel_size|cpu_optimization_enabled):' "{{ remote_helm_charts_base }}/vllm/values.yaml" || echo "Pattern not found"
-            echo "=== Resource template usage ==="
-            grep -A3 'requests:' "{{ remote_helm_charts_base }}/vllm/values.yaml" || echo "Resources section not found"
-            echo "=== Model configuration template usage ==="
-            grep -E '"\\{\\{ \\.Values\\.(tensor_parallel_size|pipeline_parallel_size) \\}\\}"' "{{ remote_helm_charts_base }}/vllm/values.yaml" | head -2 || echo "Template references not found"
-          register: helm_values_validation
-          when:
-            - optimal_balloon_config is defined
-            - vllm_charts_dir.stat.exists
-
-        - name: Display validation results
-          debug:
-            msg: "{{ helm_values_validation.stdout_lines | default(['Validation skipped - conditions not met']) }}"
-          when: helm_values_validation.stdout_lines is defined
-
         - name: Display CPU optimization helm charts update completion
           debug:
             msg:
               - "==================================================================="
-              - "CPU Optimization Helm Charts Update Complete"
+              - "CPU Optimization Configuration Complete"
               - "==================================================================="
               - "✓ CPU topology detected and analyzed"
               - "✓ Memory calculated ({{ optimal_memory_gb | default('8') }}Gi based on available socket memory)"
-              - "✓ vLLM Helm chart updated with optimal root-level values"
+              - "✓ Optimized values prepared for helm deployment"
               - "✓ CPU: {{ optimal_balloon_config.workload_cpus | default(8) }} cores"
               - "✓ Memory: {{ optimal_memory_gb | default('8') }}Gi"
               - "✓ Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size | default(1) }}"
               - "✓ Pipeline Parallel Size: {{ optimal_balloon_config.pipeline_parallel_size | default(1) }}"
-              - "✓ Template values (.Values.*) will reference updated root values"
-              - "✓ Resource requests/limits configured via templates"
-              - "✓ Parallelism settings optimized"
+              - "✓ Values will be set via --set flags during helm install"
+              - "✓ xeon-values.yaml remains unchanged (template-based)"
               - "✓ Ready for model deployment with NRI balloon policy"
               - "==================================================================="
 
@@ -510,6 +440,7 @@
               --set apisix.enabled={{ apisix_enabled }}
             {% endif %}
             {% if cpu_playbook == 'true' %}
+              --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
               --set cpu_balloon_annotation="vllm-balloon"
               --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
@@ -567,6 +498,197 @@
         - uninstall_true == 'true'
         - hugging_face_model_remove_deployment == 'true'
         - helm_release_installed.stdout != ""
+    
+    
+    
+    - name: Check if Llama4 Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-llama-4-scout-17b --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-llama-4-scout-17b
+    - name: Uninstall vllm-llama-8b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-llama-4-scout-17b"
+      run_once: true
+      tags: uninstall-llama-4-scout-17b
+      when:
+        - "'llama-4-scout-17b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+    
+    
+    - name: Deploy Llama4-17B Scout LLM Model
+      block:
+        - name: Delete Ingress resource Llama4-17B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-llama-4-scout-17b-ingress
+            state: absent
+          tags: install-llama-4-scout-17b
+        - name: Delete Ingress resource Llama4-17B from auth-apisix namespace
+          tags: install-llama-4-scout-17b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-llama-4-scout-17b-ingress
+            state: absent
+        - name: Deploy LLM model Llama 4 17B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-llama-4-scout-17b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="meta-llama/Llama-4-Scout-17B-16E-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            --set tensor_parallel_size=4
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if gaudi_deployment %}
+              --values {{ gaudi_values_file }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment
+          failed_when: helm_upgrade_install_model_deployment.rc != 0
+        - name: Register llama-4-scout-17b model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+            reg_litellm_model: "openai/meta-llama/Llama-4-Scout-17B-16E-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-llama-4-scout-17b-service/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-llama-4-scout-17b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-llama-4-scout-17b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-llama-4-scout-17b
+      when:
+        - '"llama-4-scout-17b" in model_name_list'
+        - install_true == 'true'
+
+    
+    
+    - name: Check if QWEN 2.5 3B Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-qwen-2-5-32b --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-qwen-2-5-32b
+    - name: Uninstall QWEN 2.5 3B Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-qwen-2-5-32b"
+      run_once: true
+      tags: uninstall-qwen-2-5-32b
+      when:
+        - "'qwen-2-5-32b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+    
+    - name: Deploy Qwen-2.5-32B Scout LLM Model
+      block:
+        - name: Delete Ingress resource Qwen-2.5-32B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-qwen-2-5-32b-ingress
+            state: absent
+          tags: install-qwen-2-5-32b
+        - name: Delete Ingress resource Qwen-2-5-32B from auth-apisix namespace
+          tags: install-qwen-2-5-32b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-qwen-2-5-32b-ingress
+            state: absent
+        - name: Deploy LLM model Qwen-2-5-32B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-qwen-2-5-32b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="Qwen/Qwen2.5-32B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            --set tensor_parallel_size=1
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if gaudi_deployment %}
+              --values {{ gaudi_values_file }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment
+          failed_when: helm_upgrade_install_model_deployment.rc != 0
+        - name: Register Qwen2.5-32B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen2.5-32B-Instruct"
+            reg_litellm_model: "openai/Qwen/Qwen2.5-32B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-qwen-2-5-32b-service/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-qwen-2-5-32b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-qwen-2-5-32b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-qwen-2-5-32b
+      when:
+        - '"qwen-2-5-32b" in model_name_list'
+        - install_true == 'true'
+    
+    - name: Check if vllm-llama-70b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-llama-70b --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-llama-70b
+    - name: Uninstall llama-70b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-llama-70b"
+      run_once: true
+      tags: uninstall-llama-70b
+      when:
+        - "'llama-70b' in model_name_list"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+    
+    
+    
+    
+    
     - name: Deploy Llama70b LLM Model
       block:
         - name: Delete Ingress resource Llama70b from default namespace
@@ -1102,7 +1224,7 @@
           import_tasks: register-model-genai-gateway.yml
           vars:
             reg_model_name: "BAAI/bge-base-en-v1.5"
-            reg_litellm_model: "openai/BAAI/bge-base-en-v1.5"
+            reg_litellm_model: "huggingface/BAAI/bge-base-en-v1.5"
             reg_custom_llm_provider: "huggingface"
             reg_api_base: "http://vllm-tei-service"
             reg_input_cost_per_token: 0.001
@@ -1183,11 +1305,12 @@
           import_tasks: register-model-genai-gateway.yml
           vars:
             reg_model_name: "BAAI/bge-reranker-base"
-            reg_litellm_model: "openai/BAAI/bge-reranker-base"
-            reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-teirerank-service/v1"
+            reg_litellm_model: "huggingface/BAAI/bge-reranker-base"
+            reg_custom_llm_provider: "huggingface"
+            reg_api_base: "http://vllm-teirerank-service"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
+            reg_model_mode: "rerank"
           tags:
             - install-rerank
             - install-genai-gateway
@@ -1483,6 +1606,7 @@
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
+    
     - name: Deploy CPU based LLM model  llama 8b
       block:
         - name: Delete Ingress resource Llama8b from default namespace
@@ -1502,6 +1626,7 @@
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
             --set LLM_MODEL_ID="meta-llama/Llama-3.1-8B-Instruct"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
@@ -1509,6 +1634,8 @@
             {% if cpu_playbook == 'true' %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
             {% endif %}
@@ -1589,6 +1716,7 @@
         - name: Deploy CPU based LLM model Deepseek R1 Distill Qwen 32b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-qwen32b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
             --set LLM_MODEL_ID="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
@@ -1596,6 +1724,8 @@
             {% if cpu_playbook == 'true' %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
             {% endif %}
@@ -1638,7 +1768,7 @@
         - cpu_playbook == 'true'
         - install_true == 'true'
         - "'cpu-deepseek-r1-distill-qwen-32b' in (model_name_list | regex_replace(',', ' ') | split())"
-
+    
     - name: Check if CPU Deepseek R1 Distill Llama 8B is installed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-deepseek-r1-llama-8b-cpu --short"
@@ -1675,6 +1805,7 @@
         - name: Deploy CPU based LLM model Deepseek R1 Distill Llama 8B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
             --set LLM_MODEL_ID="deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
@@ -1682,6 +1813,8 @@
             {% if cpu_playbook == 'true' %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
             {% endif %}
@@ -1724,6 +1857,290 @@
         - install_true == 'true'
         - "'cpu-deepseek-r1-distill-llama8b' in (model_name_list | regex_replace(',', ' ') | split())"
 
+    
+    
+    
+    - name: Check if CPU Llama-3.2-3B is installed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-llama-3-2-3b-cpu --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-cpu-llama-3-2-3b
+    - name: Uninstall Llama-3.2-3B
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-llama-3-2-3b-cpu"
+      run_once: true
+      tags: uninstall-cpu-llama-3-2-3b
+      when:
+        - model_name_list is defined
+        - "'cpu-llama-3-2-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+    - name: Deploy CPU Llama-3.2-3B LLM model
+      block:
+        - name: Delete Ingress resource Llama-3.2-3B from default namespace
+          tags: install-cpu-llama-3-2-3b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-llama-3-2-3b-cpu-ingress
+            state: absent
+        - name: Delete Ingress resource Llama-3.2-3B from auth-apisix namespace
+          tags: install-cpu-llama-3-2-3b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-llama-3-2-3b-cpu-ingress
+            state: absent
+        - name: Deploy CPU based LLM model Llama-3.2-3B Installation
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-llama-3-2-3b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.2-3B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if cpu_playbook == 'true' %}
+            --set cpu_balloon_annotation="vllm-balloon"
+            --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu
+          failed_when: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu.rc != 0
+        - name: Register Xeon/CPU Llama-3.2-3B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "meta-llama/Llama-3.2-3B-Instruct"
+            reg_litellm_model: "openai/meta-llama/Llama-3.2-3B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-llama-3-2-3b-cpu-service/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-cpu-llama-3-2-3b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-cpu-llama-3-2-3b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-cpu-llama-3-2-3b
+      when:
+        - model_name_list is defined
+        - cpu_playbook == 'true'
+        - install_true == 'true'
+        - "'cpu-llama-3-2-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+    
+    
+    
+    
+    
+    
+    
+    
+    - name: Check if CPU Qwen-3-1-7B is installed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-qwen-3-1-7b-cpu --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-cpu-qwen3-1-7b
+    - name: Uninstall Qwen-3-1-7B
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-qwen-3-1-7b-cpu"
+      run_once: true
+      tags: uninstall-cpu-qwen3-1-7b
+      when:
+        - model_name_list is defined
+        - "'cpu-qwen3-1-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+    - name: Deploy CPU  Qwen-3-1-7B LLM model
+      block:
+        - name: Delete Ingress resource Qwen-3-1-7B from default namespace
+          tags: install-cpu-qwen3-1-7b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-qwen-3-1-7b-cpu-ingress
+            state: absent
+        - name: Delete Ingress resource  Qwen-3-1-7B from auth-apisix namespace
+          tags: install-cpu-qwen3-1-7b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-qwen-3-1-7b-cpu-ingress
+            state: absent
+        - name: Deploy CPU based LLM model Qwen-3-1-7B Installation
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-qwen-3-1-7b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
+            --set LLM_MODEL_ID="Qwen/Qwen3-1.7B"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if cpu_playbook == 'true' %}
+            --set cpu_balloon_annotation="vllm-balloon"
+            --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu
+          failed_when: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu.rc != 0
+        - name: Register Xeon/CPU Qwen-3-1-7B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen3-1.7B"
+            reg_litellm_model: "openai/Qwen/Qwen3-1.7B"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-qwen-3-1-7b-cpu-service/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-cpu-qwen3-1-7b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-cpu-qwen3-1-7b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-cpu-qwen3-1-7b
+      when:
+        - model_name_list is defined
+        - cpu_playbook == 'true'
+        - install_true == 'true'
+        - "'cpu-qwen3-1-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    
+
+    - name: Check if CPU Qwen-3-4B is installed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-qwen-3-4b-cpu --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-cpu-qwen3-4b
+    - name: Uninstall Qwen-3-4B
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-qwen-3-4b-cpu"
+      run_once: true
+      tags: uninstall-cpu-qwen3-4b
+      when:
+        - model_name_list is defined
+        - "'cpu-qwen3-4b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+    - name: Deploy CPU  Qwen-3-4B LLM model
+      block:
+        - name: Delete Ingress resource Qwen-3-4B from default namespace
+          tags: install-cpu-qwen3-4b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-qwen-3-4b-cpu-ingress
+            state: absent
+        - name: Delete Ingress resource   Qwen-3-4B from auth-apisix namespace
+          tags: install-cpu-qwen3-4b
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-cpu-qwen-3-4b-cpu-ingress
+            state: absent
+        - name: Deploy CPU based LLM model  Qwen-3-4B Installation
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-qwen-3-4b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
+            --set LLM_MODEL_ID="Qwen/Qwen3-4B-Instruct-2507"             
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if cpu_playbook == 'true' %}
+            --set cpu_balloon_annotation="vllm-balloon"
+            --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu
+          failed_when: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu.rc != 0
+        - name: Register Xeon/CPU  Qwen-3-4B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen3-4B-Instruct-2507"
+            reg_litellm_model: "openai/Qwen/Qwen3-4B-Instruct-2507"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-qwen-3-4b-cpu-service/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-cpu-qwen3-4b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-cpu-qwen3-4b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-cpu-qwen3-4b
+      when:
+        - model_name_list is defined
+        - cpu_playbook == 'true'
+        - install_true == 'true'
+        - "'cpu-qwen3-4b' in (model_name_list | regex_replace(',', ' ') | split())"
+    
+    
+    
     - name: List of Models to be Installed
       tags: always
       run_once: true
