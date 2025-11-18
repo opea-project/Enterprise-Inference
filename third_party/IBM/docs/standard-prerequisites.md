@@ -104,13 +104,13 @@ ibmcloud resource groups
 ### 7. Model Selection (models)
 **What it is:** Which AI model you want to deploy
 
-| Model Name 								        | Cards Required       		| Storage | Model ID |
+| Model Name 								| Cards Required       		| Storage | Model ID |
 |-------------------------------------------|---------------------------|---------|----------|
-| meta-llama/Llama-3.1-8B-Instruct  		  | 1 	  					      | 20GB    | 1  		|
-| meta-llama/Llama-3.1-405B-Instruct 		  | 8       					   | 900GB   | 3		   |
-| meta-llama/Llama-3.3-70B-Instruct			  | 4       					   | 150GB   | 4 		   |
-| meta-llama/Llama-4-Scout-17B-16E-Instruct | 4       					   | 200GB   | 5 		   |
-| Qwen/Qwen2.5-32B-Instruct					  | 1       					   | 70GB    | 6 		   |
+| meta-llama/Llama-3.1-8B-Instruct  		| 1 	  					| 20GB    | 1  		 |
+| meta-llama/Llama-3.1-405B-Instruct 		| 8       					| 900GB   | 3		 |
+| meta-llama/Llama-3.3-70B-Instruct			| 4       					| 150GB   | 4 		 |
+| meta-llama/Llama-4-Scout-17B-16E-Instruct | 4       					| 200GB   | 5 		 |
+| Qwen/Qwen2.5-32B-Instruct					| 1       					| 70GB    | 6 		 |
 
 **For CLI deployment:** Use the Model ID as a string value (`"1"`, `"3"`, `"4"`, `"5"`, or `"6"`) in your terraform.tfvars file.
 **For UI deployment:** Select from the dropdown - the values will be mapped automatically.

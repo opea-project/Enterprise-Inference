@@ -20,18 +20,9 @@ data "ibm_is_subnet" "existing_subnet" {
     name = var.subnet
 }
 
-data "ibm_is_image" "ubuntu" {
-    name = var.image
-}
-
 data "ibm_is_image" "xeon_image" {
     count = local.is_multi_node ? 1 : 0
     name = var.xeon_image
-}
-
-data "ibm_is_image" "gaudi_image" {
-    count = local.is_multi_node ? 1 : 0
-    name = var.gaudi_image
 }
 
 data "ibm_resource_group" "target_rg" {
@@ -67,13 +58,14 @@ resource "ibm_is_instance" "instance_name" {
     vpc     = data.ibm_is_vpc.existing_vpc.id
     zone    = var.instance_zone
     keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
-    image   = data.ibm_is_image.ubuntu.id
     profile = var.instance_profile
     resource_group = data.ibm_resource_group.target_rg.id
-
+	catalog_offering {
+      version_crn = "crn:v1:bluemix:public:globalcatalog-collection:global::1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc:version:68d4fbbe-3984-4c62-bf27-bd938b9bef8e-global/f61fc831-f7da-485e-8d80-b94cea311960-global"
+    }
     primary_network_interface {
-        subnet          = data.ibm_is_subnet.existing_subnet.id
-        security_groups = [data.ibm_is_security_group.existing_sg.id]
+	  subnet          = data.ibm_is_subnet.existing_subnet.id
+      security_groups = [data.ibm_is_security_group.existing_sg.id]
     }
 }
 
@@ -101,13 +93,14 @@ resource "ibm_is_instance" "worker_gaudi_nodes" {
     vpc     = data.ibm_is_vpc.existing_vpc.id
     zone    = var.instance_zone
     keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
-    image   = data.ibm_is_image.gaudi_image[0].id
     profile = var.instance_profile  # Uses same profile as single-node
     resource_group = data.ibm_resource_group.target_rg.id
-
+	catalog_offering {
+      version_crn = "crn:v1:bluemix:public:globalcatalog-collection:global::1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc:version:68d4fbbe-3984-4c62-bf27-bd938b9bef8e-global/f61fc831-f7da-485e-8d80-b94cea311960-global"
+    }
     primary_network_interface {
-        subnet          = data.ibm_is_subnet.existing_subnet.id
-        security_groups = [data.ibm_is_security_group.existing_sg.id]
+      subnet          = data.ibm_is_subnet.existing_subnet.id
+      security_groups = [data.ibm_is_security_group.existing_sg.id]
     }
 }
 

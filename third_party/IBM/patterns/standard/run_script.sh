@@ -155,7 +155,7 @@ fi
 
 cd ~
 rm -rf /home/ubuntu/Enterprise-Inference
-git clone https://github.com/opea-project/Enterprise-Inference.git /home/ubuntu/Enterprise-Inference
+git clone -b release-1.3.1 --single-branch https://github.com/opea-project/Enterprise-Inference.git /home/ubuntu/Enterprise-Inference
 cd /home/ubuntu/Enterprise-Inference
 
 # Copy appropriate hosts.yaml based on deployment mode

@@ -28,18 +28,9 @@ data "ibm_resource_group" "target_rg" {
   name = var.resource_group
 }
 
-data "ibm_is_image" "packer_image" {
-    name = var.image
-}
-
 data "ibm_is_image" "xeon_image" {
     count = local.is_multi_node ? 1 : 0
     name = var.xeon_image
-}
-
-data "ibm_is_image" "gaudi_image" {
-    count = local.is_multi_node ? 1 : 0
-    name = var.gaudi_image
 }
 
 resource "ibm_is_vpc" "new_vpc" {
@@ -185,19 +176,20 @@ data "ibm_is_ssh_key" "ssh_key_id" {
 
 # Single-node instance (when deployment_mode is single-node)
 resource "ibm_is_instance" "vsi" {
-    count   = local.is_multi_node ? 0 : 1
-    name    = "${local.BASENAME}-vsi-${random_string.suffix.result}"
-    vpc     = ibm_is_vpc.new_vpc.id
-    zone    = var.instance_zone
-    keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
-    image   = data.ibm_is_image.packer_image.id
-    resource_group = data.ibm_resource_group.target_rg.id
-    profile = var.instance_profile
-
-    primary_network_interface {
-        subnet          = ibm_is_subnet.new_subnet.id
-        security_groups = [ibm_is_security_group.new_sg.id]
-    }
+  count   = local.is_multi_node ? 0 : 1
+  name    = "${local.BASENAME}-vsi-${random_string.suffix.result}"
+  vpc     = ibm_is_vpc.new_vpc.id
+  zone    = var.instance_zone
+  keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
+  resource_group = data.ibm_resource_group.target_rg.id
+  profile = var.instance_profile
+  catalog_offering {
+    version_crn = "crn:v1:bluemix:public:globalcatalog-collection:global::1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc:version:68d4fbbe-3984-4c62-bf27-bd938b9bef8e-global/f61fc831-f7da-485e-8d80-b94cea311960-global"
+  }
+  primary_network_interface {
+    subnet          = ibm_is_subnet.new_subnet.id
+    security_groups = [ibm_is_security_group.new_sg.id]
+  }
 }
 
 # Multi-node Control Plane instances (Xeon) - only when deployment_mode is multi-node
@@ -224,7 +216,9 @@ resource "ibm_is_instance" "worker_gaudi_nodes" {
     vpc     = ibm_is_vpc.new_vpc.id
     zone    = var.instance_zone
     keys    = [data.ibm_is_ssh_key.ssh_key_id.id]
-    image   = data.ibm_is_image.gaudi_image[0].id
+    catalog_offering {
+      version_crn = "crn:v1:bluemix:public:globalcatalog-collection:global::1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc:version:68d4fbbe-3984-4c62-bf27-bd938b9bef8e-global/f61fc831-f7da-485e-8d80-b94cea311960-global"
+    }
     resource_group = data.ibm_resource_group.target_rg.id
     profile = var.instance_profile  # Uses same profile as single-node
 
