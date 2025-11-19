@@ -58,23 +58,12 @@ variable "resource_group" {
   default     = ""
 }
 
-variable "image" {
-  description = "IBM Cloud instance image (for single-node or default multi-node image)"
-  type        = string
-  default     = ""
-}
-
 variable "xeon_image" {
   description = "IBM Cloud instance image for Xeon/CPU nodes in multi-node deployment"
   type        = string
   default     = "ibm-ubuntu-22-04-5-minimal-amd64-2"  # Default Ubuntu image for CPU nodes
 }
 
-variable "gaudi_image" {
-  description = "IBM Cloud instance image for Gaudi nodes in multi-node deployment"
-  type        = string
-  default     = "gaudi3-os-u22-01-22-0"
-}
 variable "ssh_private_key" {
   default     = null
   description = "Provide the private SSH key (named id_rsa) used during the creation and configuration of the bastion server to securely authenticate and connect to the bastion server. This allows access to internal network resources from a secure entry point. Note: The corresponding public SSH key (named id_rsa.pub) must already be available in the ~/.ssh/authorized_keys file on the bastion host to establish authentication."

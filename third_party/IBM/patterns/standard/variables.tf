@@ -74,11 +74,7 @@ variable "user_key" {
   description = "The contents of the TLS private key (PEM format)"
   type        = string
 }
-variable "image" {
-  description = "IBM Cloud instance image"
-  type        = string
-  default     = "gaudi3-os-u22-01-22-0"
-}
+
 variable "hugging_face_token" {
   description = "This variable specifies the hf token."
   type        = string
@@ -170,11 +166,6 @@ variable "xeon_image" {
   default     = "ibm-ubuntu-22-04-5-minimal-amd64-2"  # Default Ubuntu image for CPU nodes
 }
 
-variable "gaudi_image" {
-  description = "IBM Cloud instance image for Gaudi nodes in multi-node deployment"
-  type        = string
-  default     = "gaudi3-os-u22-01-22-0"
-}
 
 variable "control_plane_names" {
   description = "Optional custom names for control plane nodes. If not provided, defaults to 'inference-control-plane-01', etc."

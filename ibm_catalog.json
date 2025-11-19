@@ -3,7 +3,7 @@
         {
             "label": "Intel® AI for Enterprise Inference",
             "name": "da-enterprise-inference",
-            "version": "1.3.0",
+            "version": "1.3.1",
             "product_kind": "solution",
 			"tags": [
               "opea",
@@ -274,12 +274,6 @@
                             "display_name": "Gaudi worker names",
                             "default_value": "[]",
 			                "description": "Custom names for Gaudi worker nodes. If not provided, defaults to 'inference-workload-gaudi-node-01', etc."
-                        },
-			            {
-                            "key": "image",
-                            "type": "string",
-                            "default_value": "gaudi3-os-u22-01-22-0",
-                            "description": "This variable image name to be used for VSI bringup"
                         },
 			            {
                             "key": "instance_profile",

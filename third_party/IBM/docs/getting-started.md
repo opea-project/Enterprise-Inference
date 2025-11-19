@@ -77,6 +77,9 @@ The following large language models are supported for deployment:
 | Qwen/Qwen2.5-32B-Instruct					| 1       					| 70GB    | 6 		 |
 
 > **Note:** Additional models can be deployed or existing models can be removed after initial deployment by accessing the deployment instance.
+>
+> ### Quota Increase for Gaudi 3 - IBM Cloud Quick Start Guide [Quota Increase for Gaudi 3](./quota-increase.md)
+>
 
 ### Required Components
 
