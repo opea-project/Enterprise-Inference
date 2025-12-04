@@ -5,6 +5,7 @@ HOMEDIR="$(pwd)"
 KUBESPRAYDIR="$(dirname "$(realpath "$0")")/kubespray"
 VENVDIR="$(dirname "$(realpath "$0")")/kubespray225-venv"
 INVENTORY_PATH="${KUBESPRAYDIR}/inventory/mycluster/hosts.yaml"
+BECOME_PASSWORD_FILE="$(dirname "$(realpath "$0")")/inventory/.become-passfile"
 # Set the default values for the parameters
 cluster_url=""
 cert_file=""
