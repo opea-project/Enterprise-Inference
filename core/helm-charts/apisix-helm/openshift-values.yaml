@@ -1,0 +1,122 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# APISIX Namespace
+namespace: auth-apisix
+
+# APISIX Helm chart configs
+apisix:
+  version: 2.8.1
+  enabled: true
+  replicaCount: "" 
+  serviceAccount:
+    create: true
+    name: auth-apisix
+  ingress-controller:
+    replicaCount: ""
+    enabled: true
+    config:
+      apisix:
+        serviceName: auth-apisix-admin
+        serviceNamespace: auth-apisix
+      kubernetes:
+        namespaceSelector: []
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values: ["infra"]
+          - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: auth-apisix
+              topologyKey: "kubernetes.io/hostname"
+  etcd:
+    image:
+      repository: bitnamilegacy/etcd
+      tag: 3.5.10-debian-11-r2
+    serviceAccount:
+      create: true
+      name: auth-apisix-etcd
+    podSecurityContext:
+      fsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+    auth:    
+      tls:        
+        enabled: false        
+    replicaCount: ""
+    persistence:
+      enabled: true
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values: ["infra"]
+          - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: auth-apisix
+              topologyKey: "kubernetes.io/hostname"  
+  dashboard:
+    enabled: false
+
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/master"
+      operator: "Exists"
+      effect: "NoSchedule"
+  affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values: ["infra"]
+          - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: auth-apisix
+              topologyKey: "kubernetes.io/hostname"
+    

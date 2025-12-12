@@ -1,0 +1,25 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if and .Values.storage.persistentVolume.enabled (not .Values.storage.persistentVolume.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ovms-model-server.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ovms-model-server.labels" . | nindent 4 }}
+  {{- if not .Values.storage.persistentVolume.deleteOnUninstall }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.storage.persistentVolume.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.storage.persistentVolume.storageClass }}
+  storageClassName: {{ .Values.storage.persistentVolume.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.persistentVolume.size | default "50Gi" }}
+{{- end }}

@@ -25,30 +25,43 @@
             # For multi-node clusters, prefer worker nodes
             affinity:
               nodeAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    preference:
-                      matchExpressions:
-                        - key: node-role.kubernetes.io/worker
-                          operator: Exists
-                  - weight: 50
-                    preference:
-                      matchExpressions:
-                        - key: node-role.kubernetes.io/control-plane
-                          operator: DoesNotExist
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["inference"]
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["inference-xeon"]
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["inference-cpu"]
             tolerations:
               - operator: Exists # Allow scheduling on any node including master
             securityContext:
               fsGroup: 2000
               runAsGroup: 3000
-              runAsNonRoot: true
-              runAsUser: 1000
+              runAsNonRoot: false
+              runAsUser: 0
               seccompProfile:
                 type: RuntimeDefault
             containers:
               - name: ubuntu
-                image: ubuntu
-                command: ["sleep", "infinity"]
+                image: ubuntu:22.04
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    mkdir -p /var/lib/apt/lists/partial && \
+                    apt-get update -qq && \
+                    apt-get install -y -qq util-linux coreutils procps > /dev/null 2>&1 && \
+                    sleep infinity
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  runAsUser: 0
+                  readOnlyRootFilesystem: false
             restartPolicy: Always
   tags:
     - install
@@ -61,8 +74,14 @@
       - app=node-topology-optimizer
   register: optimizer_pods_info
   until: optimizer_pods_info.resources | length > 0 and (optimizer_pods_info.resources | selectattr('status.phase', 'equalto', 'Running') | list | length > 0)
-  retries: 10
-  delay: 5
+  retries: 30
+  delay: 10
+  tags:
+    - install
+
+- name: Wait additional time for packages to install in container
+  ansible.builtin.pause:
+    seconds: 45
   tags:
     - install
 
@@ -258,7 +277,7 @@
       for s in $(seq 0 $((total_sockets - 1))); do
         socket_totals[$s]=0;
       done;
-
+      
       for i in $(seq 0 $((total_numa - 1))); do
         numa_cpus=$(lscpu | grep "NUMA node$i CPU(s):" | cut -d: -f2 | xargs);
         if [[ "$numa_cpus" != "" ]]; then
@@ -486,24 +505,15 @@
     parallelism_config:
       strategy: >-
         {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
-        {%- if numa_per_socket in [2, 4] -%}
         tensor_parallel
-        {%- elif numa_per_socket in [3, 6] -%}
-        pipeline_parallel
-        {%- else -%}
-        tensor_parallel
-        {%- endif -%}
       tensor_parallel_size: >-
         {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
         {%- if numa_per_socket in [2, 4] -%}
         {{ numa_per_socket }}
-        {%- else -%}
-        1
-        {%- endif -%}
-      pipeline_parallel_size: >-
-        {%- set numa_per_socket = numa_nodes_per_socket | default(optimal_balloon_config.numa_nodes_per_socket) | default(1) | int -%}
-        {%- if numa_per_socket in [3, 6] -%}
-        {{ numa_per_socket }}
+        {%- elif numa_per_socket in [3] -%}
+        2
+        {%- elif numa_per_socket in [6] -%}
+        4
         {%- else -%}
         1
         {%- endif -%}
@@ -569,7 +579,6 @@
       === Parallelism Strategy ===
       Strategy: {{ optimal_balloon_config.strategy }}
       Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size }}
-      Pipeline Parallel Size: {{ optimal_balloon_config.pipeline_parallel_size }}
       ===================================================================
   tags:
     - install

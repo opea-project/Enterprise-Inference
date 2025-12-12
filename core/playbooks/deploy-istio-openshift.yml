@@ -1,0 +1,394 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Install and configure Istio (OpenShift Service Mesh)
+  hosts: kube_control_plane
+  gather_facts: false
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+  vars:
+    test_ns: test-ns
+    default_ns: default
+    ingress_ns: ingress-nginx
+    genai_gw_ns: genai-gateway
+    observability_ns: observability
+    habana_ns: habana-ai-operator
+    auth_apisix_ns: auth-apisix
+    peer_auth_path_base: "{{ helm_charts_base }}/istio/peer-authentication.yaml"
+    peer_auth_ingress_path_base: "{{ helm_charts_base }}/istio/peer-auth-ingress.yaml"
+    peer_auth_path: "{{ remote_helm_charts_base }}/istio/peer-authentication.yaml"
+    peer_auth_ingress_path: "{{ remote_helm_charts_base }}/istio/peer-auth-ingress.yaml"
+    # Chart version retained for possible future helm-based fallbacks
+    istio_chart_version: "1.26.2"
+    # We rely solely on kubernetes_platform passed in extra-vars / vars_files
+    k8s_platform_lower: "{{ (kubernetes_platform | default('')) | lower }}"
+
+  tasks:
+    # ========================================
+    # OPENSHIFT ASSERTION (We only support OpenShift in this playbook)
+    # ========================================
+    - name: Set is_openshift fact from kubernetes_platform
+      set_fact:
+        is_openshift: "{{ k8s_platform_lower == 'openshift' }}"
+      run_once: true
+
+    - name: Fail if not OpenShift
+      fail:
+        msg: "This playbook is for OpenShift only. Detected kubernetes_platform='{{ k8s_platform_lower }}'"
+      when: not is_openshift | bool
+      run_once: true
+
+    - name: Display platform confirmation
+      debug:
+        msg: "Running OpenShift Service Mesh installation with kubernetes_platform='{{ k8s_platform_lower }}'"
+      when: is_openshift | bool
+      run_once: true
+
+    # ========================================
+    # COMMON SETUP TASKS
+    # ========================================
+    - name: Create remote helm charts directory for istio
+      file:
+        path: "{{ remote_helm_charts_base }}/istio"
+        state: directory
+        mode: "0755"
+      run_once: true
+
+    - name: Copy istio configuration files to remote location
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {
+            src: "{{ peer_auth_path_base }}",
+            dest: "{{ remote_helm_charts_base }}/istio/peer-authentication.yaml",
+          }
+        - {
+            src: "{{ peer_auth_ingress_path_base }}",
+            dest: "{{ remote_helm_charts_base }}/istio/peer-auth-ingress.yaml",
+          }
+      run_once: true
+
+    # ========================================
+    # OPENSHIFT SERVICE MESH (OSSM) INSTALLATION
+    # ========================================
+    - name: "[OpenShift] Install OpenShift Service Mesh Operators"
+      block:
+        - name: Create istio-system namespace
+          command: kubectl create namespace istio-system
+          register: create_ns_result
+          failed_when: create_ns_result.rc != 0 and 'AlreadyExists' not in create_ns_result.stderr
+          changed_when: "'created' in create_ns_result.stdout"
+          run_once: true
+
+        - name: Install Jaeger Operator from Community
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              name: jaeger
+              namespace: openshift-operators
+            spec:
+              channel: stable
+              installPlanApproval: Automatic
+              name: jaeger
+              source: community-operators
+              sourceNamespace: openshift-marketplace
+            EOF
+          register: jaeger_operator_result
+          changed_when: "'created' in jaeger_operator_result.stdout or 'configured' in jaeger_operator_result.stdout"
+          run_once: true
+
+        - name: Install Kiali Operator
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              name: kiali-ossm
+              namespace: openshift-operators
+            spec:
+              channel: stable
+              installPlanApproval: Automatic
+              name: kiali-ossm
+              source: redhat-operators
+              sourceNamespace: openshift-marketplace
+            EOF
+          register: kiali_operator_result
+          changed_when: "'created' in kiali_operator_result.stdout or 'configured' in kiali_operator_result.stdout"
+          run_once: true
+
+        - name: Install Red Hat OpenShift Service Mesh Operator v3.2
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              name: servicemeshoperator3
+              namespace: openshift-operators
+            spec:
+              channel: stable-3.2
+              installPlanApproval: Automatic
+              name: servicemeshoperator3
+              source: redhat-operators
+              sourceNamespace: openshift-marketplace
+            EOF
+          register: ossm_operator_result
+          changed_when: "'created' in ossm_operator_result.stdout or 'configured' in ossm_operator_result.stdout"
+          run_once: true
+
+        - name: Wait for Service Mesh Operator to be ready
+          shell: |
+            timeout=600
+            elapsed=0
+            while [ $elapsed -lt $timeout ]; do
+              # Check for servicemeshoperator3 CSV with Succeeded phase
+              if kubectl get csv -n openshift-operators 2>/dev/null | grep -E 'servicemeshoperator3|servicemeshoperator' | grep -q Succeeded; then
+                echo "Service Mesh Operator is ready"
+                kubectl get csv -n openshift-operators | grep -E 'servicemeshoperator3|servicemeshoperator'
+                exit 0
+              fi
+              # Show current status for debugging
+              CSV_STATUS=$(kubectl get csv -n openshift-operators 2>/dev/null | grep -E 'servicemeshoperator3|servicemeshoperator' | head -1 || echo "Not found yet")
+              echo "Waiting for Service Mesh Operator... ($elapsed/$timeout) - Status: $CSV_STATUS"
+              sleep 10
+              elapsed=$((elapsed + 10))
+            done
+            echo "Timeout waiting for Service Mesh Operator"
+            echo "Current CSVs in openshift-operators:"
+            kubectl get csv -n openshift-operators
+            exit 1
+          register: ossm_ready_result
+          changed_when: false
+          run_once: true
+
+        - name: Wait for Istio CRD to be available
+          shell: |
+            timeout=120
+            elapsed=0
+            while [ $elapsed -lt $timeout ]; do
+              if kubectl get crd istios.sailoperator.io &>/dev/null; then
+                echo "Istio CRD is available"
+                exit 0
+              fi
+              echo "Waiting for Istio CRD... ($elapsed/$timeout)"
+              sleep 5
+              elapsed=$((elapsed + 5))
+            done
+            echo "Timeout waiting for Istio CRD"
+            exit 1
+          register: crd_ready_result
+          changed_when: false
+          run_once: true
+
+        - name: Deploy Istio with Ambient Mode (GA)
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: sailoperator.io/v1
+            kind: Istio
+            metadata:
+              name: default
+              namespace: istio-system
+            spec:
+              version: v1.27-latest
+              namespace: istio-system
+              values:
+                pilot:
+                  env:
+                    PILOT_ENABLE_AMBIENT: "true"
+            EOF
+          register: istio_cr_result
+          changed_when: "'created' in istio_cr_result.stdout or 'configured' in istio_cr_result.stdout"
+          run_once: true
+        
+        - name: Deploy Istio CNI for Ambient Mode (v1.27.3)
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: sailoperator.io/v1
+            kind: IstioCNI
+            metadata:
+              name: default
+              namespace: istio-system
+            spec:
+              version: v1.27-latest
+              namespace: istio-system
+              values:
+                cni:
+                  ambient:
+                    enabled: true
+            EOF
+          register: istio_cni_result
+          changed_when: "'created' in istio_cni_result.stdout or 'configured' in istio_cni_result.stdout"
+          run_once: true
+
+        - name: Deploy Ztunnel for Ambient Mode (v1.27.3 GA)
+          shell: |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: sailoperator.io/v1alpha1
+            kind: ZTunnel
+            metadata:
+              name: default
+              namespace: istio-system
+            spec:
+              version: v1.27-latest
+              namespace: istio-system
+            EOF
+          register: ztunnel_result
+          changed_when: "'created' in ztunnel_result.stdout or 'configured' in ztunnel_result.stdout"
+          run_once: true
+
+        - name: Wait for Istio control plane to be ready
+          shell: |
+            #!/bin/bash
+            set -e
+            echo "Checking Istio control plane status..."
+
+            i=1
+            while [ $i -le 60 ]; do
+              ready=$(kubectl get istio default -n istio-system -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "NotFound")
+
+              if [ "$ready" = "True" ]; then
+                echo "✓ Istio control plane is ready!"
+                kubectl get istio -n istio-system -o wide
+                exit 0
+              fi
+
+              echo "  Attempt $i/60: Status=${ready} - Waiting..."
+              sleep 5
+              i=$((i + 1))
+            done
+
+            echo "✗ Timeout waiting for Istio control plane"
+            kubectl get istio -n istio-system -o yaml
+            kubectl get pods -n istio-system
+            exit 1
+          register: istio_ready_result
+          changed_when: false
+          run_once: true
+
+        - name: Note about namespace membership
+          debug:
+            msg: "OSSM v3 uses namespace labels instead of ServiceMeshMemberRoll. Namespaces will be labeled in subsequent tasks."
+          run_once: true
+
+        - name: Get Service Mesh components status
+          command: kubectl get pods -n istio-system
+          register: ossm_pods
+          changed_when: false
+          run_once: true
+
+        - name: Display Service Mesh components
+          debug:
+            msg: "{{ ossm_pods.stdout_lines }}"
+          run_once: true
+
+      when: is_openshift | bool
+
+    # Vanilla Kubernetes section removed (handled by deploy-istio.yml)
+
+    # ========================================
+    # NAMESPACE CONFIGURATION - AMBIENT MODE
+    # ========================================
+    - name: "[OpenShift] Label default namespace for ambient mode"
+      command: kubectl label namespace {{ default_ns }} istio.io/dataplane-mode=ambient --overwrite
+      run_once: true
+      when: is_openshift | bool
+
+    - name: Apply peer-authentication.yaml to default namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ default_ns }}
+      run_once: true
+
+    - name: Check if genai-gateway namespace exists
+      command: kubectl get namespace {{ genai_gw_ns }}
+      register: genai_gw_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: "[OpenShift] Label genai-gateway namespace for ambient mode"
+      command: kubectl label namespace {{ genai_gw_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: genai_gw_ns_check.rc == 0 and is_openshift | bool
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to genai-gateway namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ genai_gw_ns }}
+      when: genai_gw_ns_check.rc == 0
+      run_once: true
+
+    - name: Check if habana-ai-operator namespace exists
+      command: kubectl get namespace {{ habana_ns }}
+      register: habana_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: "[OpenShift] Label habana-ai-operator namespace for ambient mode"
+      command: kubectl label namespace {{ habana_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: habana_ns_check.rc == 0 and is_openshift | bool
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to habana-ai-operator namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ habana_ns }}
+      when: habana_ns_check.rc == 0
+      run_once: true
+
+    - name: Check if observability namespace exists
+      command: kubectl get namespace {{ observability_ns }}
+      register: observability_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: "[OpenShift] Label observability namespace for ambient mode"
+      command: kubectl label namespace {{ observability_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: observability_ns_check.rc == 0 and is_openshift | bool
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to observability namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ observability_ns }}
+      when: observability_ns_check.rc == 0
+      run_once: true
+
+    - name: "[OpenShift] Label ingress-nginx namespace for ambient mode"
+      command: kubectl label namespace {{ ingress_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: is_openshift | bool
+      run_once: true
+
+    - name: Apply peer-auth-ingress.yaml to ingress-nginx namespace
+      command: kubectl apply -f {{ peer_auth_ingress_path }} -n {{ ingress_ns }}
+      run_once: true
+
+    - name: Check if auth-apisix namespace exists
+      command: kubectl get namespace {{ auth_apisix_ns }}
+      register: auth_apisix_ns_check
+      ignore_errors: true
+      run_once: true
+
+    - name: "[OpenShift] Label auth-apisix namespace for ambient mode"
+      command: kubectl label namespace {{ auth_apisix_ns }} istio.io/dataplane-mode=ambient --overwrite
+      when: auth_apisix_ns_check.rc == 0 and is_openshift | bool
+      run_once: true
+
+    - name: Apply peer-authentication.yaml to auth-apisix namespace
+      command: kubectl apply -f {{ peer_auth_path }} -n {{ auth_apisix_ns }}
+      when: auth_apisix_ns_check.rc == 0
+      run_once: true
+
+    # ========================================
+    # OPENSHIFT: VERIFY AMBIENT MODE SETUP
+    # ========================================
+    - name: "[OpenShift] Verify ambient mode ztunnel daemonset"
+      shell: |
+        echo "Checking ztunnel daemonset status..."
+        kubectl get daemonset -n istio-system -l app=ztunnel || echo "ztunnel not yet deployed"
+        kubectl get pods -n istio-system -l app=ztunnel || echo "ztunnel pods not yet running"
+      when: is_openshift | bool
+      run_once: true
+      changed_when: false
+
+    - name: "[OpenShift] Display ambient mode namespace labels"
+      shell: |
+        echo "Namespaces configured for ambient mode:"
+        kubectl get namespaces -l istio.io/dataplane-mode=ambient -o name || echo "None found yet"
+      when: is_openshift | bool
+      run_once: true
+      changed_when: false

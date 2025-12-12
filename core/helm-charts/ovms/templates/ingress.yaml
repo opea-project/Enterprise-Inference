@@ -1,0 +1,33 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if and .Values.ingress.enabled .Values.modelSource }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ovms-model-server.fullname" . }}
+  namespace: {{ .Values.ingress.namespace }}
+  labels:
+    {{- include "ovms-model-server.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /{{ .Values.modelName }}-ovms/$1
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.secretname }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.secretname }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /{{ .Values.modelName }}-ovms/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: {{- if .Values.apisixRoute.enabled }} auth-apisix-gateway{{- else }} {{ include "ovms-model-server.fullname" . }}{{- end }}
+            port:
+              number: 80
+{{- end }}

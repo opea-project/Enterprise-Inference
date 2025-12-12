@@ -56,7 +56,7 @@
       debug:
         msg: "Secret {{ secret_name }} created."
     - name: Retrieve number of Inference Infrastructure Nodes
-      ansible.builtin.shell: kubectl get nodes --selector=node-role.kubernetes.io/inference-infra=true --no-headers | wc -l
+      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra --no-headers | wc -l
       register: inference_node_count
       changed_when: false
     - name: Set Keycloak Replicas based upon Inference Infra Nodes
@@ -73,7 +73,8 @@
         kind: Ingress
         name: genai-gateway-ingress
         namespace: genai-gateway
-
+      ignore_errors: true
+   
     - name: Deploy Keycloak System
       run_once: true
       register: helm_output
@@ -92,6 +93,38 @@
             image:
               repository: bitnamilegacy/postgresql
               tag: 16.3.0-debian-12-r23
+            primary:
+              podSecurityContext:
+                enabled: true
+                fsGroup: 1001
+              containerSecurityContext:
+                enabled: false
+              persistence:
+                enabled: true
+                size: 8Gi
+            volumePermissions:
+              enabled: true
+              image:
+                repository: bitnamilegacy/os-shell
+                tag: 12-debian-12-r48 
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+                effect: NoSchedule
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["infra"]
+                  - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: Exists
           production: true
           proxy: edge
           replicaCount: "{{ inference_infra_replica_count | int }}"
@@ -119,7 +152,7 @@
                   name: memory
                   targetAverageUtilization: 60
           ingress:
-            enabled: true
+            enabled: "{{ false if kubernetes_platform == 'openshift' or kubernetes_platform == 'eks' else true }}"
             hostname: "{{ secret_name }}"
             tls: true
             ingressClassName: "nginx"
@@ -131,25 +164,31 @@
               - hosts:
                   - "{{ secret_name }}"
                 secretName: "{{ secret_name }}"
+          route:
+            enabled: "{{ true if kubernetes_platform == 'openshift' else false }}"
+            hostname: "{{ secret_name }}"
+            tls:
+              enabled: true
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
           tolerations:
-            - key: "node-role.kubernetes.io/control-plane"
-              operator: "Exists"
-              effect: "NoSchedule"
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+            - key: node-role.kubernetes.io/master
+              operator: Exists
+              effect: NoSchedule
           affinity:
             nodeAffinity:
-              preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 100
-                  preference:
-                    matchExpressions:
-                      - key: node-role.kubernetes.io/inference-infra
-                        operator: In
-                        values:
-                          - "true"
-                - weight: 50
-                  preference:
-                    matchExpressions:
-                      - key: node-role.kubernetes.io/control-plane
-                        operator: Exists
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: role
+                    operator: In
+                    values: ["infra"]
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
             podAntiAffinity:
               preferredDuringSchedulingIgnoredDuringExecution:
                 - weight: 100
@@ -174,16 +213,108 @@
     - name: Wait for Keycloak pods to be ready
       kubernetes.core.k8s_info:
         kind: Pod
-        namespace: keycloak
+        namespace: default
         label_selectors:
-          - app=keycloak
+          - app.kubernetes.io/name=keycloak
       register: keycloak_pods
       until:
-        - keycloak_pods.resources | map('select', 'status.phase') | select('equalto', 'Running') | list | length == keycloak_pods.resources | length
-        - keycloak_pods.resources | map('select', 'status.containerStatuses') | sum(attribute='ready', start=0) == keycloak_pods.resources | length
+        - keycloak_pods.resources | length > 0
+        - keycloak_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length == keycloak_pods.resources | length
+        - keycloak_pods.resources | map(attribute='status.containerStatuses') | flatten | selectattr('ready', 'equalto', true) | list | length == (keycloak_pods.resources | map(attribute='status.containerStatuses') | flatten | list | length)
       retries: 60
-      delay: 5
+      delay: 10
+      changed_when: false
       when: deploy_keycloak == "yes"
+
+    - name: Wait for Keycloak service endpoint to be ready
+      ansible.builtin.shell: |
+        kubectl get endpoints keycloak -n default -o jsonpath='{.subsets[*].addresses[*].ip}' | grep -q .
+      register: keycloak_endpoint
+      until: keycloak_endpoint.rc == 0
+      retries: 30
+      delay: 10
+      changed_when: false
+      when: deploy_keycloak == "yes"
+
+    - name: Wait for Keycloak token endpoint and authentication to be working
+      ansible.builtin.shell: |
+        kubectl exec -n default $(kubectl get pod -n default -l app.kubernetes.io/name=keycloak -o jsonpath='{.items[0].metadata.name}') -- \
+          curl -X POST -w "%{http_code}" -o /dev/null -s \
+          -d "client_id=admin-cli" \
+          -d "username={{ keycloak_admin_user }}" \
+          -d "password={{ keycloak_admin_password }}" \
+          -d "grant_type=password" \
+          http://localhost:8080/realms/master/protocol/openid-connect/token 2>/dev/null || echo "000"
+      register: keycloak_token_health
+      until: keycloak_token_health.stdout is defined and keycloak_token_health.stdout == "200"
+      retries: 30
+      delay: 5
+      changed_when: false
+      failed_when: false
+      when: deploy_keycloak == "yes"
+
+    - name: Wait for Keycloak admin API for client management to be ready
+      ansible.builtin.shell: |
+        TOKEN=$(kubectl exec -n default $(kubectl get pod -n default -l app.kubernetes.io/name=keycloak -o jsonpath='{.items[0].metadata.name}') -- \
+          curl -s -X POST \
+          -d "client_id=admin-cli" \
+          -d "username={{ keycloak_admin_user }}" \
+          -d "password={{ keycloak_admin_password }}" \
+          -d "grant_type=password" \
+          http://localhost:8080/realms/master/protocol/openid-connect/token 2>/dev/null | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+        kubectl exec -n default $(kubectl get pod -n default -l app.kubernetes.io/name=keycloak -o jsonpath='{.items[0].metadata.name}') -- \
+          curl -w "%{http_code}" -o /dev/null -s \
+          -H "Authorization: Bearer $TOKEN" \
+          http://localhost:8080/admin/realms/master/clients 2>/dev/null || echo "000"
+      register: keycloak_admin_health
+      until: keycloak_admin_health.stdout is defined and keycloak_admin_health.stdout == "200"
+      retries: 30
+      delay: 5
+      changed_when: false
+      failed_when: false
+      when: deploy_keycloak == "yes"
+
+    - name: Additional wait to ensure Keycloak realm API is stable
+      ansible.builtin.pause:
+        seconds: 15
+      when: deploy_keycloak == "yes"
+
+    - name: Create ALB Ingress for Keycloak on EKS
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: keycloak-ingress
+            namespace: default
+            annotations:
+              alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+              alb.ingress.kubernetes.io/certificate-arn: "{{ aws_certificate_arn | default('') }}"
+              alb.ingress.kubernetes.io/group.name: keycloak-apisix
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+              alb.ingress.kubernetes.io/scheme: internet-facing
+              alb.ingress.kubernetes.io/target-type: ip
+          spec:
+            ingressClassName: alb
+            rules:
+              - host: "{{ secret_name }}"
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: keycloak
+                          port:
+                            number: 80
+            tls:
+              - hosts:
+                  - "{{ secret_name }}"
+                secretName: "{{ secret_name }}"
+      when: 
+        - deploy_keycloak == "yes"
+        - kubernetes_platform == "eks"
 
     - name: Ensure Remote Directory Exists
       ansible.builtin.file:
@@ -216,6 +347,22 @@
         mode: "0755"
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
+    - name: Use EKS-specific ingress configuration for Keycloak
+      ansible.builtin.copy:
+        src: "{{ remote_helm_charts_base }}/keycloak/templates/ingress_eks.yaml"
+        dest: "{{ remote_helm_charts_base }}/keycloak/templates/ingress.yaml"
+        remote_src: yes
+      when: kubernetes_platform == "eks"
+    - name: Remove duplicate EKS ingress template for Keycloak
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/keycloak/templates/ingress_eks.yaml"
+        state: absent
+      when: kubernetes_platform == "eks"
+    - name: Remove EKS ingress template when not on EKS
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/keycloak/templates/ingress_eks.yaml"
+        state: absent
+      when: kubernetes_platform != "eks"
     - name: Synchronize dependencies for APISIX
       ansible.builtin.command: helm dependency update "{{ remote_helm_charts_base }}/apisix-helm/"
       register: helm_dependency_update
@@ -232,13 +379,45 @@
     - name: Deploy APISIX System
       command: >
         helm upgrade --install auth-apisix {{ remote_helm_charts_base }}/apisix-helm/
-        --values {{ remote_helm_charts_base }}/apisix-helm/values.yaml
+        --values {{ remote_helm_charts_base }}/apisix-helm/{% if kubernetes_platform == 'openshift' %}openshift-values.yaml{% else %}values.yaml{% endif %}
         --set apisix.replicaCount={{ inference_infra_replica_count }}
         --set apisix.ingress-controller.replicaCount={{ inference_infra_replica_count }}
         --set apisix.etcd.replicaCount={{ inference_infra_replica_count }}
         --namespace auth-apisix --create-namespace
       when: deploy_apisix == "yes"
       run_once: true
+
+    - name: Add SCC policy to auth-apisix service account
+      command: oc adm policy add-scc-to-user anyuid -z auth-apisix -n auth-apisix
+      when: 
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
+      run_once: true
+      ignore_errors: true
+    
+    - name: Restart auth-apisix deployment after SCC policy change
+      command: kubectl rollout restart deployment/auth-apisix -n auth-apisix
+      when:
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
+      run_once: true
+      ignore_errors: true
+    
+    - name: Add SCC policy to auth-apisix-etcd service account
+      command: oc adm policy add-scc-to-user anyuid -z auth-apisix-etcd -n auth-apisix
+      when: 
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
+      run_once: true
+      ignore_errors: true
+    
+    - name: Restart auth-apisix pods to apply SCC changes
+      command: kubectl rollout restart statefulset -n auth-apisix
+      when:
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
+      run_once: true
+      ignore_errors: true
     - name: Wait for APISIX pods to be ready
       kubernetes.core.k8s_info:
         kind: Pod
@@ -273,14 +452,150 @@
         --set ingress.serviceName=auth-apisix-gateway
         --set ingress.servicePort=80
         --set ingress.secretName={{ secret_name }}
+        {% if kubernetes_platform == 'openshift' %}
+        --set route.enabled=true
+        --set route.host={{ secret_name }}
+        --set route.tls.termination=edge
+        --set route.servicePort=80
+        --set route.serviceName=auth-apisix-gateway
+        --set route.tls.insecureEdgeTerminationPolicy=Redirect
+        {% else %}
+        --set route.enabled=false
+        --set ingress.host={{ secret_name }}
+        --set ingress.serviceName=auth-apisix-gateway
+        --set ingress.servicePort=80
+        --set ingress.secretName={{ secret_name }}
+        {% endif %}
       environment:
         secret_name: "{{ secret_name }}"
       run_once: true
       register: keycloak_ingress_register_msg_in
       failed_when: keycloak_ingress_register_msg_in.rc != 0
       when: deploy_keycloak == "yes"
-    - name: Execute the Keycloak Realm Creation Script
-      command: "{{ remote_helm_charts_base }}/keycloak-realmcreation.sh {{ secret_name }} {{ keycloak_admin_user }} {{ keycloak_admin_password }} {{ keycloak_client_id }}"
+
+    - name: Create ConfigMap with Keycloak realm creation script
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: keycloak-realm-script
+            namespace: default
+          data:
+            keycloak-realmcreation.sh: "{{ lookup('file', remote_home_dir + '/keycloak-realmcreation.sh') }}"
+      run_once: true
+      when: deploy_keycloak == "yes"
+
+    - name: Create Keycloak realm setup Job
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: keycloak-realm-setup
+            namespace: default
+          spec:
+            ttlSecondsAfterFinished: 300
+            backoffLimit: 3
+            template:
+              metadata:
+                name: keycloak-realm-setup
+              spec:
+                restartPolicy: Never
+                containers:
+                - name: keycloak-setup
+                  image: ubuntu:22.04
+                  command: ["/bin/bash", "-c"]
+                  args:
+                    - |
+                      set -e
+                      
+                      # Install dependencies
+                      apt-get update -qq
+                      apt-get install -y -qq curl jq
+                      
+                      # Copy script to writable location
+                      cp /scripts/keycloak-realmcreation.sh /tmp/keycloak-realmcreation.sh
+                      chmod +x /tmp/keycloak-realmcreation.sh
+                      
+                      # Retry mechanism for Keycloak availability
+                      MAX_RETRIES=30
+                      RETRY_DELAY=10
+                      RETRY_COUNT=0
+                      
+                      echo "Waiting for Keycloak to be ready..."
+                      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                        # Test token endpoint
+                        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+                          -d "client_id=admin-cli" \
+                          -d "username={{ keycloak_admin_user }}" \
+                          -d "password={{ keycloak_admin_password }}" \
+                          -d "grant_type=password" \
+                          http://keycloak.default.svc.cluster.local:80/realms/master/protocol/openid-connect/token || echo "000")
+                        
+                        if [ "$HTTP_CODE" = "200" ]; then
+                          echo "Keycloak is ready (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+                          break
+                        fi
+                        
+                        RETRY_COUNT=$((RETRY_COUNT + 1))
+                        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                          echo "Keycloak not ready yet (attempt $RETRY_COUNT/$MAX_RETRIES, HTTP: $HTTP_CODE). Retrying in ${RETRY_DELAY}s..."
+                          sleep $RETRY_DELAY
+                        else
+                          echo "ERROR: Keycloak failed to become ready after $MAX_RETRIES attempts"
+                          exit 1
+                        fi
+                      done
+                      
+                      # Additional stability wait
+                      echo "Waiting 15 seconds for Keycloak to stabilize..."
+                      sleep 15
+                      
+                      # Run the script with internal service name
+                      echo "Running realm creation script..."
+                      /tmp/keycloak-realmcreation.sh \
+                        keycloak.default.svc.cluster.local:80 \
+                        "{{ keycloak_admin_user }}" \
+                        "{{ keycloak_admin_password }}" \
+                        "{{ keycloak_client_id }}"
+                  volumeMounts:
+                  - name: scripts
+                    mountPath: /scripts
+                    readOnly: true
+                volumes:
+                - name: scripts
+                  configMap:
+                    name: keycloak-realm-script
+                    defaultMode: 0755
+                tolerations:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+                    effect: NoSchedule
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+                    effect: NoSchedule
+      run_once: true
+      when: deploy_keycloak == "yes"
+
+    - name: Wait for Keycloak realm setup Job to complete
+      kubernetes.core.k8s_info:
+        kind: Job
+        namespace: default
+        name: keycloak-realm-setup
+      register: realm_job
+      until: >
+        realm_job.resources[0].status.succeeded is defined and
+        realm_job.resources[0].status.succeeded == 1
+      retries: 30
+      delay: 10
+      run_once: true
+      when: deploy_keycloak == "yes"
+
+    - name: Get Keycloak realm setup Job logs
+      command: kubectl logs job/keycloak-realm-setup -n default
       register: script_output
       run_once: true
       environment:
@@ -288,6 +603,7 @@
         https_proxy: ""
         no_proxy: ""
       when: deploy_keycloak == "yes"
+
     - name: Set client_secret fact
       set_fact:
         client_secret: "{{ script_output.stdout | regex_search('Client secret: (.*)') | join('') | regex_replace('^Client secret: ') }}"
@@ -297,15 +613,42 @@
         - script_output.stdout is search('Client secret:')
         - deploy_keycloak == "yes"
       run_once: true
-    - debug:
-        msg: "The client secret is: {{ client_secret }}"
+
+    - name: Verify Keycloak ApisixRoute is synced
+      shell: |
+        kubectl get apisixroute keycloak-apisix-keycloak-token-route -n default -o jsonpath='{.status.conditions[?(@.type=="ResourcesAvailable")].status}' 2>/dev/null || echo "NotFound"
+      register: apisixroute_status
+      until: apisixroute_status.stdout == "True"
+      retries: 15
+      delay: 4
+      failed_when: false
+      when: 
+        - deploy_keycloak == "yes"
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
       run_once: true
-      when: deploy_keycloak == "yes"
-    - name: Print the script output
-      debug:
-        msg: "{{ script_output.stdout }}"
+
+    - name: Force Keycloak ApisixRoute resync if verification failed
+      shell: |
+        ROUTE_NAME="keycloak-apisix-keycloak-token-route"
+        if kubectl get apisixroute $ROUTE_NAME -n default >/dev/null 2>&1; then
+          echo "Forcing resync by recreating the route..."
+          kubectl get apisixroute $ROUTE_NAME -n default -o yaml > /tmp/keycloak-route.yaml
+          kubectl delete apisixroute $ROUTE_NAME -n default
+          sleep 2
+          kubectl apply -f /tmp/keycloak-route.yaml
+          rm -f /tmp/keycloak-route.yaml
+          echo "Route recreated"
+        else
+          echo "Route not found, skipping resync"
+        fi
+      when: 
+        - deploy_keycloak == "yes"
+        - deploy_apisix == "yes"
+        - kubernetes_platform == "openshift"
+        - apisixroute_status.stdout != "True"
       run_once: true
-      when: deploy_keycloak == "yes"
+
     - name: Remove any existing deployment directory
       ansible.builtin.file:
         path: "{{ remote_helm_charts_base }}"

@@ -1,0 +1,60 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  {{- if .Values.apisix.enabled }}
+  annotations:
+    router.openshift.io/allow-hostname-claim: "true"
+  {{- end }}
+  labels:
+    {{- include "teirerank.labels" . | nindent 4 }}
+  name: {{ include "teirerank.fullname" . }}-route
+  namespace: {{- if .Values.apisix.enabled }}
+                auth-apisix
+              {{- else }}
+                default
+              {{- end }}
+spec:
+  host: {{ .Values.route.host }}
+  {{- if .Values.apisix.enabled }}
+  path: {{- if not .Values.accelDevice }}
+    /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu
+    {{- else }}
+    /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}
+    {{- end }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{- if .Values.apisix.enabled }}
+            auth-apisix-gateway
+          {{- else }}
+            {{ include "teirerank.fullname" . }}-service
+          {{- end }}
+    weight: 100
+  port:
+    targetPort: apisix-gateway
+  {{- if .Values.route.tls }}
+  tls:
+    {{- if .Values.route.tls.termination }}
+    termination: {{ .Values.route.tls.termination }}
+    {{- end }}
+    {{- if .Values.route.tls.insecureEdgeTerminationPolicy }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+    {{- if .Values.route.tls.certificate }}
+    certificate: {{ .Values.route.tls.certificate }}
+    {{- end }}
+    {{- if .Values.route.tls.key }}
+    key: {{ .Values.route.tls.key }}
+    {{- end }}
+    {{- if .Values.route.tls.caCertificate }}
+    caCertificate: {{ .Values.route.tls.caCertificate }}
+    {{- end }}
+    {{- if .Values.route.tls.destinationCACertificate }}
+    destinationCACertificate: {{ .Values.route.tls.destinationCACertificate }}
+    {{- end }}
+  {{- end }}
+  wildcardPolicy: {{ .Values.route.wildcardPolicy | default "None" }}
+{{- end }}

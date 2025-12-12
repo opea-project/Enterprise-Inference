@@ -45,9 +45,11 @@ spec:
             port:
               number: 80
         # path: /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/(.*)
-        path: {{- if not .Values.accelDevice }}
+        path: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+          /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/(.*)
+          {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
           /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}-teicpu/(.*)
-          {{- else }}
+          {{- else if not .Values.apisix.enabled }}
           /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/(.*)
           {{- end }}
         pathType: ImplementationSpecific

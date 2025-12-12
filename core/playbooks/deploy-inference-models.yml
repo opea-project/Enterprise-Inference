@@ -80,6 +80,181 @@
                 src: "{{ helm_charts_base }}",
                 dest: "{{ remote_helm_charts_base }}/",
               }
+          run_once: true
+          tags: always
+        - name: Use EKS-specific ingress configuration for VLLM
+          ansible.builtin.copy:
+            src: "{{ remote_helm_charts_base }}/vllm/templates/ingress_eks.yaml"
+            dest: "{{ remote_helm_charts_base }}/vllm/templates/ingress.yaml"
+            mode: "0644"
+            remote_src: yes
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove duplicate EKS ingress template for VLLM
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/vllm/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for VLLM when not on EKS
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/vllm/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform != "eks"
+          run_once: true
+          tags: always
+        - name: Use EKS-specific ingress configuration for TEI
+          ansible.builtin.copy:
+            src: "{{ remote_helm_charts_base }}/tei/templates/ingress_eks.yaml"
+            dest: "{{ remote_helm_charts_base }}/tei/templates/ingress.yaml"
+            mode: "0644"
+            remote_src: yes
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove duplicate EKS ingress template for TEI
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tei/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TEI when not on EKS
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tei/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform != "eks"
+          run_once: true
+          tags: always
+        - name: Use EKS-specific ingress configuration for TEI Rerank
+          ansible.builtin.copy:
+            src: "{{ remote_helm_charts_base }}/teirerank/templates/ingress_eks.yaml"
+            dest: "{{ remote_helm_charts_base }}/teirerank/templates/ingress.yaml"
+            mode: "0644"
+            remote_src: yes
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove duplicate EKS ingress template for TEI Rerank
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/teirerank/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TEI Rerank when not on EKS
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/teirerank/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform != "eks"
+          run_once: true
+          tags: always
+        - name: Use EKS-specific ingress configuration for TGI
+          ansible.builtin.copy:
+            src: "{{ remote_helm_charts_base }}/tgi/templates/ingress_eks.yaml"
+            dest: "{{ remote_helm_charts_base }}/tgi/templates/ingress.yaml"
+            mode: "0644"
+            remote_src: yes
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove duplicate EKS ingress template for TGI
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tgi/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TGI when not on EKS
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tgi/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform != "eks"
+          run_once: true
+          tags: always
+
+        - name: Verify only one ingress template exists for each chart (EKS)
+          ansible.builtin.shell: |
+            echo "VLLM templates:"
+            ls -la {{ remote_helm_charts_base }}/vllm/templates/ingress*.yaml || echo "No files found"
+            echo "TEI templates:"
+            ls -la {{ remote_helm_charts_base }}/tei/templates/ingress*.yaml || echo "No files found"
+            echo "TEI Rerank templates:"
+            ls -la {{ remote_helm_charts_base }}/teirerank/templates/ingress*.yaml || echo "No files found"
+            echo "TGI templates:"
+            ls -la {{ remote_helm_charts_base }}/tgi/templates/ingress*.yaml || echo "No files found"
+          register: template_verification
+          when: kubernetes_platform == "eks"
+          run_once: true
+          tags: always
+
+        # OpenShift-specific tasks: Remove all ingress templates and keep only route templates
+        - name: Remove standard ingress template for VLLM (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/vllm/templates/ingress.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for VLLM (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/vllm/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove standard ingress template for TEI (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tei/templates/ingress.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TEI (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tei/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove standard ingress template for TEI Rerank (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/teirerank/templates/ingress.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TEI Rerank (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/teirerank/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove standard ingress template for TGI (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tgi/templates/ingress.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+        - name: Remove EKS ingress template for TGI (OpenShift)
+          ansible.builtin.file:
+            path: "{{ remote_helm_charts_base }}/tgi/templates/ingress_eks.yaml"
+            state: absent
+          when: kubernetes_platform == "openshift"
+          run_once: true
+          tags: always
+
+        - name: Display template verification results
+          debug:
+            msg: "{{ template_verification.stdout_lines }}"
+          when:
+            - kubernetes_platform == "eks"
+            - template_verification is defined
+          run_once: true
           tags: always
     - name: CPU Topology Detection and Optimization (for CPU deployments only)
       when: cpu_playbook == 'true' and balloon_policy_cpu == "enabled"
@@ -153,25 +328,16 @@
                 {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
                 {%- if numa_per_socket in [2, 4] -%}
                 {{ numa_per_socket }}
-                {%- else -%}
-                1
-                {%- endif -%}
-              pipeline_parallel_size: >-
-                {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
-                {%- if numa_per_socket in [3, 6] -%}
-                {{ numa_per_socket }}
+                {%- elif numa_per_socket in [3] -%}
+                2
+                {%- elif numa_per_socket in [6] -%}
+                4
                 {%- else -%}
                 1
                 {%- endif -%}
               strategy: >-
                 {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
-                {%- if numa_per_socket in [2, 4] -%}
                 tensor_parallel
-                {%- elif numa_per_socket in [3, 6] -%}
-                pipeline_parallel
-                {%- else -%}
-                tensor_parallel
-                {%- endif -%}
 
         - name: Combine topology and parallelism configs
           ansible.builtin.set_fact:
@@ -293,20 +459,145 @@
           tags: install-keycloak-apisix
     - name: Fetch the keycloak client secret
       block:
-        - name: Fetch the keycloak client secret
-          command: "{{ remote_helm_charts_base }}/keycloak-realmcreation.sh {{ secret_name }} {{ keycloak_admin_user }} {{ keycloak_admin_password }} {{ keycloak_client_id }}"
+        - name: Create ConfigMap with Keycloak realm creation script
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: keycloak-realm-script
+                namespace: default
+              data:
+                keycloak-realmcreation.sh: "{{ lookup('file', remote_home_dir + '/keycloak-realmcreation.sh') }}"
+          run_once: true
+
+        - name: Create Keycloak realm setup Job
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: keycloak-realm-setup-models
+                namespace: default
+              spec:
+                ttlSecondsAfterFinished: 300
+                backoffLimit: 3
+                template:
+                  metadata:
+                    name: keycloak-realm-setup
+                  spec:
+                    restartPolicy: Never
+                    containers:
+                    - name: keycloak-setup
+                      image: ubuntu:22.04
+                      command: ["/bin/bash", "-c"]
+                      args:
+                        - |
+                          set -e
+
+                          # Install dependencies
+                          export DEBIAN_FRONTEND=noninteractive
+                          apt-get update -qq
+                          apt-get install -y -qq curl jq
+
+                          # Copy script to writable location
+                          cp /scripts/keycloak-realmcreation.sh /tmp/keycloak-realmcreation.sh
+                          chmod +x /tmp/keycloak-realmcreation.sh
+
+                          # Wait for Keycloak to be ready with retry logic
+                          MAX_RETRIES=30
+                          RETRY_DELAY=10
+                          RETRY_COUNT=0
+
+                          echo "Waiting for Keycloak to be ready..."
+                          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                            echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Testing Keycloak authentication..."
+
+                            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                              -X POST \
+                              -d "client_id=admin-cli" \
+                              -d "username={{ keycloak_admin_user }}" \
+                              -d "password={{ keycloak_admin_password }}" \
+                              -d "grant_type=password" \
+                              http://keycloak.default.svc.cluster.local:80/realms/master/protocol/openid-connect/token)
+
+                            if [ "$HTTP_CODE" = "200" ]; then
+                              echo "Keycloak is ready and authenticated successfully"
+                              break
+                            else
+                              echo "Keycloak not ready yet (HTTP $HTTP_CODE), waiting ${RETRY_DELAY}s..."
+                              RETRY_COUNT=$((RETRY_COUNT + 1))
+                              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                                sleep $RETRY_DELAY
+                              fi
+                            fi
+                          done
+
+                          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                            echo "ERROR: Keycloak did not become ready after $MAX_RETRIES attempts"
+                            exit 1
+                          fi
+
+                          # Additional stabilization wait
+                          echo "Waiting 15 seconds for Keycloak to stabilize..."
+                          sleep 15
+
+                          # Run the realm creation script
+                          echo "Running Keycloak realm creation script..."
+                          /tmp/keycloak-realmcreation.sh \
+                            keycloak.default.svc.cluster.local:80 \
+                            "{{ keycloak_admin_user }}" \
+                            "{{ keycloak_admin_password }}" \
+                            "{{ keycloak_client_id }}"
+                      volumeMounts:
+                      - name: scripts
+                        mountPath: /scripts
+                        readOnly: true
+                    volumes:
+                    - name: scripts
+                      configMap:
+                        name: keycloak-realm-script
+                        defaultMode: 0755
+                    tolerations:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: Exists
+                        effect: NoSchedule
+                      - key: node-role.kubernetes.io/master
+                        operator: Exists
+                        effect: NoSchedule
+          run_once: true
+
+        - name: Wait for Keycloak realm setup Job to complete
+          kubernetes.core.k8s_info:
+            kind: Job
+            namespace: default
+            name: keycloak-realm-setup-models
+          register: realm_job
+          until: >
+            realm_job.resources[0].status.succeeded is defined and
+            realm_job.resources[0].status.succeeded == 1
+          retries: 30
+          delay: 10
+          run_once: true
+
+        - name: Get Keycloak realm setup Job logs
+          command: kubectl logs job/keycloak-realm-setup-models -n default
           register: script_output
-          environment:
-            http_proxy: ""
-            https_proxy: ""
-            no_proxy: ""
+          run_once: true
+
         - name: Set Keycloak client fact
           set_fact:
             client_secret: "{{ script_output.stdout | regex_search('Client secret: (.*)') | join('') | regex_replace('^Client secret: ') }}"
           when: script_output.stdout is search('Client secret:')
-        - name: Display Keycloak client
+          run_once: true
+
+        - name: Warning when client secret not found
           debug:
-            msg: "The client key is: {{ client_secret }}"
+            msg: "WARNING: Client secret was not found in the Keycloak setup job output. Please check the job logs manually."
+          when: client_secret is not defined
+          run_once: true
       run_once: true
       when: deploy_keycloak == 'yes'
       tags: install-keycloak-apisix
@@ -355,6 +646,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
@@ -364,6 +656,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -380,7 +675,7 @@
             reg_model_name: "meta-llama/Llama-3.1-8B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.1-8B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-8b-service/v1"
+            reg_api_base: "http://vllm-llama-8b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -438,6 +733,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if cpu_playbook == 'true' %}
               --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
@@ -452,6 +748,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -467,7 +766,7 @@
             reg_model_name: "{{ huggingface_model_id }}"
             reg_litellm_model: "openai/{{ huggingface_model_id }}"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://{{huggingface_model_deployment_name}}-vllm-service/v1"
+            reg_api_base: "http://{{huggingface_model_deployment_name}}-vllm-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -498,9 +797,9 @@
         - uninstall_true == 'true'
         - hugging_face_model_remove_deployment == 'true'
         - helm_release_installed.stdout != ""
-    
-    
-    
+
+
+
     - name: Check if Llama4 Model is deployed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-llama-4-scout-17b --short"
@@ -517,8 +816,8 @@
         - "'llama-4-scout-17b' in (model_name_list | regex_replace(',', ' ') | split())"
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
-    
-    
+
+
     - name: Deploy Llama4-17B Scout LLM Model
       block:
         - name: Delete Ingress resource Llama4-17B from default namespace
@@ -545,6 +844,7 @@
             --set tensor_parallel_size=4
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -553,6 +853,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -568,7 +871,7 @@
             reg_model_name: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-4-Scout-17B-16E-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-4-scout-17b-service/v1"
+            reg_api_base: "http://vllm-llama-4-scout-17b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -584,8 +887,8 @@
         - '"llama-4-scout-17b" in model_name_list'
         - install_true == 'true'
 
-    
-    
+
+
     - name: Check if QWEN 2.5 3B Model is deployed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-qwen-2-5-32b --short"
@@ -602,7 +905,7 @@
         - "'qwen-2-5-32b' in (model_name_list | regex_replace(',', ' ') | split())"
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
-    
+
     - name: Deploy Qwen-2.5-32B Scout LLM Model
       block:
         - name: Delete Ingress resource Qwen-2.5-32B from default namespace
@@ -629,6 +932,7 @@
             --set tensor_parallel_size=1
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -637,6 +941,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -652,7 +959,7 @@
             reg_model_name: "Qwen/Qwen2.5-32B-Instruct"
             reg_litellm_model: "openai/Qwen/Qwen2.5-32B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-qwen-2-5-32b-service/v1"
+            reg_api_base: "http://vllm-qwen-2-5-32b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -667,7 +974,7 @@
       when:
         - '"qwen-2-5-32b" in model_name_list'
         - install_true == 'true'
-    
+
     - name: Check if vllm-llama-70b Model is deployed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-llama-70b --short"
@@ -684,11 +991,11 @@
         - "'llama-70b' in model_name_list"
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
-    
-    
-    
-    
-    
+
+
+
+
+
     - name: Deploy Llama70b LLM Model
       block:
         - name: Delete Ingress resource Llama70b from default namespace
@@ -715,6 +1022,7 @@
             --set tensor_parallel_size=4
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -723,6 +1031,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -738,7 +1049,7 @@
             reg_model_name: "meta-llama/Llama-3.1-70B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.1-70B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-70b-service/v1"
+            reg_api_base: "http://vllm-llama-70b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -796,6 +1107,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --set tensor_parallel_size=4
@@ -805,6 +1117,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -821,7 +1136,7 @@
             reg_model_name: "meta-llama/Llama-3.3-70B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.3-70B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-3-3-70b-service/v1"
+            reg_api_base: "http://vllm-llama-3-3-70b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -880,6 +1195,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -888,6 +1204,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -903,7 +1222,7 @@
             reg_model_name: "mistralai/Mixtral-8x7B-Instruct-v0.1"
             reg_litellm_model: "openai/mistralai/Mixtral-8x7B-Instruct-v0.1"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-mixtral-7b-service/v1"
+            reg_api_base: "http://vllm-mixtral-7b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -962,6 +1281,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -970,6 +1290,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -985,7 +1308,7 @@
             reg_model_name: "codellama/CodeLlama-34b-Instruct-hf"
             reg_litellm_model: "openai/codellama/CodeLlama-34b-Instruct-hf"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-codellama-service/v1"
+            reg_api_base: "http://vllm-codellama-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1042,6 +1365,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -1050,6 +1374,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1065,7 +1392,7 @@
             reg_model_name: "tiiuae/Falcon3-7B-Instruct"
             reg_litellm_model: "openai/tiiuae/Falcon3-7B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-falcon3-7b-service/v1"
+            reg_api_base: "http://vllm-falcon3-7b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1123,6 +1450,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values {{ gaudi_values_file }}
@@ -1131,6 +1459,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1146,7 +1477,7 @@
             reg_model_name: "mistralai/Mistral-7B-Instruct-v0.3"
             reg_litellm_model: "openai/mistralai/Mistral-7B-Instruct-v0.3"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-mistral-7b-service/v1"
+            reg_api_base: "http://vllm-mistral-7b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1202,6 +1533,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values "{{ remote_helm_charts_base }}/tei/gaudi-values.yaml"
@@ -1210,6 +1542,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1226,7 +1561,7 @@
             reg_model_name: "BAAI/bge-base-en-v1.5"
             reg_litellm_model: "huggingface/BAAI/bge-base-en-v1.5"
             reg_custom_llm_provider: "huggingface"
-            reg_api_base: "http://vllm-tei-service"
+            reg_api_base: "http://vllm-tei-service.default"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
             reg_model_mode: "embedding"
@@ -1283,6 +1618,7 @@
             --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --values "{{ remote_helm_charts_base }}/teirerank/gaudi-values.yaml"
@@ -1291,6 +1627,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1307,7 +1646,7 @@
             reg_model_name: "BAAI/bge-reranker-base"
             reg_litellm_model: "huggingface/BAAI/bge-reranker-base"
             reg_custom_llm_provider: "huggingface"
-            reg_api_base: "http://vllm-teirerank-service"
+            reg_api_base: "http://vllm-teirerank-service.default"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
             reg_model_mode: "rerank"
@@ -1367,6 +1706,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --set tensor_parallel_size=2
@@ -1376,6 +1716,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1391,7 +1734,7 @@
             reg_model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
             reg_litellm_model: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-deepkseek-r1-qwen-32b-service/v1"
+            reg_api_base: "http://vllm-deepkseek-r1-qwen-32b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1449,6 +1792,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
@@ -1458,6 +1802,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1473,7 +1820,7 @@
             reg_model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
             reg_litellm_model: "openai/deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-deepkseek-r1-llama-8b-service/v1"
+            reg_api_base: "http://vllm-deepkseek-r1-llama-8b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1531,6 +1878,7 @@
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
             {% if gaudi_deployment %}
               --set tensor_parallel_size=8
@@ -1540,6 +1888,9 @@
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1555,7 +1906,7 @@
             reg_model_name: "meta-llama/Llama-3.1-405B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.1-405B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama3-405b-service/v1"
+            reg_api_base: "http://vllm-llama3-405b-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1606,23 +1957,27 @@
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
-    
+
     - name: Deploy CPU based LLM model  llama 8b
       block:
         - name: Delete Ingress resource Llama8b from default namespace
           tags: install-cpu-llama-8b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
             name: vllm-llama-8b-cpu-ingress
             state: absent
+          ignore_errors: yes
         - name: Delete Ingress resource Llama8b from auth-apisix namespace
           tags: install-cpu-llama-8b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
             name: vllm-llama-8b-cpu-ingress
             state: absent
+          ignore_errors: yes
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -1641,11 +1996,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1661,7 +2027,7 @@
             reg_model_name: "meta-llama/Llama-3.1-8B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.1-8B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-8b-cpu-service/v1"
+            reg_api_base: "http://vllm-llama-8b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1701,6 +2067,7 @@
       block:
         - name: Delete Ingress resource  Deepseek R1 Distill Qwen 32b from default namespace
           tags: install-cpu-deepseek-r1-distill-qwen-32b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
@@ -1708,6 +2075,7 @@
             state: absent
         - name: Delete Ingress resource  Deepseek R1 Distill Qwen 32b from auth-apisix namespace
           tags: install-cpu-deepseek-r1-distill-qwen-32b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
@@ -1731,11 +2099,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1751,7 +2130,7 @@
             reg_model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
             reg_litellm_model: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-deepseek-r1-qwen32b-cpu-service/v1"
+            reg_api_base: "http://vllm-deepseek-r1-qwen32b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1790,6 +2169,7 @@
       block:
         - name: Delete Ingress resource Deepseek R1 Distill Llama 8B from default namespace
           tags: install-cpu-deepseek-r1-distill-llama8b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
@@ -1797,6 +2177,7 @@
             state: absent
         - name: Delete Ingress resource Deepseek R1 Distill Llama 8B from auth-apisix namespace
           tags: install-cpu-deepseek-r1-distill-llama8b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
@@ -1820,11 +2201,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1840,7 +2232,7 @@
             reg_model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
             reg_litellm_model: "openai/deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-deepseek-r1-llama-8b-cpu-service/v1"
+            reg_api_base: "http://vllm-deepseek-r1-llama-8b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1857,9 +2249,9 @@
         - install_true == 'true'
         - "'cpu-deepseek-r1-distill-llama8b' in (model_name_list | regex_replace(',', ' ') | split())"
 
-    
-    
-    
+
+
+
     - name: Check if CPU Llama-3.2-3B is installed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-llama-3-2-3b-cpu --short"
@@ -1882,6 +2274,7 @@
       block:
         - name: Delete Ingress resource Llama-3.2-3B from default namespace
           tags: install-cpu-llama-3-2-3b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
@@ -1889,6 +2282,7 @@
             state: absent
         - name: Delete Ingress resource Llama-3.2-3B from auth-apisix namespace
           tags: install-cpu-llama-3-2-3b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
@@ -1912,11 +2306,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -1932,7 +2337,7 @@
             reg_model_name: "meta-llama/Llama-3.2-3B-Instruct"
             reg_litellm_model: "openai/meta-llama/Llama-3.2-3B-Instruct"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-llama-3-2-3b-cpu-service/v1"
+            reg_api_base: "http://vllm-llama-3-2-3b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -1949,14 +2354,14 @@
         - cpu_playbook == 'true'
         - install_true == 'true'
         - "'cpu-llama-3-2-3b' in (model_name_list | regex_replace(',', ' ') | split())"
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
     - name: Check if CPU Qwen-3-1-7B is installed
       ansible.builtin.command:
         cmd: "helm list --filter vllm-qwen-3-1-7b-cpu --short"
@@ -1979,6 +2384,7 @@
       block:
         - name: Delete Ingress resource Qwen-3-1-7B from default namespace
           tags: install-cpu-qwen3-1-7b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
@@ -1986,6 +2392,7 @@
             state: absent
         - name: Delete Ingress resource  Qwen-3-1-7B from auth-apisix namespace
           tags: install-cpu-qwen3-1-7b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
@@ -2009,11 +2416,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -2029,7 +2447,7 @@
             reg_model_name: "Qwen/Qwen3-1.7B"
             reg_litellm_model: "openai/Qwen/Qwen3-1.7B"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-qwen-3-1-7b-cpu-service/v1"
+            reg_api_base: "http://vllm-qwen-3-1-7b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -2047,7 +2465,7 @@
         - install_true == 'true'
         - "'cpu-qwen3-1-7b' in (model_name_list | regex_replace(',', ' ') | split())"
 
-    
+
 
     - name: Check if CPU Qwen-3-4B is installed
       ansible.builtin.command:
@@ -2071,6 +2489,7 @@
       block:
         - name: Delete Ingress resource Qwen-3-4B from default namespace
           tags: install-cpu-qwen3-4b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: default
@@ -2078,6 +2497,7 @@
             state: absent
         - name: Delete Ingress resource   Qwen-3-4B from auth-apisix namespace
           tags: install-cpu-qwen3-4b
+          ignore_errors: yes
           kubernetes.core.k8s:
             kind: Ingress
             namespace: auth-apisix
@@ -2087,7 +2507,7 @@
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen-3-4b-cpu "{{ remote_helm_charts_base }}/vllm"
             --values "{{ xeon_values_file }}"
-            --set LLM_MODEL_ID="Qwen/Qwen3-4B-Instruct-2507"             
+            --set LLM_MODEL_ID="Qwen/Qwen3-4B-Instruct-2507"
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
@@ -2101,11 +2521,22 @@
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
             {% endif %}
-            {% if ingress_enabled %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
               --set ingress.enabled={{ ingress_enabled }}
               --set ingress.host={{ secret_name }}
               --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
             {% endif %}
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
@@ -2121,7 +2552,7 @@
             reg_model_name: "Qwen/Qwen3-4B-Instruct-2507"
             reg_litellm_model: "openai/Qwen/Qwen3-4B-Instruct-2507"
             reg_custom_llm_provider: "openai"
-            reg_api_base: "http://vllm-qwen-3-4b-cpu-service/v1"
+            reg_api_base: "http://vllm-qwen-3-4b-cpu-service.default/v1"
             reg_input_cost_per_token: 0.001
             reg_output_cost_per_token: 0.002
           tags:
@@ -2138,9 +2569,9 @@
         - cpu_playbook == 'true'
         - install_true == 'true'
         - "'cpu-qwen3-4b' in (model_name_list | regex_replace(',', ' ') | split())"
-    
-    
-    
+
+
+
     - name: List of Models to be Installed
       tags: always
       run_once: true

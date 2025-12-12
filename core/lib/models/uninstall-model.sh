@@ -18,15 +18,10 @@ remove_inference_llm_models_playbook() {
         INVENTORY_PATH=$brownfield_deployment_host_file
     fi     
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-inference-models.yml \
-        --extra-vars "secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} uninstall_true=${uninstall_true} model_name_list='${model_name_list//\ /,}' hugging_face_model_remove_deployment=${hugging_face_model_remove_deployment} hugging_face_model_remove_name=${hugging_face_model_remove_name} deploy_ceph=${deploy_ceph} balloon_policy_cpu=${balloon_policy_cpu}"  --tags "$tags" --vault-password-file "$vault_pass_file" 
+        --extra-vars "kubernetes_platform=${kubernetes_platform} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} uninstall_true=${uninstall_true} model_name_list='${model_name_list//\ /,}' hugging_face_model_remove_deployment=${hugging_face_model_remove_deployment} hugging_face_model_remove_name=${hugging_face_model_remove_name} deploy_ceph=${deploy_ceph} balloon_policy_cpu=${balloon_policy_cpu}"  --tags "$tags" --vault-password-file "$vault_pass_file" 
 }
 
 remove_model() {
-    if [ "$brownfield_deployment" == "yes" ]; then
-        echo "Setting up Bastion Node..."
-        setup_bastion "$@"
-        INVENTORY_PATH=$brownfield_deployment_host_file
-    fi
     read_config_file "$@"        
     prompt_for_input "$@"
     skip_check="true"    
@@ -47,6 +42,11 @@ remove_model() {
         if [[ ! $user_response =~ ^(yes|y|Y|YES)$ ]]; then                
             echo "Aborting LLM Model removal process. Exiting!!"
             exit 1
+        fi
+        if [ "$brownfield_deployment" == "yes" ]; then
+        echo "Setting up Bastion Node..."
+        setup_bastion "$@"
+        INVENTORY_PATH=$brownfield_deployment_host_file
         fi
         invoke_prereq_workflows "$@"       
         execute_and_check "Removing Inference LLM Models..." remove_inference_llm_models_playbook "$@" \

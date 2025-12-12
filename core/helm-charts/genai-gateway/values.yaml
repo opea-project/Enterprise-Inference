@@ -10,11 +10,23 @@ service:
   type: LoadBalancer
   port: 4000
 
-nodeSelector:
-  node-role.kubernetes.io/control-plane: ""
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["infra"]
+      - matchExpressions:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
 
 tolerations:
   - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/master"
     operator: "Exists"
     effect: "NoSchedule"
 
@@ -49,6 +61,12 @@ probes:
 ingress:
   host: ""
   secretname: ""
+route:
+  enabled: false  
+  host: ""        
+  tls:
+    termination: "edge"  
+    insecureEdgeTerminationPolicy: "Redirect"
 env:
   LITELLM_MASTER_KEY: "<REPLACE_WITH_MASTER_KEY>"
   LITELLM_SALT_KEY: "<REPLACE_WITH_SALT_KEY>"
@@ -90,10 +108,22 @@ postgresql:
       enabled: true
       size: 8Gi
       storageClass: ""
-    nodeSelector:
-      node-role.kubernetes.io/control-plane: ""
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values: ["infra"]
+          - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
     tolerations:
       - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
 redis:
@@ -109,10 +139,22 @@ redis:
       enabled: true
       size: 2Gi
       storageClass: ""
-    nodeSelector:
-      node-role.kubernetes.io/control-plane: ""
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values: ["infra"]
+          - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
     tolerations:
       - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
 backup:

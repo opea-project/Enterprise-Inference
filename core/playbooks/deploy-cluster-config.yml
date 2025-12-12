@@ -58,6 +58,7 @@
               - hosts:
                   - "{{ secret_name }}"
                 secretName: "{{ secret_name }}"
+      when: brownfield_deployment != "yes"
       tags: deploy_cluster_dashboard
     - name: Create ServiceAccount for Admin Dashboard
       community.kubernetes.k8s:

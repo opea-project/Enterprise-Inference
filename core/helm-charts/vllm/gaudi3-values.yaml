@@ -17,14 +17,16 @@ image:
 
 affinity:
   nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/inference-gaudi
-              operator: In
-              values:
-                - "true"
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-gaudi"]
 
 runtime: "habana"
 HABANA_VISIBLE_DEVICES: "all"

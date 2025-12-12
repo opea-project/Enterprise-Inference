@@ -11,7 +11,7 @@ spec:
   - name: {{ include "tei.fullname" . }}-apisixroute
     match:
       hosts:
-      - {{ .Values.ingress.host }}
+      - {{ .Values.route.host | default .Values.ingress.host }}
       paths:
       # - /{{ .Values.EMBEDDING_MODEL_ID | splitList "/" | last }}/*
       {{- if not .Values.accelDevice }}
@@ -21,15 +21,23 @@ spec:
       {{- end }}
     backends:
     - serviceName: {{ include "tei.fullname" . }}-service
-      servicePort: 80
+      servicePort: {{- if .Values.route.enabled }}
+                     tei
+                   {{- else }}
+                     80
+                   {{- end }}
     plugins:
     - name: openid-connect
       enable: true
       secretRef: {{ include "tei.fullname" . }}-secret
       config:
         discovery: {{ .Values.oidc.discovery }}
+        {{- if eq .Values.platform "openshift" }}
+        use_jwks: {{ .Values.oidc.use_jwks }}
+        {{- else }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
         introspection_endpoint_auth_method: client_secret_basic
+        {{- end }}
         scope: openid profile email
         bearer_only: true
         realm: master

@@ -3,46 +3,15 @@
 This guide provides step-by-step instructions to deploy Intel® AI for Enterprise Inference on a single node.
 
 ## Prerequisites
-Before running the automation, complete all [prerequisites](./prerequisites.md).
+Before running the automation, it is recommended to complete all [prerequisites](./prerequisites.md). For a quicker setup, the minimum steps are:
+1. [SSH Key Setup](./prerequisites.md#ssh-key-setup)
+2. [SSL/TLS Certificate Setup for Development Environment](./prerequisites.md#development-environment)
+3. [Hugging Face Token Generation](./prerequisites.md#hugging-face-token-generation)
 
 ## Deployment
 
 ### Step 1: Configure the Automation config file
 Clone the Enterprise Inference repo, then copy the single node preset inference config file to the working directory:
-
-### Step 1: Modify the hosts file
-Since we are testing locally, we need to map a fake domain (`api.example.com`) to `localhost` in the `/etc/hosts` file.
-
-Run the following command to edit the hosts file:
-```
-sudo nano /etc/hosts
-```
-Add this line at the end:
-```
-127.0.0.1 api.example.com
-```
-Save and exit (`CTRL+X`, then `Y` and `Enter`).
-
-### Step 2: Generate a self-signed SSL certificate
-Run the following command to create a self-signed SSL certificate that covers api.example.com and trace-api.example.com:
-```bash
-mkdir -p ~/certs && cd ~/certs && \
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
-  -subj "/CN=api.example.com" \
-  -addext "subjectAltName = DNS:api.example.com, DNS:trace-api.example.com"
-```
-Note: the -addext option requires OpenSSL >= 1.1.1.
-
-Files produced:
-- cert.pem — the self-signed certificate (contains SANs)
-- key.pem — the private key
-
-Important DNS step:
-Please add trace-api.example.com to DNS and point it to the node where Ingress controller is deployed.
-
-### Step 3: Configure the Automation config file
-Move the single node preset inference config file to the runnig directory
-
 ```
 cd ~
 git clone https://github.com/opea-project/Enterprise-Inference.git
@@ -50,7 +19,7 @@ cd Enterprise-Inference
 cp -f docs/examples/single-node/inference-config.cfg core/inventory/inference-config.cfg
 ```
 
-Modify `inference-config.cfg` if needed. Ensure the `cluster_url` field is set to the DNS used, and the paths to the certificate and key files are valid. The keycloak fields and deployment options can be left unchanged. For systems behind a proxy, refer to the [proxy guide](./running-behind-proxy.md).
+Modify `inference-config.cfg` as needed. Ensure the `cluster_url` field is set to the DNS used, and the paths to the certificate and key files are valid. The keycloak fields and deployment options can be left unchanged. For systems behind a proxy, refer to the [proxy guide](./running-behind-proxy.md).
 
 ### Step 2: Update `hosts.yaml` File
 Copy the single node preset hosts config file to the working directory:
@@ -68,7 +37,7 @@ cd core
 chmod +x inference-stack-deploy.sh
 ```
 
- Export the Hugging Face token as an environment variable by replacing "Your_Hugging_Face_Token_ID" with actual Hugging Face Token. Alternatively, set `hugging-face-token` to the token value inside `inference-config.cfg`.
+Export the Hugging Face token as an environment variable by replacing "Your_Hugging_Face_Token_ID" with actual Hugging Face Token. Alternatively, set `hugging-face-token` to the token value inside `inference-config.cfg`.
 ```bash
 export HUGGINGFACE_TOKEN=<<Your_Hugging_Face_Token_ID>>
 ```
@@ -82,7 +51,7 @@ Run the command below to deploy the Llama 3.1 8B parameter model on CPU.
 ```
 #### Intel® Gaudi® AI Accelerators
 
-> **📝 Note**: If you're using Intel® Gaudi® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./gaudi-prerequisites.md#automated-installationupgrade-process) before deployment.
+> **📝 Note**: If running on Intel® Gaudi® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./gaudi-prerequisites.md#automated-installationupgrade-process) before deployment.
 
 Run the command below to deploy the Llama 3.1 8B parameter model on Intel® Gaudi®. For Gaudi 3, set `cpu-or-gpu` to `gaudi3` instead.
 ```bash
@@ -96,18 +65,27 @@ This will deploy the setup automatically. If any issues are encountered, double-
 ### Step 4: Testing Inference
 On the node run the following commands to test if Intel® AI for Enterprise Inference is successfully deployed:
 
-If using Keycloak, generate a token using the script `generate-token.sh`. Ensure the values of the variables match what is set in `inference-config.cfg`. This will also set the environment variable `TOKEN` used in the next step.
+If using Keycloak, generate a token using the script `generate-token.sh`. Ensure the values of the variables match what is set in `inference-config.cfg`. This will also set the environment variables `BASE_URL` and `TOKEN` used in the next step.
 ```bash
 source scripts/generate-token.sh
 ```
 
+If not using Keycloak, set the environment variable `BASE_URL` to the DNS used in the setup i.e. `api.example.com`.
+
+See the example commands below to test inference with Llama 3.1 8B Instruct. For a list of deployed models, this command can be used (if using Keycloak):
+```bash
+kubectl get apisixroutes
+```
+
 To test on CPU only. Note `vllmcpu` is appended to the URL.
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+```
 
 To test on Intel® Gaudi® AI Accelerators:
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+```
 
 ## Post-Deployment
 With the deployed model on the server, refer to the [post-deployment instructions](./README.md#post-deployment) for options.

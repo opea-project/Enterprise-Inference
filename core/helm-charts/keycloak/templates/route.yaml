@@ -1,0 +1,47 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    router.openshift.io/allow-hostname-claim: "true"
+  name: {{ .Release.Name }}-keycloak-apisix
+  namespace: auth-apisix
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  host: {{ .Values.route.host | default .Values.ingress.host }}
+  path: /token
+  to:
+    kind: Service
+    name: {{ .Values.route.serviceName }}
+    weight: 100
+  port:
+    targetPort: apisix-gateway
+  tls:
+    termination: {{ .Values.route.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    router.openshift.io/allow-hostname-claim: "true"
+  name: keycloak
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  host: keycloak-{{ .Values.route.host | default .Values.ingress.host }}
+  path: /
+  to:
+    kind: Service
+    name: keycloak
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: {{ .Values.route.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+{{- end }}

@@ -26,7 +26,12 @@
       when: helm_repo_list.stdout != ""
 
     - name: Retrieving the Number of Inference Infrastructure Nodes
-      ansible.builtin.shell: kubectl get nodes --selector=node-role.kubernetes.io/inference-infra=true -o jsonpath='{.items[*].metadata.name}' | wc -w
+      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra -o jsonpath='{.items[*].metadata.name}' | wc -w
+      register: inference_node_count
+      changed_when: false
+
+    - name: Retrieving the Number of Infrastructure Nodes
+      ansible.builtin.shell: kubectl get nodes --selector=role=infra -o jsonpath='{.items[*].metadata.name}' | wc -w
       register: inference_node_count
       changed_when: false
 
@@ -69,24 +74,23 @@
                 http: 80
                 https: 443
             tolerations:
-              - key: "node-role.kubernetes.io/control-plane"
-                operator: "Exists"
-                effect: "NoSchedule"
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+                effect: NoSchedule
             affinity:
               nodeAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    preference:
-                      matchExpressions:
-                        - key: node-role.kubernetes.io/inference-infra
-                          operator: In
-                          values:
-                            - "true"
-                  - weight: 50
-                    preference:
-                      matchExpressions:
-                        - key: node-role.kubernetes.io/control-plane
-                          operator: Exists
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["infra"]
+                  - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: Exists
               podAntiAffinity:
                 preferredDuringSchedulingIgnoredDuringExecution:
                   - weight: 100

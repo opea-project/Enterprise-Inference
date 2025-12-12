@@ -1,0 +1,44 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if and .Values.apisixRoute.enabled .Values.modelSource }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "ovms-model-server.fullname" . }}-apisixroute
+  namespace: {{ .Values.apisixRoute.namespace }}
+  labels:
+    {{- include "ovms-model-server.labels" . | nindent 4 }}
+spec:
+  http:
+  - name: {{ .Values.modelName }}-route
+    match:
+      hosts:
+      - {{ .Values.apisixRoute.host }}
+      paths:
+      - /{{ .Values.modelName }}-ovms/*
+    backends:
+    - serviceName: {{ include "ovms-model-server.fullname" . }}
+      servicePort: {{ .Values.service.restPort }}
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^/{{ .Values.modelName }}-ovms/(.*)
+          - /$1
+        headers:
+          Content-Type: application/json
+    {{- if .Values.oidc.enabled }}
+    - name: openid-connect
+      enable: true
+      secretRef: {{ include "ovms-model-server.fullname" . }}-secret
+      config:
+        discovery: {{ .Values.oidc.discovery }}
+        scope: openid profile email
+        bearer_only: true
+        realm: {{ .Values.oidc.realm }}
+        introspection_endpoint: {{ .Values.oidc.introspectionEndpoint }}
+        introspection_endpoint_auth_method: client_secret_basic
+    {{- end }}
+{{- end }}

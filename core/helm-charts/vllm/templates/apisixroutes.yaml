@@ -12,7 +12,7 @@ spec:
   - name: {{ include "vllm.fullname" . }}-apisixroute
     match:
       hosts:
-      - {{ .Values.ingress.host }}
+      - {{ .Values.route.host | default .Values.ingress.host }}
       paths:
       # - /{{ $modelName }}/*
       {{- if not .Values.accelDevice }}
@@ -22,15 +22,23 @@ spec:
       {{- end }}
     backends:
     - serviceName: {{ include "vllm.fullname" . }}-service
-      servicePort: 80
+      servicePort: {{- if .Values.route.enabled }}
+                     vllm
+                   {{- else }}
+                     80
+                   {{- end }}
     plugins:
     - name: openid-connect
       enable: true
       secretRef: {{ include "vllm.fullname" . }}-secret
       config:
         discovery: {{ .Values.oidc.discovery }}
+        {{- if eq .Values.platform "openshift" }}
+        use_jwks: {{ .Values.oidc.use_jwks }}
+        {{- else }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
         introspection_endpoint_auth_method: client_secret_basic
+        {{- end }}
         scope: openid profile email
         bearer_only: true
         realm: master

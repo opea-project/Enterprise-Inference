@@ -106,6 +106,7 @@ source "$SCRIPT_DIR/lib/system/precheck/readiness-check.sh"
 # Cluster management
 source "$SCRIPT_DIR/lib/cluster/config/cluster-config-init.sh"
 source "$SCRIPT_DIR/lib/cluster/config/setup-user-cluster-config.sh"
+source "$SCRIPT_DIR/lib/cluster/config/label-nodes.sh"
 source "$SCRIPT_DIR/lib/cluster/state/cluster-state-check.sh"
 source "$SCRIPT_DIR/lib/cluster/deployment/fresh-install.sh"
 source "$SCRIPT_DIR/lib/cluster/deployment/cluster-update.sh"

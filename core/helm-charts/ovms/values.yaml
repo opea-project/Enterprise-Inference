@@ -1,0 +1,232 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Default values for ovms-model-server Helm chart
+
+# Global settings
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace to deploy into
+namespace: default
+
+# Number of replicas
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: openvino/model_server
+  # Tag for OpenVINO models (prefixed with "OpenVINO/")
+  tag: "2025.4"
+  # Tag for non-OpenVINO models (requires HF token)
+  nonOpenvinoTag: "latest-py"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Service Account
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels:
+  app: ovms-model-server
+
+# Security Context for the pod
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 5000
+  fsGroup: 5000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Security Context for containers
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 5000
+
+# Model Configuration
+# Deploy a model by passing the source path via --set
+# Example: helm install qwen . --set modelSource="OpenVINO/Qwen3-4B-int4-ov" --set modelName="qwen3-4b"
+modelSource: ""
+modelName: ""
+
+# HuggingFace Configuration
+# Required for non-OpenVINO models (models not prefixed with "OpenVINO/")
+# Option 1: Pass token directly via --set huggingface.token=$HUGGINGFACE_TOKEN
+# Option 2: Create a secret manually: kubectl create secret generic hf-token-secret --from-literal=token=<your-hf-token>
+huggingface:
+  # Token for HuggingFace Hub (will create secret automatically if provided)
+  token: ""
+  secretName: "hf-token-secret"
+  secretKey: "token"
+
+# Model defaults (applied to any deployed model)
+model:
+  targetDevice: CPU
+  task: text_generation
+  cacheSize: 20
+  logLevel: INFO
+  # Weight format for non-OpenVINO models (fp16, fp32, int8, int4, int4_sym_g128, int4_asym_g128, etc.)
+  # When set, uses export_model.py script for model conversion with specified precision
+  # When empty, uses default ovms pull (fp16)
+  weightFormat: ""
+  # OpenVINO plugin config for CPU/NUMA optimization
+  # Use dot notation: --set model.pluginConfig.PERFORMANCE_HINT="LATENCY"
+  # Or multiple: --set model.pluginConfig.NUM_STREAMS="2" --set model.pluginConfig.AFFINITY="NUMA"
+  # Common options:
+  #   NUM_STREAMS: "AUTO" or number (e.g., "2" for 2 NUMA nodes)
+  #   AFFINITY: "NONE", "CORE", "NUMA", "HYBRID_AWARE"
+  #   ENABLE_HYPER_THREADING: "YES" or "NO"
+  #   INFERENCE_NUM_THREADS: number of threads per stream
+  #   PERFORMANCE_HINT: "THROUGHPUT" or "LATENCY"
+  pluginConfig: {}
+  # Init container resources for model download and conversion
+  # Note: Large models like Llama 3.1-8B require significant memory for conversion
+  initResources:
+    requests:
+      cpu: "4"
+      memory: 50Gi
+    limits:
+      cpu: "8"
+      memory: 50Gi
+  # Runtime container resources
+  resources:
+    requests:
+      cpu: "12"
+      memory: 16Gi
+    limits:
+      cpu: "12"
+      memory: 24Gi
+
+# Storage configuration for models
+storage:
+  # emptyDir configuration (model downloaded every pod restart)
+  emptyDir:
+    enabled: false
+    sizeLimit: 30Gi
+  # Persistent Volume configuration (model persists across restarts)
+  persistentVolume:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    existingClaim: ""
+    # Delete PVC when helm uninstall is run (default: true)
+    # Set to false to keep model data after uninstall
+    deleteOnUninstall: true
+
+# OVMS Server Configuration
+server:
+  # gRPC port (internal container port)
+  grpcPort: 8080
+  # REST API port (internal container port)
+  restPort: 8081
+  
+  # Liveness probe configuration
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /v2/health/live
+      port: rest
+    initialDelaySeconds: 120
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  # Readiness probe configuration
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /v2/health/ready
+      port: rest
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+  
+  # Extra arguments to pass to OVMS
+  extraArgs: []
+
+# Service configuration
+service:
+  type: ClusterIP
+  # gRPC service port for for high-performance inference
+  grpcPort: 9000
+  # REST API service port for standard HTTP requests and health checks
+  restPort: 8080
+  annotations: {}
+  labels: {}
+
+# OIDC Configuration (OpenID Connect Authentication)
+oidc:
+  enabled: true
+  realm: master
+  clientId: "my-client-id" # Replace with your client ID
+  clientSecret: "tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR" # Replace with your client secret
+  discovery: "http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration"
+  introspectionEndpoint: "http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect"
+
+# APISIX Route configuration
+apisixRoute:
+  enabled: true
+  namespace: default
+  name: ""  # Will use chart name with suffix
+  host: "api.example.com"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  namespace: auth-apisix
+  host: "api.example.com"
+  secretname: "api.example.com"
+
+# Additional secrets
+secrets:
+  enabled: false
+  # Additional secret data (besides OIDC)
+  data: {}
+    # Example:
+    # api-key: base64-encoded-key
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}
+
+# Priority class name
+priorityClassName: ""
+
+# Additional volumes
+extraVolumes: []
+
+# Additional volume mounts for main container
+extraVolumeMounts: []
+
+# Additional environment variables
+extraEnv: []
+  # - name: EXTRA_VAR
+  #   value: "value"
+
+# Additional environment variables from ConfigMap or Secret
+extraEnvFrom: []
+  # - configMapRef:
+  #     name: extra-config
+  # - secretRef:
+  #     name: extra-secret

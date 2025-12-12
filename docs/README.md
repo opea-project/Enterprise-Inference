@@ -44,7 +44,7 @@ bash inference-stack-deploy.sh
 
 Intel® AI for Enterprise Inference supports brownfield deployment, allowing you to deploy the inference stack on an existing Kubernetes cluster without disrupting current workloads. This approach leverages your current infrastructure and preserves existing workloads and configurations.
 
-For brownfield deployment guide, refer [Brownfield Deployment Guide](examples/brownfield/brownfield_deployment.md).
+For brownfield deployment guide, refer [Brownfield Deployment Guide](brownfield/brownfield_deployment.md).
 
 
 
