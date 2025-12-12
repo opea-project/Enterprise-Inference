@@ -76,13 +76,34 @@
             dest: "{{ remote_helm_charts_base }}/genai-gateway-trace",
           }
       run_once: true
+    - name: Use EKS-specific ingress configuration
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base_genai }}/templates/ingress_eks.yaml"
+        dest: "{{ remote_helm_charts_base }}/genai-gateway/templates/ingress.yaml"
+        mode: "0644"
+      when: kubernetes_platform == "eks"
+      run_once: true
+    - name: Remove duplicate EKS ingress template
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/templates/ingress_eks.yaml"
+        state: absent
+      when: kubernetes_platform == "eks"
+      run_once: true
+    - name: Remove EKS ingress template when not on EKS
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/templates/ingress_eks.yaml"
+        state: absent
+      when: kubernetes_platform != "eks"
+      run_once: true
     - name: Delete Ingress Resource
       kubernetes.core.k8s:
         state: absent
+        api_version: networking.k8s.io/v1
         kind: Ingress
         name: keycloak
         namespace: default
       run_once: true
+      ignore_errors: true
     - name: Install GenAI Gateway System
       command: >
         helm dependency update {{ remote_helm_charts_base }}/genai-gateway
@@ -101,8 +122,18 @@
         --set postgresql.auth.password={{ postgresql_password }}
         --set postgresql.auth.postgresPassword={{ postgresql_password }}
         --set redis.auth.password={{ redis_password }}
+        {% if kubernetes_platform == 'openshift' %}
+        --set route.enabled=true
+        --set route.host={{ secret_name }}
+        --set route.tls.termination=edge
+        --set route.tls.insecureEdgeTerminationPolicy=Redirect
+        --set ingress.enabled=false
+        {% else %}
+        --set ingress.enabled=true
         --set ingress.host={{ secret_name }}
         --set ingress.secretname={{ secret_name }}
+        --set route.enabled=false
+        {% endif %}
         -f {{ remote_helm_charts_base }}/genai-gateway/values.yaml
       run_once: true
     - name: Wait for GenAI Gateway Pods to be Ready
@@ -147,6 +178,23 @@
         msg: "Secret trace-{{ secret_name }} created."
       run_once: true
     
+    - name: Create EKS ingress annotations file for GenAI Gateway Trace
+      copy:
+        content: |
+          langfuse:
+            ingress:
+              annotations:
+                alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+                alb.ingress.kubernetes.io/certificate-arn: "{{ aws_certificate_arn | default('') }}"
+                alb.ingress.kubernetes.io/group.name: eks-genai-trace
+                alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+                alb.ingress.kubernetes.io/reconcile: now
+                alb.ingress.kubernetes.io/scheme: internet-facing
+                alb.ingress.kubernetes.io/target-type: ip
+        dest: "{{ remote_helm_charts_base }}/genai-gateway-trace/eks-ingress-annotations.yaml"
+      when: kubernetes_platform == "eks"
+      run_once: true
+
     - name: Install GenAI Gateway Trace System
       command: >
         helm upgrade --install genai-gateway-trace langfuse/langfuse
@@ -154,26 +202,39 @@
         --version {{ genai_gateway_trace_chart_version | default('1.5.1') }}
         --set fullnameOverride=genai-gateway-trace
         --set nameOverride=genai-gateway-trace
-        --set clickhouse.auth.username={{ clickhouse_username }} \
-        --set clickhouse.auth.password={{ clickhouse_password }} \
-        --set langfuse.additionalEnv[0].value={{ langfuse_public_key }} \
-        --set langfuse.additionalEnv[1].value={{ langfuse_secret_key }} \
-        --set langfuse.additionalEnv[2].value={{ langfuse_login }} \
-        --set langfuse.additionalEnv[3].value={{ langfuse_user }} \
-        --set langfuse.additionalEnv[4].value={{ langfuse_password }} \
-        --set langfuse.salt.value={{ clickhouse_password }} \
-        --set s3.auth.rootPassword={{ minio_secret }} \
-        --set s3.auth.rootUser={{ minio_user }} \
-        --set postgresql.auth.password={{ postgres_password }} \
-        --set postgresql.auth.username={{ postgres_user }} \
-        --set redis.auth.password={{ clickhouse_password }} \
-        --set langfuse.ingress.enabled=true \
-        --set langfuse.ingress.className=nginx \
-        --set langfuse.ingress.tls.enabled="true" \
-        --set langfuse.ingress.hosts[0].host="trace-{{ secret_name }}" \
-        --set langfuse.ingress.tls.secretName="trace-{{ secret_name }}" \
-        --set langfuse.nextauth.url="https://trace-{{ secret_name }}" \
-        --set langfuse.nextauth.secret.value={{ clickhouse_password }} \
+        --set clickhouse.auth.username={{ clickhouse_username }}
+        --set clickhouse.auth.password={{ clickhouse_password }}
+        --set langfuse.additionalEnv[0].value={{ langfuse_public_key }}
+        --set langfuse.additionalEnv[1].value={{ langfuse_secret_key }}
+        --set langfuse.additionalEnv[2].value={{ langfuse_login }}
+        --set langfuse.additionalEnv[3].value={{ langfuse_user }}
+        --set langfuse.additionalEnv[4].value={{ langfuse_password }}
+        --set langfuse.salt.value={{ clickhouse_password }}
+        --set s3.auth.rootPassword={{ minio_secret }}
+        --set s3.auth.rootUser={{ minio_user }}
+        --set postgresql.auth.password={{ postgres_password }}
+        --set postgresql.auth.username={{ postgres_user }}
+        --set redis.auth.password={{ clickhouse_password }}
+        --set langfuse.nextauth.secret.value={{ clickhouse_password }}
+        {% if kubernetes_platform == 'openshift' %}
+        --set langfuse.route.enabled=true
+        --set langfuse.route.host=trace-{{ secret_name }}
+        --set langfuse.route.tls.termination=edge
+        --set langfuse.route.tls.insecureEdgeTerminationPolicy=Redirect
+        --set langfuse.ingress.enabled=false
+        --set langfuse.nextauth.url=https://trace-{{ secret_name }}
+        {% else %}
+        --set langfuse.ingress.enabled=true
+        --set langfuse.ingress.className={{ 'alb' if kubernetes_platform == 'eks' else 'nginx' }}
+        --set langfuse.ingress.tls.enabled=true
+        --set langfuse.ingress.hosts[0].host=trace-{{ secret_name }}
+        --set langfuse.ingress.tls.secretName=trace-{{ secret_name }}
+        --set langfuse.nextauth.url=https://trace-{{ secret_name }}
+        --set langfuse.route.enabled=false
+        {% endif %}
+        {% if kubernetes_platform == 'eks' %}
+        -f {{ remote_helm_charts_base }}/genai-gateway-trace/eks-ingress-annotations.yaml
+        {% endif %}
         -f {{ remote_helm_charts_base }}/genai-gateway-trace/charts/langfuse/values.yaml
       run_once: true            
     - name: Wait for All GenAI Gateway Trace Pods to be Ready
@@ -187,4 +248,32 @@
       retries: 60
       delay: 10
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
+      run_once: true
+    
+    - name: Apply Custom OpenShift Route for GenAI Gateway Trace
+      kubernetes.core.k8s:
+        state: present
+        namespace: genai-gateway
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: genai-gateway-trace
+            namespace: genai-gateway
+            labels:
+              app.kubernetes.io/instance: genai-gateway-trace
+              app.kubernetes.io/name: langfuse
+          spec:
+            host: "trace-{{ secret_name }}"
+            path: /
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+            to:
+              kind: Service
+              name: genai-gateway-trace-web
+              weight: 100
+            port:
+              targetPort: 3000
+      when: kubernetes_platform == "openshift"
       run_once: true

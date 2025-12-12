@@ -11,6 +11,20 @@ tls:
   host: ""
   secretName: ""
   secretNamespace: default
+# Route configuration (OpenShift)
+route:
+  enabled: false
+  host: ""
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+# APISIX Gateway Route configuration (OpenShift)
+apisixRoute:
+  enabled: false
+  host: ""
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
 ingress:
   host: ""
   serviceName: auth-apisix-gateway

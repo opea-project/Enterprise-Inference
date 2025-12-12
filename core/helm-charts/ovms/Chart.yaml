@@ -1,0 +1,15 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v2
+name: ovms-model-server
+description: A Helm chart for deploying OpenVINO Model Server
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - openvino
+  - model-server
+  - llm
+  - inference
+  - ai

@@ -11,7 +11,7 @@ spec:
   - name: {{ include "teirerank.fullname" . }}-apisixroute
     match:
       hosts:
-      - {{ .Values.ingress.host }}
+      - {{ .Values.route.host | default .Values.ingress.host }}
       paths:
       # - /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/*
       {{- if not .Values.accelDevice }}
@@ -21,15 +21,23 @@ spec:
       {{- end }}
     backends:
     - serviceName: {{ include "teirerank.fullname" . }}-service
-      servicePort: 80
+      servicePort: {{- if .Values.route.enabled }}
+                     teirerank
+                   {{- else }}
+                     80
+                   {{- end }}
     plugins:
     - name: openid-connect
       enable: true
       secretRef: {{ include "teirerank.fullname" . }}-secret
       config:
         discovery: {{ .Values.oidc.discovery }}
+        {{- if eq .Values.platform "openshift" }}
+        use_jwks: {{ .Values.oidc.use_jwks }}
+        {{- else }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
         introspection_endpoint_auth_method: client_secret_basic
+        {{- end }}
         scope: openid profile email
         bearer_only: true
         realm: master

@@ -1,0 +1,82 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Label Kubernetes Nodes
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+  roles:
+    - role: inference-tools
+    - role: kubernetes-precheck
+  tasks:
+    - name: Get control plane node hostnames
+      set_fact:
+        control_plane_nodes: "{{ groups['kube_control_plane'] | default([]) }}"
+      run_once: true
+
+    - name: Get worker node hostnames
+      set_fact:
+        worker_nodes: "{{ groups['kube_node'] | default([]) }}"
+      run_once: true
+
+    - name: Display control plane nodes
+      debug:
+        msg: "Control plane nodes: {{ control_plane_nodes }}"
+      run_once: true
+
+    - name: Display worker nodes
+      debug:
+        msg: "Worker nodes: {{ worker_nodes }}"
+      run_once: true
+
+    - name: Get actual node names from Kubernetes cluster
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: k8s_nodes
+      run_once: true
+
+    - name: Label control plane nodes with role=infra
+      kubernetes.core.k8s:
+        state: patched
+        kind: Node
+        name: "{{ item.metadata.name }}"
+        definition:
+          metadata:
+            labels:
+              role: "infra"
+      loop: "{{ k8s_nodes.resources }}"
+      when: 
+        - item.metadata.name in control_plane_nodes or item.metadata.labels['node-role.kubernetes.io/control-plane'] is defined
+      run_once: true
+
+    - name: Label worker nodes with role=inference
+      kubernetes.core.k8s:
+        state: patched
+        kind: Node
+        name: "{{ item.metadata.name }}"
+        definition:
+          metadata:
+            labels:
+              role: "inference"
+      loop: "{{ k8s_nodes.resources }}"
+      when:
+        - item.metadata.name in worker_nodes or (item.metadata.labels['node-role.kubernetes.io/control-plane'] is not defined and item.metadata.name not in control_plane_nodes)
+      run_once: true
+
+    - name: Verify node labels
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: labeled_nodes
+      run_once: true
+
+    - name: Display labeled nodes
+      debug:
+        msg: |
+          Node: {{ item.metadata.name }}
+          Labels: {{ item.metadata.labels | dict2items | selectattr('key', 'match', '^role') | list | items2dict(key_name='key', value_name='value') }}
+      loop: "{{ labeled_nodes.resources }}"
+      run_once: true

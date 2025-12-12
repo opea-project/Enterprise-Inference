@@ -1,0 +1,889 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy Observability on OpenShift
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_observability.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+  roles:
+    - role: inference-tools
+  tasks:
+    # =========================================================================
+    # DNS + NAMESPACE PREP
+    # =========================================================================
+    - name: Detect DNS service name
+      shell: |
+        if kubectl get svc -n openshift-dns dns-default >/dev/null 2>&1; then
+          echo "dns-default"
+        elif kubectl get svc -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q .; then
+          kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].metadata.name}'
+        else
+          echo "coredns"
+        fi
+      register: dns_service_check
+      run_once: true
+      tags: always
+      changed_when: false
+
+    - name: Set DNS service fact
+      set_fact:
+        dns_service_name: "{{ dns_service_check.stdout }}"
+      run_once: true
+      tags: always
+
+    - name: Create observability namespace
+      community.kubernetes.k8s:
+        name: observability
+        api_version: v1
+        kind: Namespace
+        state: present
+      run_once: true
+      tags: always
+
+    # =========================================================================
+    # OPENSHIFT USER WORKLOAD MONITORING (METRICS)
+    # =========================================================================
+    - name: Enable OpenShift User Workload Monitoring
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: cluster-monitoring-config
+            namespace: openshift-monitoring
+          data:
+            config.yaml: |
+              enableUserWorkload: true
+              prometheusK8s:
+                retention: 15d
+                volumeClaimTemplate:
+                  spec:
+                    resources:
+                      requests:
+                        storage: 50Gi
+
+    - name: Wait for User Workload Monitoring to be ready
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        timeout=300
+        interval=10
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if kubectl get pods -n openshift-user-workload-monitoring 2>/dev/null | grep -q "prometheus-user-workload"; then
+            if kubectl get pods -n openshift-user-workload-monitoring -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | grep -q "Running"; then
+              echo "User Workload Monitoring is ready"
+              exit 0
+            fi
+          fi
+          echo "Waiting for User Workload Monitoring to be ready... ($elapsed/$timeout seconds)"
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+        echo "Warning: User Workload Monitoring not ready after $timeout seconds, continuing anyway"
+        exit 0
+      changed_when: false
+
+    # =========================================================================
+    # COMMON ARTIFACTS (CONFIGMAPS / DASHBOARDS)
+    # =========================================================================
+    - name: Transfer observability dependency files
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base }}/observability/"
+        dest: "{{ remote_helm_charts_base }}/"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: no
+      tags: always
+
+    - name: Create Config for Gaudi Grafana Dashboard
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.shell: |
+        kubectl create configmap habana-dashboard-configmap \
+          --from-file=habana-dashboard.json={{ remote_helm_charts_base }}/habana-exporter/grafana-gaudi-dashboard.json \
+          -n observability --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl label configmap habana-dashboard-configmap grafana_dashboard=1 -n observability --overwrite
+      args:
+        executable: /bin/bash
+
+    - name: Create Config for Gaudi Cluster Utilization Dashboard
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.shell: |
+        kubectl create configmap habana-cluster-dashboard-configmap \
+          --from-file=habana-cluster-dashboard.json={{ remote_helm_charts_base }}/habana-exporter/grafana-gaudi-cluster-util.json \
+          -n observability --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl label configmap habana-cluster-dashboard-configmap grafana_dashboard=1 -n observability --overwrite
+      args:
+        executable: /bin/bash
+
+    - name: Create Config for Xeon Grafana Dashboard
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.shell: |
+        kubectl create configmap xeon-dashboard-configmap \
+          --from-file=grafana-xeon-dashboard.json={{ remote_helm_charts_base }}/xeon-exporter/grafana-xeon-dashboard.json \
+          -n observability --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl label configmap xeon-dashboard-configmap grafana_dashboard=1 -n observability --overwrite
+      args:
+        executable: /bin/bash
+
+    # =========================================================================
+    # OPTIONAL LOGGING STACK (ELASTICSEARCH + FLUENTBIT)
+    # =========================================================================
+    - name: Add Bitnami Helm repository
+      tags: deploy_logging
+      community.kubernetes.helm_repository:
+        name: bitnami
+        repo_url: https://charts.bitnami.com/bitnami
+      when: deploy_logging == "yes"
+
+    - name: Check Helm repositories for logging
+      ansible.builtin.command: helm repo list
+      register: helm_repo_list_observability
+      failed_when: false
+      changed_when: false
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Update Helm repositories for logging
+      ansible.builtin.shell: helm repo update
+      when:
+        - deploy_logging == "yes"
+        - helm_repo_list_observability.stdout != ""
+      tags: deploy_logging
+
+    - name: Install Elasticsearch System (logging)
+      community.kubernetes.helm:
+        name: logging-elasticsearch
+        chart_ref: bitnami/elasticsearch
+        release_namespace: observability
+        chart_version: "21.4.8"
+        values:
+          name: elasticsearch
+          master.replicas: 3
+          coordinating.service.type: LoadBalancer
+      run_once: true
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Create Fluentbit group and user
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+      block:
+        - name: Create Fluentbit group
+          group:
+            name: fluentbit
+            state: present
+        - name: Create Fluentbit user
+          user:
+            name: fluentbit
+            groups: fluentbit
+
+    - name: Set ownership of log directories
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: fluentbit
+        mode: 0750
+      loop:
+        - /var/log/pods
+        - /var/log/containers
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Transfer logging dependency files
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base }}/"
+        dest: "{{ remote_helm_charts_base }}/"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: no
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Create Fluent Bit ClusterRoleBinding
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: fluent-bit-binding-observability
+          subjects:
+            - kind: ServiceAccount
+              name: fluent-bit
+              namespace: observability
+          roleRef:
+            kind: ClusterRole
+            name: fluent-bit
+            apiGroup: rbac.authorization.k8s.io
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Install Fluent Bit
+      community.kubernetes.helm:
+        name: logging-fluentbit
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/fluent-bit
+        release_namespace: observability
+        values_files: "{{ remote_helm_charts_base }}/fluentbit/fluebit-values.yml"
+        chart_version: "2.5.5"
+      run_once: true
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+
+    - name: Update Fluent Bit ConfigMap and restart deployment
+      when: deploy_logging == "yes"
+      tags: deploy_logging
+      block:
+        - name: Update Fluent Bit ConfigMap
+          community.kubernetes.k8s:
+            state: present
+            src: "{{ remote_helm_charts_base }}/fluentbit/fluentbit-config.yml"
+            kind: ConfigMap
+            namespace: observability
+        - name: Rollout restart Fluent Bit deployment
+          ansible.builtin.command:
+            cmd: kubectl rollout restart deployment/logging-fluentbit-fluent-bit --namespace=observability
+          run_once: true
+
+    # =========================================================================
+    # LOKI / OTEL STACK (COMMON)
+    # =========================================================================
+    - name: Add Grafana Helm repo (Loki)
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.helm_repository:
+        name: grafana
+        repo_url: https://grafana.github.io/helm-charts
+
+    - name: Add OpenTelemetry Helm repo
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.helm_repository:
+        name: open-telemetry
+        repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
+
+    - name: Transfer shared dependency files
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base }}/"
+        dest: "{{ remote_helm_charts_base }}/"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: no
+      tags: always
+
+    - name: Build chart dependencies for logs-stack chart
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: helm dependency build logs-stack
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      become: false
+
+    - name: Create ClusterRole for OTEL Collector log access
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: otelcol-logs-file-access
+          rules:
+          - apiGroups: [""]
+            resources: ["nodes", "nodes/proxy", "pods", "pods/log", "namespaces"]
+            verbs: ["get", "list", "watch"]
+          - apiGroups: ["apps"]
+            resources: ["replicasets"]
+            verbs: ["get", "list", "watch"]
+
+    - name: Bind OTEL Collector ClusterRole
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: otelcol-logs-file-access-binding
+          subjects:
+          - kind: ServiceAccount
+            name: logs-stack-otelcol-logs
+            namespace: observability
+          roleRef:
+            kind: ClusterRole
+            name: otelcol-logs-file-access
+            apiGroup: rbac.authorization.k8s.io
+
+    - name: Install/Upgrade logs-stack chart with AWS settings
+      when: aws_access_key is defined and aws_access_key | length > 0
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: >
+          helm upgrade --install logs-stack ./logs-stack
+          --namespace observability
+          -f {{ remote_helm_charts_base }}/observability/logs-stack/aws-s3-values.yaml
+          --set loki.global.dnsService={{ dns_service_name }}
+          --set loki.loki.storage_config.aws.region={{ aws_region }}
+          --set loki.loki.storage_config.aws.bucketnames={{ aws_bucket }}
+          --set loki.loki.storage_config.aws.access_key_id={{ aws_access_key }}
+          --set loki.loki.storage_config.aws.secret_access_key={{ aws_secret_key }}
+          --set loki.loki.storage.bucketNames.chunks={{ aws_bucket }}
+          --set loki.loki.storage.bucketNames.admin={{ aws_bucket }}
+          --set loki.loki.storage.bucketNames.ruler={{ aws_bucket }}
+          --set loki.loki.limits_config.ingestion_rate_mb=32
+          --set loki.loki.limits_config.ingestion_burst_size_mb=64
+          --set loki.loki.limits_config.per_stream_rate_limit=16MB
+          --set loki.loki.limits_config.per_stream_rate_limit_burst=32MB
+          --set loki.loki.limits_config.reject_old_samples=false
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.enabled=true
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.queue_size=5000
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.num_consumers=10
+          --set otelcol-logs.serviceAccount.create=false
+          --set otelcol-logs.serviceAccount.name=logs-stack-otelcol-logs
+          --set otelcol-logs.podSecurityContext.runAsUser=0
+          --set otelcol-logs.podSecurityContext.seLinuxOptions.type=spc_t
+          --set otelcol-logs.securityContext.readOnlyRootFilesystem=false
+          --set otelcol-logs.securityContext.allowPrivilegeEscalation=false
+          --set otelcol-logs.securityContext.capabilities.add={DAC_READ_SEARCH,SYS_PTRACE}
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      register: logs_install
+      until: logs_install is successful
+      retries: 5
+      delay: 10
+
+    - name: Install/Upgrade logs-stack chart with Minio settings
+      when: aws_access_key is not defined or aws_access_key | length == 0
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: >
+          helm upgrade --install logs-stack ./logs-stack
+          --namespace observability
+          --set loki.global.dnsService={{ dns_service_name }}
+          --set loki.loki.limits_config.ingestion_rate_mb=32
+          --set loki.loki.limits_config.ingestion_burst_size_mb=64
+          --set loki.loki.limits_config.per_stream_rate_limit=16MB
+          --set loki.loki.limits_config.per_stream_rate_limit_burst=32MB
+          --set loki.loki.limits_config.reject_old_samples=false
+          --set minio.makeBucketJob.backoffLimit=10
+          --set minio.makeBucketJob.activeDeadlineSeconds=600
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.enabled=true
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.queue_size=5000
+          --set otelcol-logs.config.exporters.otlphttp/loki.sending_queue.num_consumers=10
+          --set otelcol-logs.serviceAccount.create=false
+          --set otelcol-logs.serviceAccount.name=logs-stack-otelcol-logs
+          --set otelcol-logs.podSecurityContext.runAsUser=0
+          --set otelcol-logs.podSecurityContext.seLinuxOptions.type=spc_t
+          --set otelcol-logs.securityContext.readOnlyRootFilesystem=false
+          --set otelcol-logs.securityContext.allowPrivilegeEscalation=false
+          --set otelcol-logs.securityContext.capabilities.add={DAC_READ_SEARCH,SYS_PTRACE}
+      args:
+        chdir: "{{ remote_helm_charts_base }}/observability"
+      register: logs_install_minio
+      until: logs_install_minio is successful
+      retries: 5
+      delay: 10
+
+    # =========================================================================
+    # STANDALONE GRAFANA FOR OPENSHIFT
+    # =========================================================================
+    - name: Create Grafana ServiceAccount
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: grafana
+            namespace: observability
+
+    - name: Grant Grafana access to Prometheus
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: grafana-cluster-monitoring-view
+          subjects:
+          - kind: ServiceAccount
+            name: grafana
+            namespace: observability
+          roleRef:
+            kind: ClusterRole
+            name: cluster-monitoring-view
+            apiGroup: rbac.authorization.k8s.io
+
+    - name: Deploy Grafana
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.helm:
+        name: grafana
+        chart_ref: grafana/grafana
+        release_namespace: observability
+        chart_version: "8.5.2"
+        values:
+          adminPassword: "{{ grafana_admin_password }}"
+          serviceAccount:
+            create: false
+            name: grafana
+          replicas: 1
+          persistence:
+            enabled: true
+            size: 10Gi
+          datasources:
+            datasources.yaml:
+              apiVersion: 1
+              datasources:
+              - name: Loki
+                type: loki
+                access: proxy
+                url: http://loki-read.observability.svc.cluster.local:3100
+                isDefault: true
+                editable: true
+                jsonData:
+                  maxLines: 1000
+                  httpHeaderName1: "X-Scope-OrgID"
+                secureJsonData:
+                  httpHeaderValue1: "ent-inference-loki"
+              - name: Prometheus
+                type: prometheus
+                access: proxy
+                url: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+                isDefault: false
+                editable: true
+                jsonData:
+                  tlsSkipVerify: true
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              labelValue: "1"
+              folder: /tmp/dashboards
+              searchNamespace: observability
+          grafana.ini:
+            server:
+              root_url: "https://observability-{{ secret_name }}"
+              serve_from_sub_path: true
+            auth.anonymous:
+              enabled: true
+              org_role: Viewer
+            users:
+              default_theme: light
+      register: grafana_install
+      until: grafana_install is successful
+      retries: 5
+      delay: 10
+
+    - name: Wait for Grafana pod readiness
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        timeout=120
+        interval=5
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if kubectl get pods -n observability -l app.kubernetes.io/name=grafana --no-headers 2>/dev/null | grep -q "Running"; then
+            echo "Grafana is ready"
+            exit 0
+          fi
+          echo "Waiting for Grafana to be ready... ($elapsed/$timeout seconds)"
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+        echo "Warning: Grafana not ready after $timeout seconds"
+        exit 0
+      changed_when: false
+
+    - name: Create Grafana ServiceAccount token secret
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: grafana-token
+            namespace: observability
+            annotations:
+              kubernetes.io/service-account.name: grafana
+          type: kubernetes.io/service-account-token
+      register: grafana_token_secret
+
+    - name: Wait for Grafana token to populate
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        for i in {1..30}; do
+          TOKEN=$(kubectl get secret grafana-token -n observability -o jsonpath='{.data.token}' 2>/dev/null | base64 -d)
+          TOKEN_LEN=$(echo -n "$TOKEN" | wc -c)
+          if [ -n "$TOKEN" ] && [ "$TOKEN_LEN" -gt 100 ]; then
+            echo "$TOKEN"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo ""
+      register: grafana_sa_token
+      failed_when: false
+      changed_when: false
+
+    - name: Update Prometheus datasource with Bearer token
+      run_once: true
+      tags: deploy_observability
+      when: grafana_sa_token.stdout | length > 0
+      shell: |
+        set -e
+
+        echo "Waiting for Grafana API to be ready..."
+        sleep 10
+
+        GRAFANA_POD=$(kubectl get pods -n observability -l app.kubernetes.io/name=grafana --no-headers | grep Running | head -1 | awk '{print $1}')
+        if [ -z "$GRAFANA_POD" ]; then
+          echo "ERROR: Grafana pod not ready yet"
+          exit 1
+        fi
+        echo "Grafana pod: $GRAFANA_POD"
+
+        GRAFANA_PASSWORD=$(kubectl get secret grafana -n observability -o jsonpath="{.data.admin-password}" 2>/dev/null | base64 -d)
+        if [ -z "$GRAFANA_PASSWORD" ]; then
+          echo "ERROR: Could not retrieve Grafana admin password"
+          exit 1
+        fi
+
+        TOKEN=$(kubectl get secret grafana-token -n observability -o jsonpath='{.data.token}' 2>/dev/null | base64 -d)
+        if [ -z "$TOKEN" ]; then
+          echo "ERROR: Could not retrieve Bearer token"
+          exit 1
+        fi
+        TOKEN_LENGTH=$(echo -n "$TOKEN" | wc -c)
+        echo "Bearer token length: $TOKEN_LENGTH"
+
+        DATASOURCE_RESPONSE=$(kubectl exec -n observability $GRAFANA_POD -c grafana -- \
+          curl -s -X GET \
+          -H "Authorization: Basic $(echo -n "admin:$GRAFANA_PASSWORD" | base64)" \
+          'http://localhost:3000/api/datasources/name/Prometheus' 2>/dev/null || echo "")
+        DATASOURCE_ID=$(echo "$DATASOURCE_RESPONSE" | grep -o '"id":[0-9]*' | cut -d':' -f2)
+        if [ -z "$DATASOURCE_ID" ]; then
+          echo "ERROR: Prometheus datasource not found"
+          exit 1
+        fi
+
+        cat > /tmp/grafana-ds-update.json <<EOFJSON
+        {
+          "id": $DATASOURCE_ID,
+          "name": "Prometheus",
+          "type": "prometheus",
+          "access": "proxy",
+          "url": "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091",
+          "isDefault": false,
+          "jsonData": {
+            "tlsSkipVerify": true,
+            "httpHeaderName1": "Authorization"
+          },
+          "secureJsonData": {
+            "httpHeaderValue1": "Bearer $TOKEN"
+          }
+        }
+        EOFJSON
+
+        # Copy the update JSON to the pod
+        kubectl cp /tmp/grafana-ds-update.json observability/$GRAFANA_POD:/tmp/update.json -c grafana
+
+        UPDATE_RESPONSE=$(kubectl exec -n observability $GRAFANA_POD -c grafana -- \
+          curl -s -X PUT \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Basic $(echo -n "admin:$GRAFANA_PASSWORD" | base64)" \
+          -d @/tmp/update.json \
+          "http://localhost:3000/api/datasources/$DATASOURCE_ID")
+
+        if echo "$UPDATE_RESPONSE" | grep -q '"message":"Datasource updated"'; then
+          echo "SUCCESS: Prometheus datasource updated with Bearer token"
+        else
+          echo "WARNING: $UPDATE_RESPONSE"
+        fi
+
+        rm -f /tmp/grafana-ds-update.json
+      register: prometheus_datasource_update
+      failed_when: false
+      changed_when: false
+
+    - name: Display Prometheus datasource update result
+      run_once: true
+      tags: deploy_observability
+      debug:
+        msg: "{{ (prometheus_datasource_update.stdout_lines | default(['Datasource update was skipped'])) | join('\n') }}"
+
+    - name: Final Prometheus datasource configuration check
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        set -e
+        sleep 5
+
+        GRAFANA_POD=$(kubectl get pod -n observability -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
+        GRAFANA_PASSWORD=$(kubectl get secret grafana -n observability -o jsonpath="{.data.admin-password}" | base64 -d)
+        TOKEN=$(kubectl get secret grafana-token -n observability -o jsonpath='{.data.token}' | base64 -d)
+
+        TOKEN_LENGTH=$(echo -n "$TOKEN" | wc -c)
+        if [ -z "$TOKEN" ] || [ "$TOKEN_LENGTH" -lt 100 ]; then
+          echo "ERROR: Invalid or missing Bearer token"
+          exit 1
+        fi
+
+        CURRENT_CONFIG=$(kubectl exec -n observability $GRAFANA_POD -c grafana -- \
+          curl -s -X GET \
+          -H "Authorization: Basic $(echo -n "admin:$GRAFANA_PASSWORD" | base64)" \
+          'http://localhost:3000/api/datasources/name/Prometheus')
+
+        if echo "$CURRENT_CONFIG" | grep -q '"httpHeaderValue1":true'; then
+          echo "Datasource already configured with Bearer token"
+          exit 0
+        fi
+
+        DATASOURCE_ID=$(echo "$CURRENT_CONFIG" | grep -o '"id":[0-9]*' | cut -d':' -f2)
+        if [ -z "$DATASOURCE_ID" ]; then
+          echo "ERROR: Could not get datasource ID"
+          exit 1
+        fi
+
+        cat > /tmp/final-ds-update.json <<EOFJSON
+        {
+          "id": $DATASOURCE_ID,
+          "name": "Prometheus",
+          "type": "prometheus",
+          "access": "proxy",
+          "url": "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091",
+          "isDefault": false,
+          "jsonData": {
+            "tlsSkipVerify": true,
+            "httpHeaderName1": "Authorization"
+          },
+          "secureJsonData": {
+            "httpHeaderValue1": "Bearer $TOKEN"
+          }
+        }
+        EOFJSON
+
+        # Copy the JSON to the pod
+        kubectl cp /tmp/final-ds-update.json observability/$GRAFANA_POD:/tmp/ds-update.json -c grafana
+
+        RESULT=$(kubectl exec -n observability $GRAFANA_POD -c grafana -- sh -c "\
+          curl -s -X PUT \
+          -H 'Content-Type: application/json' \
+          -H 'Authorization: Basic \$(echo -n \"admin:$GRAFANA_PASSWORD\" | base64)' \
+          -d @/tmp/ds-update.json \
+          http://localhost:3000/api/datasources/$DATASOURCE_ID")
+
+        if echo "$RESULT" | grep -q '"message":"Datasource updated"'; then
+          echo "SUCCESS: Prometheus datasource configured with Bearer token"
+        else
+          echo "WARNING: $RESULT"
+        fi
+
+        rm -f /tmp/final-ds-update.json
+      register: final_datasource_config
+      failed_when: false
+      changed_when: false
+
+    - name: Create Grafana Route
+      run_once: true
+      tags: deploy_observability
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: grafana
+            namespace: observability
+          spec:
+            host: "observability-{{ secret_name }}"
+            to:
+              kind: Service
+              name: grafana
+              weight: 100
+            port:
+              targetPort: 3000
+            tls:
+              termination: edge
+              insecureEdgeTerminationPolicy: Redirect
+            wildcardPolicy: None
+
+    - name: Verify Loki datasource connectivity from Grafana
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        sleep 10
+        GRAFANA_POD=$(kubectl get pods -n observability -l app.kubernetes.io/name=grafana --no-headers 2>/dev/null | grep Running | head -1 | awk '{print $1}')
+        if [ -n "$GRAFANA_POD" ]; then
+          kubectl exec -n observability $GRAFANA_POD -c grafana -- wget -qO- --timeout=5 'http://loki-read.observability.svc.cluster.local:3100/ready' 2>/dev/null || echo "Loki not ready yet"
+          LABELS=$(kubectl exec -n observability $GRAFANA_POD -c grafana -- wget -qO- --timeout=5 --header='X-Scope-OrgID: ent-inference-loki' 'http://loki-read.observability.svc.cluster.local:3100/loki/api/v1/labels' 2>/dev/null || echo "")
+          if echo "$LABELS" | grep -q "k8s_namespace_name"; then
+            echo "Loki datasource accessible"
+          else
+            echo "Loki still initializing or empty"
+          fi
+        else
+          echo "Grafana pod not ready yet for connectivity test"
+        fi
+      register: loki_connectivity_test
+      failed_when: false
+      changed_when: false
+
+    - name: Get Grafana admin password
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        kubectl get secret grafana -n observability -o jsonpath="{.data.admin-password}" 2>/dev/null | base64 -d || echo "Password retrieval pending"
+      register: grafana_password
+      failed_when: false
+      changed_when: false
+
+    - name: Display deployment summary
+      run_once: true
+      tags: deploy_observability
+      debug:
+        msg: |
+          ╔════════════════════════════════════════════════════════════════╗
+          ║  Observability Deployment Complete (OpenShift)                ║
+          ╚════════════════════════════════════════════════════════════════╝
+
+          DNS Service: {{ dns_service_name }}
+
+    # =========================================================================
+    # APPLY OPENSHIFT SCCs (After Helm Installation)
+    # =========================================================================
+    - name: Wait for Loki ServiceAccounts to be created by Helm
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        timeout=60
+        interval=5
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if kubectl get sa logs-stack-otelcol-logs -n observability >/dev/null 2>&1 && kubectl get sa logs-stack-loki -n observability >/dev/null 2>&1; then
+            echo "ServiceAccounts found"
+            exit 0
+          fi
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+        echo "Warning: ServiceAccounts not found, continuing anyway"
+        exit 0
+      changed_when: false
+
+    - name: Add Loki SA to anyuid SCC
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: oc adm policy add-scc-to-user anyuid system:serviceaccount:observability:logs-stack-loki
+      failed_when: false
+      changed_when: false
+
+    - name: Add OTEL Collector to hostaccess SCC
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: oc adm policy add-scc-to-user hostaccess system:serviceaccount:observability:logs-stack-otelcol-logs
+      failed_when: false
+      changed_when: false
+
+    - name: Add Minio SA to anyuid SCC when using Minio
+      when: aws_access_key is not defined or aws_access_key | length == 0
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        timeout=60
+        interval=5
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if kubectl get sa -n observability | grep -q minio; then
+            SA_NAME=$(kubectl get sa -n observability | grep minio | awk '{print $1}' | head -1)
+            echo "Found Minio ServiceAccount: $SA_NAME"
+            oc adm policy add-scc-to-user anyuid system:serviceaccount:observability:$SA_NAME
+            exit 0
+          fi
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+        echo "Warning: Minio ServiceAccount not found, skipping SCC binding"
+        exit 0
+      failed_when: false
+      changed_when: false
+
+    - name: Restart Loki components to apply SCC
+      run_once: true
+      tags: deploy_observability
+      shell: |
+        kubectl rollout restart statefulset loki-backend loki-write -n observability 2>/dev/null || true
+        kubectl rollout restart deployment loki-read -n observability 2>/dev/null || true
+      failed_when: false
+      changed_when: false
+
+    - name: Restart OTEL Collector pods to apply SCC
+      run_once: true
+      tags: deploy_observability
+      ansible.builtin.command:
+        cmd: kubectl rollout restart daemonset -n observability -l app.kubernetes.io/name=opentelemetry-collector
+      failed_when: false
+      changed_when: false
+
+    # =========================================================================
+    # CUSTOM METRICS EXPORTERS
+    # =========================================================================
+    - name: Check if Gaudi Nodes are available
+      shell: "kubectl get nodes -l habana.ai/device.family=gaudi --no-headers | wc -l"
+      register: gaudi_node_count
+      changed_when: false
+      tags: deploy_observability
+
+    - name: Set Gaudi availability fact
+      set_fact:
+        gaudi_available: "{{ gaudi_node_count.stdout | int > 0 }}"
+      tags: deploy_observability
+
+    - name: Transfer Habana exporter assets
+      ansible.builtin.copy:
+        src: "{{ helm_charts_base }}/observability/habana-exporter"
+        dest: "{{ remote_helm_charts_base }}/"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        remote_src: no
+      when: gaudi_available
+      tags: deploy_observability
+
+    - name: Apply Habana Metrics Service Monitor
+      community.kubernetes.k8s:
+        state: present
+        src: "{{ remote_helm_charts_base }}/habana-exporter/habana-metrics.yml"
+      when: gaudi_available
+      tags: deploy_observability

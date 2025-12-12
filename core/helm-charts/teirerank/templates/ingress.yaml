@@ -4,7 +4,7 @@
 # Please edit the object below. Lines beginning with a '#' will be ignored,
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
-{{- if or .Values.ingress.enabled .Values.apisix.enabled }}
+{{- if .Values.ingress.enabled}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -46,9 +46,11 @@ spec:
             port:
               number: 80
         # path: /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
-        path: {{- if not .Values.accelDevice }}
+        path: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+          /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+          {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
           /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/(.*)
-          {{- else }}
+          {{- else if not .Values.apisix.enabled }}
           /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
           {{- end }}
         pathType: ImplementationSpecific

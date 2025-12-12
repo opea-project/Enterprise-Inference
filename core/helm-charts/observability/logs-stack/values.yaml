@@ -189,6 +189,7 @@ loki:
   # Enable minio for storage
   minio:
     enabled: true
+    address: http://logs-stack-minio.observability.svc:9000
 
   ### SELF-LOGGING
   # Warning: THIS Is depreacted will be removed in future versions

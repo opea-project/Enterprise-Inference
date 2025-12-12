@@ -39,13 +39,13 @@
 # 1 - An error occurred during the execution of the script.
 
 
-KEYCLOAK_URL="https://$1"
+KEYCLOAK_URL="http://$1"
 USERNAME=$2
 PASSWORD=$3
 CLIENT_ID=$4
 
 # Get access token
-TOKEN=$(curl -s -k -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "username=$USERNAME" \
     -d "password=$PASSWORD" \
@@ -61,7 +61,7 @@ fi
 
 
 # Create new client
-CLIENT_RESPONSE=$(curl -s -k -X POST "$KEYCLOAK_URL/admin/realms/master/clients" \
+CLIENT_RESPONSE=$(curl -s -X POST "$KEYCLOAK_URL/admin/realms/master/clients" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -d '{
@@ -83,7 +83,7 @@ else
 fi
 
 # Get client UUID
-CLIENT_UUID=$(curl -s -k -X GET "$KEYCLOAK_URL/admin/realms/master/clients?clientId=$CLIENT_ID" \
+CLIENT_UUID=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/master/clients?clientId=$CLIENT_ID" \
     -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id')
 
 if [ -z "$CLIENT_UUID" ]; then
@@ -92,7 +92,7 @@ if [ -z "$CLIENT_UUID" ]; then
 fi
 
 # Enable Client authentication capability config with Service account roles checked
-UPDATE_CLIENT_RESPONSE=$(curl -s -k -X PUT "$KEYCLOAK_URL/admin/realms/master/clients/$CLIENT_UUID" \
+UPDATE_CLIENT_RESPONSE=$(curl -s -X PUT "$KEYCLOAK_URL/admin/realms/master/clients/$CLIENT_UUID" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -d '{
@@ -107,7 +107,7 @@ else
 fi
 
 # Update the Realm settings for access token lifespan to 15 minutes
-UPDATE_REALM_RESPONSE=$(curl -s -k -X PUT "$KEYCLOAK_URL/admin/realms/master" \
+UPDATE_REALM_RESPONSE=$(curl -s -X PUT "$KEYCLOAK_URL/admin/realms/master" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -d '{
@@ -124,7 +124,7 @@ fi
 echo "Script executed successfully"
 
 # Get client secret
-CLIENT_SECRET=$(curl -s -k -X GET "$KEYCLOAK_URL/admin/realms/master/clients/$CLIENT_UUID/client-secret" \
+CLIENT_SECRET=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/master/clients/$CLIENT_UUID/client-secret" \
     -H "Authorization: Bearer $TOKEN" | jq -r '.value')
 
 if [ -z "$CLIENT_SECRET" ]; then

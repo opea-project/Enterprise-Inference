@@ -94,15 +94,18 @@ Modify `/etc/hosts` by adding this line to map the DNS to `127.0.0.1` or `localh
 127.0.0.1 api.example.com
 ```
 
-Generate a self-signed SSL certificate with OpenSSL. For this example, `api.example.com` is used as the DNS.
+Run the following command to create a self-signed SSL certificate that covers api.example.com and trace-api.example.com. trace-api.example.com will point to the node where the Ingress controller is deployed.
 ```bash
-mkdir -p ~/certs && cd ~/certs
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
+mkdir -p ~/certs && cd ~/certs && \
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+  -subj "/CN=api.example.com" \
+  -addext "subjectAltName = DNS:api.example.com, DNS:trace-api.example.com"
 ```
+>**Note:** the -addext option requires OpenSSL >= 1.1.1.
 
-This generates two files:
-- `cert.pem`: The self-signed certificate.
-- `key.pem`: The private key.
+Files generated:
+- `cert.pem` — the self-signed certificate (contains SANs)
+- `key.pem` — the private key
 
 ## Hugging Face Token Generation
 1. Go to the [Hugging Face website](https://huggingface.co/) and sign in or create a new account.
