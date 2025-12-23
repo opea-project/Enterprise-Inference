@@ -5,6 +5,11 @@ HOMEDIR="$(pwd)"
 KUBESPRAYDIR="$(dirname "$(realpath "$0")")/kubespray"
 VENVDIR="$(dirname "$(realpath "$0")")/kubespray225-venv"
 INVENTORY_PATH="${KUBESPRAYDIR}/inventory/mycluster/hosts.yaml"
+# Path to the file containing the sudo (become) password for automation.
+# The file should contain the password in plain text (no extra whitespace or newlines).
+# For security, set file permissions to 600 (read/write for owner only):
+#   chmod 600 <path-to-file>
+# IMPORTANT: Add this file to .gitignore to prevent accidental commits to version control.
 BECOME_PASSWORD_FILE="$(dirname "$(realpath "$0")")/inventory/.become-passfile"
 # Set the default values for the parameters
 cluster_url=""
