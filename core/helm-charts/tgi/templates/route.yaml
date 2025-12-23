@@ -1,0 +1,57 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.route.enabled }}
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) | splitList "/" | last }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  {{- if .Values.apisix.enabled }}
+  annotations:
+    haproxy.router.openshift.io/rewrite-target: /{{ $modelName }}/$1
+  {{- end }}
+  labels:
+    {{- include "tgi.labels" . | nindent 4 }}
+  name: {{ include "tgi.fullname" . }}-route
+  namespace: {{- if .Values.apisix.enabled }}
+                auth-apisix
+              {{- else }}
+                default
+              {{- end }}
+spec:
+  host: {{ .Values.route.host }}
+  {{- if .Values.apisix.enabled }}
+  path: /{{ $modelName }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{- if .Values.apisix.enabled }}
+            auth-apisix-gateway
+          {{- else }}
+            {{ include "tgi.fullname" . }}-service
+          {{- end }}
+    weight: 100
+  port:
+    targetPort: http
+  {{- if .Values.route.tls }}
+  tls:
+    {{- if .Values.route.tls.termination }}
+    termination: {{ .Values.route.tls.termination }}
+    {{- end }}
+    {{- if .Values.route.tls.insecureEdgeTerminationPolicy }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+    {{- if .Values.route.tls.certificate }}
+    certificate: {{ .Values.route.tls.certificate }}
+    {{- end }}
+    {{- if .Values.route.tls.key }}
+    key: {{ .Values.route.tls.key }}
+    {{- end }}
+    {{- if .Values.route.tls.caCertificate }}
+    caCertificate: {{ .Values.route.tls.caCertificate }}
+    {{- end }}
+    {{- if .Values.route.tls.destinationCACertificate }}
+    destinationCACertificate: {{ .Values.route.tls.destinationCACertificate }}
+    {{- end }}
+  {{- end }}
+  wildcardPolicy: {{ .Values.route.wildcardPolicy | default "None" }}
+{{- end }}

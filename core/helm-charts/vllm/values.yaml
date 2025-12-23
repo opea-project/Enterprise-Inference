@@ -87,13 +87,24 @@ ingress:
   host: ""
   namespace: default
   secretname: ""
-  
+
+route:
+  enabled: false
+  host: ""
+  tls:
+    termination: "edge"
+    insecureEdgeTerminationPolicy: "Redirect"
+
+# Platform type: openshift or vanilla kubernetes
+platform: vanilla
+
 oidc:
   realm: master
   client_id: ""
   client_secret: ""
   discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
   introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
+  use_jwks: true
 
 
 extraCmdArgs: []
@@ -136,27 +147,22 @@ readinessProbe:
 #   periodSeconds: 30
 #   failureThreshold: 79
 
-nodeSelector: {}
-
-tolerations: []
-
 affinity:
   nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/inference-xeon
-              operator: In
-              values:
-                - "true"
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/inference-cpu
-              operator: In
-              values:
-                - "true"
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-xeon"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-cpu"]
 
 LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
 SERVED_MODEL_NAME: ""

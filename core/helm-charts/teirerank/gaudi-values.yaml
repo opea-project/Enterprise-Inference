@@ -20,6 +20,19 @@ resources:
   limits:
     habana.ai/gaudi: 1
 
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-gaudi"]
+
 livenessProbe:
   timeoutSeconds: 1
 readinessProbe:

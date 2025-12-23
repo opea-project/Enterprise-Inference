@@ -34,21 +34,20 @@ image:
 # Node affinity for Xeon inference nodes
 affinity:
   nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/inference-xeon
-              operator: In
-              values:
-                - "true"
-      - weight: 90
-        preference:
-          matchExpressions:
-            - key: node-role.kubernetes.io/inference-cpu
-              operator: In
-              values:
-                - "true"
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-xeon"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-cpu"]
 
 # vLLM CPU environment variables
 VLLM_CPU_SGL_KERNEL: "1"

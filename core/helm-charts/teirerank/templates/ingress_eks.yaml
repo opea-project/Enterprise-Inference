@@ -1,0 +1,39 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "teirerank.fullname" . }}-ingress
+  namespace: {{ .Values.ingress.namespace }}
+  annotations:
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/certificate-arn: "{{ default "" .Values.aws_certificate_arn }}"
+    alb.ingress.kubernetes.io/group.name: keycloak-apisix
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+              /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+              {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
+              /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}-teirerankcpu/(.*)
+              {{- else if not .Values.apisix.enabled }}
+              /{{ .Values.RERANK_MODEL_ID | splitList "/" | last }}/(.*)
+              {{- end }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "teirerank.fullname" . }}-service
+                port:
+                  number: 80
+  tls:
+    - hosts:
+      - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.secretname }}
+{{- end }}

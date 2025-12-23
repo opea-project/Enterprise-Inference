@@ -3,11 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 deploy_from_huggingface() {
-    if [ "$brownfield_deployment" == "yes" ]; then
-        echo "Setting up Bastion Node..."
-        setup_bastion "$@"
-        INVENTORY_PATH=$brownfield_deployment_host_file
-    fi
     echo "-------------------------------------------------"
     echo "|         Deploy Model from Huggingface          |"
     echo "|------------------------------------------------|"    
@@ -38,6 +33,11 @@ deploy_from_huggingface() {
         if [[ ! $user_response =~ ^(yes|y|Y|YES)$ ]]; then        
             echo "Deployment process has been cancelled. Exiting!!"
             exit 1
+        fi
+        if [ "$brownfield_deployment" == "yes" ]; then
+        echo "Setting up Bastion Node..."
+        setup_bastion "$@"
+        INVENTORY_PATH=$brownfield_deployment_host_file
         fi
         invoke_prereq_workflows "$@"                
         execute_and_check "Deploying Inference LLM Models..." deploy_inference_llm_models_playbook "$@" \

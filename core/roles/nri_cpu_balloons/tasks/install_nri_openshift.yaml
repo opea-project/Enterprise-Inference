@@ -1,0 +1,406 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+# ============================================================================
+# OpenShift-specific NRI installation tasks
+# ============================================================================
+
+- name: Display OpenShift NRI installation info
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Installing NRI on OpenShift Platform"
+      - "==================================================================="
+      - "Namespace: {{ nri_cpu_balloons.namespace }}"
+      - "Using OpenShift SCC for security context"
+      - "==================================================================="
+  run_once: true
+
+# ============================================================================
+# STEP 1: Deploy NRI directory initialization DaemonSet
+# ============================================================================
+- name: Create NRI directory initialization DaemonSet
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: nri-directory-init
+        namespace: "{{ nri_cpu_balloons.namespace }}"
+        labels:
+          app: nri-directory-init
+      spec:
+        selector:
+          matchLabels:
+            app: nri-directory-init
+        template:
+          metadata:
+            labels:
+              app: nri-directory-init
+          spec:
+            hostPID: true
+            hostNetwork: true
+            securityContext:
+              seLinuxOptions:
+                type: spc_t
+            containers:
+            - name: init-dirs
+              image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+              command:
+              - /bin/sh
+              - -c
+              - |
+                set -e
+                NODE_NAME="${HOSTNAME:-$(cat /proc/sys/kernel/hostname 2>/dev/null || echo 'unknown-node')}"
+                echo "Creating NRI directories on node ${NODE_NAME}..."
+                
+                # Create all required NRI directories
+                mkdir -p /host/var/lib/nri-resource-policy/containers 2>/dev/null || true
+                mkdir -p /host/var/run/nri 2>/dev/null || true
+                mkdir -p /host/opt/nri/plugins 2>/dev/null || true
+                mkdir -p /host/etc/nri/conf.d 2>/dev/null || true
+                
+                # Remove any existing cache file - NRI application will create it fresh
+                if [ -e /host/var/lib/nri-resource-policy/cache ]; then
+                    echo "Removing existing cache file - NRI will create it fresh..."
+                    rm -f /host/var/lib/nri-resource-policy/cache
+                fi
+                
+                # Set ownership and permissions for directories only
+                chown -R 0:0 /host/var/lib/nri-resource-policy 2>/dev/null || true
+                chown -R 0:0 /host/var/run/nri 2>/dev/null || true
+                chmod 755 /host/var/lib/nri-resource-policy 2>/dev/null || true
+                chmod 755 /host/var/run/nri 2>/dev/null || true
+                
+                # Set SELinux contexts
+                chcon -R -t container_var_lib_t /host/var/lib/nri-resource-policy 2>/dev/null || echo "SELinux context setting skipped"
+                chcon -t container_runtime_exec_t /host/var/run/nri 2>/dev/null || echo "SELinux context setting skipped"
+                
+                echo "NRI directories initialized successfully on ${NODE_NAME}"
+                sleep infinity
+              securityContext:
+                privileged: true
+                seLinuxOptions:
+                  type: spc_t
+              volumeMounts:
+              - name: host-root
+                mountPath: /host
+            volumes:
+            - name: host-root
+              hostPath:
+                path: /
+            tolerations:
+            - operator: Exists
+  run_once: true
+
+- name: Wait for NRI directory initialization to complete
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: nri-directory-init
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: nri_init_status
+  until:
+    - nri_init_status.resources | length > 0
+    - nri_init_status.resources[0].status.numberAvailable | default(0) > 0
+    - nri_init_status.resources[0].status.numberReady | default(0) == nri_init_status.resources[0].status.numberAvailable | default(0)
+  retries: 20
+  delay: 10
+  run_once: true
+
+- name: Display NRI directory initialization status
+  ansible.builtin.debug:
+    msg: "NRI directories initialized on {{ nri_init_status.resources[0].status.numberReady | default(0) }} nodes"
+  run_once: true
+
+# ============================================================================
+# STEP 2: Create OpenShift Security Context Constraint
+# ============================================================================
+- name: Create OpenShift SCC for NRI (non-privileged mode)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: security.openshift.io/v1
+      kind: SecurityContextConstraints
+      metadata:
+        name: nri-resource-policy
+        annotations:
+          kubernetes.io/description: "SCC for NRI Resource Policy - provides required capabilities without privileged mode"
+          managed-by: "nri-cpu-balloons-ansible-role"
+      allowHostDirVolumePlugin: true
+      allowHostIPC: true
+      allowHostNetwork: true
+      allowHostPID: true
+      allowHostPorts: false
+      allowPrivilegeEscalation: true
+      allowPrivilegedContainer: false
+      allowedCapabilities:
+        - NET_ADMIN
+        - SYS_ADMIN
+        - DAC_OVERRIDE
+        - DAC_READ_SEARCH
+        - FOWNER
+        - CHOWN
+        - SYS_PTRACE
+        - SYS_RESOURCE
+      defaultAddCapabilities: []
+      fsGroup:
+        type: RunAsAny
+      priority: 10
+      readOnlyRootFilesystem: false
+      requiredDropCapabilities: []
+      runAsUser:
+        type: RunAsAny
+      seLinuxContext:
+        type: MustRunAs
+        seLinuxOptions:
+          type: spc_t
+      supplementalGroups:
+        type: RunAsAny
+      volumes:
+        - configMap
+        - downwardAPI
+        - emptyDir
+        - hostPath
+        - persistentVolumeClaim
+        - projected
+        - secret
+  run_once: true
+  register: scc_creation_result
+
+- name: Display OpenShift SCC creation status
+  ansible.builtin.debug:
+    msg: 
+      - "OpenShift SCC 'nri-resource-policy' created/updated for non-privileged deployment"
+      - "SCC Action: {{ 'Created' if scc_creation_result.changed else 'Already exists' }}"
+  run_once: true
+
+# ============================================================================
+# STEP 3: Deploy NRI using Helm
+# ============================================================================
+- name: Add NRI plugins Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ nri_cpu_balloons.helm.repo_name }}"
+    repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
+    state: present
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  retries: 3
+  delay: 10
+  register: helm_repo_result
+  until: helm_repo_result is succeeded
+  run_once: true
+
+- name: Update Helm repositories for NRI
+  ansible.builtin.command: helm repo update
+  run_once: true
+
+- name: Deploy NRI resource policy with runtime patching (for older CRI-O)
+  ansible.builtin.command: >
+    helm upgrade --install nri-resource-policy-balloons
+    {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
+    --namespace {{ nri_cpu_balloons.namespace }}
+    --create-namespace
+    --set nri.runtime.patchConfig=true
+    --wait
+    --timeout {{ nri_cpu_balloons.installation_timeout }}s
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  run_once: true
+  when: crio_needs_patch | default(false)
+
+- name: Deploy NRI resource policy without runtime patching (for newer CRI-O)
+  ansible.builtin.command: >
+    helm upgrade --install nri-resource-policy-balloons
+    {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
+    --namespace {{ nri_cpu_balloons.namespace }}
+    --create-namespace
+  environment:
+    HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
+    HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
+    NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  run_once: true
+  when: not (crio_needs_patch | default(false))
+
+- name: Wait for DaemonSet to be created by Helm
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: nri-resource-policy-balloons
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: nri_daemonset_created
+  until: nri_daemonset_created.resources | length > 0
+  retries: 12
+  delay: 5
+  run_once: true
+
+# ============================================================================
+# STEP 4: Bind SCC to service account
+# ============================================================================
+- name: Wait for service account to be created by Helm
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ServiceAccount
+    name: nri-resource-policy-balloons
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: nri_sa_check
+  until: nri_sa_check.resources | length > 0
+  retries: 12
+  delay: 5
+  run_once: true
+
+- name: Bind OpenShift SCC to NRI service account
+  ansible.builtin.shell: |
+    oc adm policy add-scc-to-user nri-resource-policy \
+      -z nri-resource-policy-balloons \
+      -n {{ nri_cpu_balloons.namespace }} 2>&1
+  run_once: true
+  register: scc_binding_result
+  failed_when: false
+
+- name: Display SCC binding command output
+  ansible.builtin.debug:
+    msg:
+      - "SCC binding command output:"
+      - "{{ scc_binding_result.stdout }}"
+      - "{{ scc_binding_result.stderr if scc_binding_result.stderr is defined else '' }}"
+  run_once: true
+
+- name: Verify SCC binding with retries
+  ansible.builtin.command: >
+    oc get scc nri-resource-policy -o jsonpath='{.users}'
+  register: scc_users_check
+  until: "'system:serviceaccount:' + nri_cpu_balloons.namespace + ':nri-resource-policy-balloons' in scc_users_check.stdout"
+  retries: 5
+  delay: 3
+  run_once: true
+  ignore_errors: true
+
+- name: Display SCC binding status
+  ansible.builtin.debug:
+    msg:
+      - "SCC Users: {{ scc_users_check.stdout if scc_users_check.stdout | length > 0 else 'none' }}"
+      - "SCC Binding Status: {{ 'SUCCESS ✓' if (scc_users_check.rc | default(1)) == 0 else 'FAILED - Will continue and verify later' }}"
+  run_once: true
+
+# ============================================================================
+# STEP 5: Apply OpenShift security context with spc_t
+# ============================================================================
+- name: Wait for DaemonSet to stabilize
+  ansible.builtin.pause:
+    seconds: 5
+    prompt: "Waiting for DaemonSet to stabilize before patching..."
+  run_once: true
+
+- name: Apply OpenShift security context to NRI DaemonSet (privileged with spc_t)
+  ansible.builtin.shell: |
+    kubectl patch daemonset nri-resource-policy-balloons -n {{ nri_cpu_balloons.namespace }} --type strategic --patch '
+    spec:
+      template:
+        spec:
+          hostPID: true
+          hostNetwork: true
+          securityContext:
+            seLinuxOptions:
+              type: spc_t
+          containers:
+          - name: nri-resource-policy-balloons
+            securityContext:
+              privileged: false
+              allowPrivilegeEscalation: true
+              runAsUser: 0
+              runAsGroup: 0
+              seLinuxOptions:
+                type: spc_t
+              capabilities:
+                add:
+                - NET_ADMIN
+                - SYS_ADMIN
+                - SYS_PTRACE
+                - SYS_RESOURCE
+                - DAC_OVERRIDE
+                drop: []
+    '
+  register: patch_result
+  until: patch_result.rc == 0
+  retries: 3
+  delay: 5
+  run_once: true
+
+- name: Display security context patch result
+  ansible.builtin.debug:
+    msg: "Security context patch applied: {{ patch_result.stdout }}"
+  run_once: true
+
+- name: Verify security context patch applied
+  ansible.builtin.shell: |
+    kubectl get daemonset nri-resource-policy-balloons -n {{ nri_cpu_balloons.namespace }} \
+      -o jsonpath='{.spec.template.spec.containers[0].securityContext.seLinuxOptions.type}'
+  register: verify_patch
+  until: "'spc_t' in verify_patch.stdout"
+  retries: 5
+  delay: 3
+  run_once: true
+  delay: 3
+  run_once: true
+
+- name: Display verification result
+  ansible.builtin.debug:
+    msg: "Verified capabilities in DaemonSet: {{ verify_patch.stdout }}"
+  run_once: true
+
+# ============================================================================
+# STEP 6: Restart pods to apply security context
+# ============================================================================
+- name: Force restart of NRI pods to apply security context changes
+  ansible.builtin.shell: |
+    kubectl -n {{ nri_cpu_balloons.namespace }} delete pods -l app.kubernetes.io/name=nri-resource-policy-balloons --grace-period=0 --force
+  run_once: true
+
+- name: Wait for pods to be deleted and recreated
+  ansible.builtin.pause:
+    seconds: 10
+    prompt: "Waiting for NRI pods to be recreated with new security context..."
+  run_once: true
+
+- name: Wait for complete DaemonSet rollout
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: nri-resource-policy-balloons
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: ds_rollout_check
+  until:
+    - ds_rollout_check.resources | length > 0
+    - ds_rollout_check.resources[0].status.updatedNumberScheduled is defined
+    - ds_rollout_check.resources[0].status.desiredNumberScheduled is defined
+    - ds_rollout_check.resources[0].status.numberReady is defined
+    - ds_rollout_check.resources[0].status.updatedNumberScheduled | int == ds_rollout_check.resources[0].status.desiredNumberScheduled | int
+    - ds_rollout_check.resources[0].status.numberReady | int == ds_rollout_check.resources[0].status.desiredNumberScheduled | int
+  retries: 30
+  delay: 10
+  run_once: true
+
+- name: Display rollout status
+  ansible.builtin.debug:
+    msg:
+      - "DaemonSet Rollout Status:"
+      - "  Desired: {{ ds_rollout_check.resources[0].status.desiredNumberScheduled | default(0) }}"
+      - "  Updated: {{ ds_rollout_check.resources[0].status.updatedNumberScheduled | default(0) }}"
+      - "  Ready: {{ ds_rollout_check.resources[0].status.numberReady | default(0) }}"
+      - "  Rollout Complete: {{ 'YES ✓' if (ds_rollout_check.resources[0].status.updatedNumberScheduled | default(0) == ds_rollout_check.resources[0].status.desiredNumberScheduled | default(1)) else 'NO' }}"
+  run_once: true
+
+# ============================================================================
+# STEP 7: Set NRI support flag
+# ============================================================================
+- name: Mark NRI as supported on OpenShift
+  ansible.builtin.set_fact:
+    nri_supported: true
+  run_once: true

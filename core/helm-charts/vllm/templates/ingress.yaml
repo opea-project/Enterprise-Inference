@@ -3,7 +3,7 @@
 # Please edit the object below. Lines beginning with a '#' will be ignored,
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
-{{- if or .Values.ingress.enabled .Values.apisix.enabled }}
+{{- if .Values.ingress.enabled}}
 {{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) | splitList "/" | last }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -46,9 +46,11 @@ spec:
             port:
               number: 80
         # path: /{{ $modelName }}/(.*)
-        path: {{- if not .Values.accelDevice }}
+        path: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+          /{{ $modelName }}/(.*)
+          {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
           /{{ $modelName }}-vllmcpu/(.*)
-          {{- else }}
+          {{- else if not .Values.apisix.enabled }}
           /{{ $modelName }}/(.*)
           {{- end }}
         pathType: ImplementationSpecific

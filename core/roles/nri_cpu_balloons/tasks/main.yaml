@@ -2,6 +2,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
+# ============================================================================
+# Platform Detection - Use kubernetes_platform from brownfield deployment
+# ============================================================================
+- name: Display platform information
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Platform Configuration"
+      - "==================================================================="
+      - "Kubernetes Platform: {{ kubernetes_platform | default('UNDEFINED - THIS IS A PROBLEM!') }}"
+      - "OpenShift Deployment: {{ (kubernetes_platform | default('')) == 'openshift' }}"
+      - "==================================================================="
+  tags:
+    - install
+
+# ============================================================================
+# Default Configuration
+# ============================================================================
 - name: Set default NRI CPU balloons configuration if not defined
   ansible.builtin.set_fact:
     nri_cpu_balloons:
@@ -125,8 +143,14 @@
   tags:
     - install
 
+- name: Set NRI installation task file based on platform
+  ansible.builtin.set_fact:
+    nri_install_file: "{{ 'install_nri_openshift.yaml' if kubernetes_platform == 'openshift' else 'install_nri.yaml' }}"
+  tags:
+    - install
+
 - name: Install NRI if not present and balloon doesn't exist or needs update
-  ansible.builtin.include_tasks: install_nri.yaml
+  ansible.builtin.include_tasks: "{{ nri_install_file }}"
   when:
     - not vllm_balloon_exists or balloon_needs_update | default(false)
     - not nri_supported | default(false)
@@ -220,6 +244,7 @@
       - "Global configuration issues:"
       - "  preserve section missing: {{ 'YES' if existing_config.config.get('preserve') is not defined else 'NO' }}"
       - "  global pinMemory incorrect: {{ 'YES' if existing_config.config.get('pinMemory', true) != false else 'NO' }}"
+      - "Louie: Need to allocate cpu with sub-NUMA awareness : set node-granularity : 'numa' , allocated-full-node: true and set prefer-nodes: [0,1] "
       - "==================================================================="
   when: vllm_balloon_exists
   tags:
@@ -405,9 +430,6 @@
     {{ nri_cpu_balloons.helm.repo_name }}/{{ nri_cpu_balloons.helm.chart_name }}
     --namespace {{ nri_cpu_balloons.namespace }}
     --values {{ tmp_dir }}/nri-values.yaml
-    --wait
-    --timeout 300s
-    --atomic
     {{ '--force' if balloon_needs_update | default(false) else '' }}
   environment:
     HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
@@ -417,6 +439,102 @@
   delegate_to: "{{ groups['kube_control_plane'][0] }}"
   run_once: true
   when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Wait for DaemonSet to exist before patching (OpenShift only)
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: nri-resource-policy-balloons
+    namespace: "{{ nri_cpu_balloons.namespace }}"
+  register: ds_check
+  until: ds_check.resources | length > 0
+  retries: 10
+  delay: 3
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when:
+    - kubernetes_platform == 'openshift'
+  tags:
+    - install
+
+- name: Apply OpenShift security context patch to NRI DaemonSet
+  ansible.builtin.shell: |
+    kubectl patch daemonset nri-resource-policy-balloons -n {{ nri_cpu_balloons.namespace }} --type strategic --patch '
+    spec:
+      template:
+        spec:
+          hostPID: true
+          hostNetwork: true
+          securityContext:
+            seLinuxOptions:
+              type: spc_t
+          containers:
+          - name: nri-resource-policy-balloons
+            securityContext:
+              privileged: false
+              allowPrivilegeEscalation: true
+              runAsUser: 0
+              runAsGroup: 0
+              seLinuxOptions:
+                type: spc_t
+              capabilities:
+                add:
+                - NET_ADMIN
+                - SYS_ADMIN
+                - SYS_PTRACE
+                - SYS_RESOURCE
+                - DAC_OVERRIDE
+                drop: []
+    '
+  register: security_patch_result
+  until: security_patch_result.rc == 0
+  retries: 3
+  delay: 5
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  failed_when: security_patch_result.rc != 0
+  when:
+    - kubernetes_platform == 'openshift'
+  tags:
+    - install
+
+- name: Verify security context patch applied (OpenShift only)
+  ansible.builtin.shell: |
+    kubectl get daemonset nri-resource-policy-balloons -n {{ nri_cpu_balloons.namespace }} \
+      -o jsonpath='{.spec.template.spec.containers[0].securityContext.capabilities.add}'
+  register: verify_patch
+  until: "'SYS_ADMIN' in verify_patch.stdout"
+  retries: 5
+  delay: 3
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when:
+    - kubernetes_platform == 'openshift'
+  tags:
+    - install
+
+- name: Force restart all NRI pods after security context patch (OpenShift only)
+  ansible.builtin.shell: |
+    kubectl -n {{ nri_cpu_balloons.namespace }} delete pods \
+      -l app.kubernetes.io/name=nri-resource-policy-balloons \
+      --grace-period=0 --force
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  when:
+    - kubernetes_platform == 'openshift'
+  tags:
+    - install
+
+- name: Wait for pods to be recreated (OpenShift only)
+  ansible.builtin.pause:
+    seconds: 15
+    prompt: "Waiting for NRI pods to be recreated with correct security context..."
+  run_once: true
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - kubernetes_platform == 'openshift'
   tags:
     - install
 

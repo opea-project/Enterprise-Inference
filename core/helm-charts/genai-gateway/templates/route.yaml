@@ -1,0 +1,21 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: genai-gateway-route
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  host: {{ .Values.route.host | default .Values.ingress.host }}
+  to:
+    kind: Service
+    name: genai-gateway-service
+    weight: 100
+  port:
+    targetPort: 4000
+  tls:
+    termination: {{ .Values.route.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+{{- end }}

@@ -68,19 +68,42 @@
       tags: python_packages
 
     # Kubectl Installation
+    - name: Check if kubectl is already installed
+      stat:
+        path: /usr/local/bin/kubectl
+      register: kubectl_exists
+      tags: kubectl
+
+    - name: Check existing kubectl version if installed
+      command: kubectl version --client --short
+      register: existing_kubectl_version
+      when: kubectl_exists.stat.exists
+      changed_when: false
+      ignore_errors: yes
+      tags: kubectl
+
+    - name: Display existing kubectl version
+      debug:
+        msg: "kubectl is already installed: {{ existing_kubectl_version.stdout if existing_kubectl_version.stdout is defined else 'version check failed' }}"
+      when: kubectl_exists.stat.exists and existing_kubectl_version.rc == 0
+      tags: kubectl
+
     - name: Download kubectl binary
       get_url:
         url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
         dest: /tmp/kubectl
         mode: '0755'
+        timeout: 120
+      when: not kubectl_exists.stat.exists or (existing_kubectl_version is defined and existing_kubectl_version.rc != 0)
       tags: kubectl
 
-    - name: Install kubectl
+    - name: Install kubectl to /usr/local/bin
       copy:
         src: /tmp/kubectl
         dest: /usr/local/bin/kubectl
         mode: '0755'
         remote_src: yes
+      when: not kubectl_exists.stat.exists or (existing_kubectl_version is defined and existing_kubectl_version.rc != 0)
       tags: kubectl
 
     - name: Verify kubectl installation
@@ -91,7 +114,16 @@
 
     - name: Display kubectl version
       debug:
-        var: kubectl_version_output.stdout
+        msg:
+          - "=== KUBECTL INSTALLATION ==="
+          - "{{ kubectl_version_output.stdout }}"
+          - "============================"
+      tags: kubectl
+
+    - name: Clean up kubectl temporary file
+      file:
+        path: /tmp/kubectl
+        state: absent
       tags: kubectl
 
     # Helm Installation

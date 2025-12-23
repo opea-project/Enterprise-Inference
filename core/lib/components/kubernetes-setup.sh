@@ -12,4 +12,7 @@ install_kubernetes() {
     execute_and_check "Setting up kubeconfig for the user..." run_kube_conf_copy_playbook \
         "Kubeconfig is set up." \
         "Failed to set up kubeconfig for the user. Exiting."
+    execute_and_check "Labeling Kubernetes nodes..." run_label_nodes_playbook \
+        "Kubernetes nodes labeled successfully." \
+        "Node labeling failed. Please resolve the issue before proceeding."
 }

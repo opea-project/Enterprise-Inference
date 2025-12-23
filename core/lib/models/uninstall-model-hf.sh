@@ -3,11 +3,6 @@
 
 
 remove_model_deployed_via_huggingface(){
-    if [ "$brownfield_deployment" == "yes" ]; then
-        echo "Setting up Bastion Node..."
-        setup_bastion "$@"
-        INVENTORY_PATH=$brownfield_deployment_host_file
-    fi
     echo "-------------------------------------------------"
     echo "|         Removing Model using Deployment name   |"
     echo "|------------------------------------------------|"
@@ -32,6 +27,11 @@ remove_model_deployed_via_huggingface(){
         hugging_face_model_remove_name="${hugging_face_model_remove_name}-cpu"
     fi
     if [ -n "$hugging_face_model_remove_name" ]; then
+        if [ "$brownfield_deployment" == "yes" ]; then
+        echo "Setting up Bastion Node..."
+        setup_bastion "$@"
+        INVENTORY_PATH=$brownfield_deployment_host_file
+        fi
         invoke_prereq_workflows "$@"                
         execute_and_check "Removing Inference LLM Models..." remove_inference_llm_models_playbook "$@" \
             "Inference LLM Model is removed successfully." \
