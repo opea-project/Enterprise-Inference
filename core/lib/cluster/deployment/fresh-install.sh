@@ -190,5 +190,5 @@ fresh_installation() {
 
 run_fresh_install_playbook() {
     echo "Running the cluster.yml playbook to set up the Kubernetes cluster..."
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root cluster.yml
+    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" cluster.yml
 }
