@@ -194,16 +194,21 @@ echo "Access Token: $TOKEN"
 
 ```bash
 # Test chat completions endpoint
-For Inferencing with Qwen3-4B-int4-ov:
-curl -k ${BASE_URL}/qwen3-4b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "OpenVINO/Qwen3-4B-int4-ov","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
 
-For Inferencing with Mistral-7B-Instruct-v0.3-int4-cw-ov:
-curl -k ${BASE_URL}/mistral-7b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "OpenVINO/Mistral-7B-Instruct-v0.3-int4-cw-ov","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
+For Inferencing with any deployed models:
+kubectl get apisixroute -A
+<img width="1231" height="111" alt="image" src="https://github.com/user-attachments/assets/a898d711-98c8-4817-a0fe-07e5e94473a3" />
 
-For Inferencing with meta-llama/Llama-3.2-3B-Instruct:
-curl -k ${BASE_URL}/llama-3.2-3b-instruct-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is api"}],"model": "meta-llama/Llama-3.2-3B-Instruct","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
+export MODEL_APISIX_ROUTE="llama-3.2-3b-instruct-ovms"
+export MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
+
+curl -k ${BASE_URL}/${MODEL_APISIX_ROUTE}/v3/chat/completions -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is api"}],"model": "'"$MODEL_ID"'","max_tokens": 32,"temperature": 0.4}'
 
 ```
+**NOTE: export respective MODEL_APISIX_ROUTE and MODEL_ID to test the model endpoints**
 ---
 ## Undeployment
 
