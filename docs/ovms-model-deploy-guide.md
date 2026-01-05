@@ -195,7 +195,7 @@ echo "Access Token: $TOKEN"
 ```bash
 # Test chat completions endpoint
 
-For Inferencing with any deployed models:
+# For Inferencing with any deployed models, use below command to get model route
 kubectl get apisixroute -A
 ```
 ![alt text](pictures/apisix-route.png)
