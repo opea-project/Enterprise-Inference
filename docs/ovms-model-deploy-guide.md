@@ -195,13 +195,13 @@ echo "Access Token: $TOKEN"
 ```bash
 # Test chat completions endpoint
 For Inferencing with Qwen3-4B-int4-ov:
-curl -k ${BASE_URL}/qwen3-4b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "qwen3-4b","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/qwen3-4b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "OpenVINO/Qwen3-4B-int4-ov","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with Mistral-7B-Instruct-v0.3-int4-cw-ov:
-curl -k ${BASE_URL}/mistral-7b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "mistral-7b","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/mistral-7b-ovms/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is photosynthesis"}],"model": "OpenVINO/Mistral-7B-Instruct-v0.3-int4-cw-ov","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
 
 For Inferencing with meta-llama/Llama-3.2-3B-Instruct:
-curl -k ${BASE_URL}/llama-3.2-3b-instruct/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is api"}],"model": "llama-3.2-3b-instruct","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
+curl -k ${BASE_URL}/llama-3.2-3b-instruct/v3/chat/completions -X POST -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is api"}],"model": "meta-llama/Llama-3.2-3B-Instruct","max_tokens": 32,"temperature": 0.4}' -H 'Content-Type: application/json' -sS -H "Authorization: Bearer $TOKEN"
 
 ```
 ---
