@@ -197,7 +197,7 @@ echo "Access Token: $TOKEN"
 
 For Inferencing with any deployed models:
 kubectl get apisixroute -A
-<img width="1231" height="111" alt="image" src="https://github.com/user-attachments/assets/a898d711-98c8-4817-a0fe-07e5e94473a3" />
+![alt text](pictures/apisix-routes.png)
 
 export MODEL_APISIX_ROUTE="llama-3.2-3b-instruct-ovms"
 export MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
@@ -208,7 +208,7 @@ curl -k ${BASE_URL}/${MODEL_APISIX_ROUTE}/v3/chat/completions -X POST \
   -d '{"messages": [{"role": "system","content": "You are helpful assistant"},{"role": "user","content": "what is api"}],"model": "'"$MODEL_ID"'","max_tokens": 32,"temperature": 0.4}'
 
 ```
-**NOTE: export respective MODEL_APISIX_ROUTE and MODEL_ID to test the model endpoints**
+**NOTE:** export respective MODEL_APISIX_ROUTE and MODEL_ID to test the model endpoints
 ---
 ## Undeployment
 
