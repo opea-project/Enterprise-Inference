@@ -197,8 +197,9 @@ echo "Access Token: $TOKEN"
 
 For Inferencing with any deployed models:
 kubectl get apisixroute -A
+```
 ![alt text](pictures/apisix-routes.png)
-
+```
 export MODEL_APISIX_ROUTE="llama-3.2-3b-instruct-ovms"
 export MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
 
