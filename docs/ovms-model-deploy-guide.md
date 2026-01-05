@@ -200,8 +200,8 @@ kubectl get apisixroute -A
 ```
 ![alt text](pictures/apisix-routes.png)
 ```
-export MODEL_APISIX_ROUTE="llama-3.2-3b-instruct-ovms"
-export MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
+export MODEL_APISIX_ROUTE="qwen3-4b-ovms"
+export MODEL_ID=OpenVINO/Qwen3-4B-int4-ov
 
 curl -k ${BASE_URL}/${MODEL_APISIX_ROUTE}/v3/chat/completions -X POST \
   -H 'Content-Type: application/json' \
