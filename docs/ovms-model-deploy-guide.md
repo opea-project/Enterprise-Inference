@@ -198,7 +198,7 @@ echo "Access Token: $TOKEN"
 For Inferencing with any deployed models:
 kubectl get apisixroute -A
 ```
-![alt text](pictures/apisix-routes.png)
+![alt text](pictures/apisix-route.png)
 ```
 export MODEL_APISIX_ROUTE="qwen3-4b-ovms"
 export MODEL_ID=OpenVINO/Qwen3-4B-int4-ov
