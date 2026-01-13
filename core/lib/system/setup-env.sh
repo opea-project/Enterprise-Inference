@@ -70,7 +70,7 @@ setup_initial_env() {
     else
         echo "Virtual environment activated successfully. Path: $VIRTUAL_ENV"
     fi                 
-           
+    export ANSIBLE_PYTHON_INTERPRETER="$VENVDIR/bin/python"       
     export PIP_BREAK_SYSTEM_PACKAGES=1
     $VENVDIR/bin/python3 -m pip install --upgrade pip
     $VENVDIR/bin/python3 -m pip install -U -r requirements.txt    
