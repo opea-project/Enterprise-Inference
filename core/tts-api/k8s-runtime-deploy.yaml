@@ -1,0 +1,307 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tts-api-config
+  namespace: default
+data:
+  VLLM_URL: "http://svara-tts-vllm:2080"
+  API_PORT: "8000"
+  # Intel Xeon CPU Optimizations
+  MKL_NUM_THREADS: "16"
+  OMP_NUM_THREADS: "16"
+  TORCH_NUM_THREADS: "16"
+  # Intel MKL settings
+  KMP_BLOCKTIME: "1"
+  KMP_AFFINITY: "granularity=fine,compact,1,0"
+  # Disable CUDA
+  CUDA_VISIBLE_DEVICES: ""
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tts-api-code
+  namespace: default
+data:
+  server.py: |
+    """
+    FastAPI TTS Server - Runtime version (no Docker build needed)
+    """
+    import asyncio
+    import os
+    import sys
+    import time
+    from typing import Optional, List
+    
+    import httpx
+    from fastapi import FastAPI, HTTPException, Response
+    from pydantic import BaseModel, Field
+    import uvicorn
+    
+    # Import tts_engine as a package
+    sys.path.insert(0, '/app')
+    from tts_engine.codec import SNACCodec
+    from tts_engine.constants import SAMPLE_RATE, BIT_DEPTH, AUDIO_TOKEN_OFFSETS
+    
+    # Configuration
+    VLLM_URL = os.getenv("VLLM_URL", "http://10.233.104.79:2080")
+    VLLM_MODEL = "kenpath/svara-tts-v1"
+    API_PORT = int(os.getenv("API_PORT", "8000"))
+    
+    app = FastAPI(title="Svara TTS API", version="1.0.0")
+    snac_codec = None
+    
+    class TTSRequest(BaseModel):
+        text: str = Field(..., min_length=1, max_length=500)
+        voice: str = Field(default="en-US-male")
+        
+    class VoiceInfo(BaseModel):
+        id: str
+        name: str
+        language: str
+        gender: str
+        
+    class HealthResponse(BaseModel):
+        status: str
+        vllm_status: str
+        snac_loaded: bool
+        timestamp: float
+    
+    @app.on_event("startup")
+    async def startup_event():
+        global snac_codec
+        print("🚀 Starting TTS API Server...")
+        print(f"📍 VLLM URL: {VLLM_URL}")
+        print(f"🔧 CPU: Intel Xeon with MKL optimization")
+        print(f"⚙️  Threads: OMP={os.getenv('OMP_NUM_THREADS')}, MKL={os.getenv('MKL_NUM_THREADS')}")
+        snac_codec = SNACCodec(device='cpu')
+        print("✅ TTS API Server ready!")
+    
+    @app.get("/health", response_model=HealthResponse)
+    async def health_check():
+        vllm_status = "unknown"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{VLLM_URL}/health")
+                vllm_status = "healthy" if response.status_code == 200 else "unhealthy"
+        except:
+            vllm_status = "unreachable"
+        return HealthResponse(
+            status="healthy" if snac_codec else "degraded",
+            vllm_status=vllm_status,
+            snac_loaded=snac_codec is not None,
+            timestamp=time.time()
+        )
+    
+    @app.get("/v1/voices", response_model=List[VoiceInfo])
+    async def list_voices():
+        return [
+            VoiceInfo(id="en-US-male", name="English (US) Male", language="en-US", gender="male"),
+            VoiceInfo(id="en-US-female", name="English (US) Female", language="en-US", gender="female"),
+        ]
+    
+    @app.post("/v1/text-to-speech")
+    async def text_to_speech(request: TTSRequest):
+        if snac_codec is None:
+            raise HTTPException(status_code=503, detail="SNAC not initialized")
+        
+        # Simplified demo response
+        return {"status": "success", "message": f"TTS for: {request.text}"}
+    
+    @app.get("/")
+    async def root():
+        return {"service": "Svara TTS API", "status": "running"}
+    
+    if __name__ == "__main__":
+        uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tts-api
+  namespace: default
+  labels:
+    app: tts-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tts-api
+  template:
+    metadata:
+      labels:
+        app: tts-api
+    spec:
+      initContainers:
+      - name: install-deps
+        image: python:3.10-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Installing CPU-only dependencies for Intel Xeon..."
+            # Install PyTorch CPU-only first
+            pip install --target=/deps \
+              torch==2.5.1+cpu \
+              torchaudio==2.5.1+cpu \
+              --index-url https://download.pytorch.org/whl/cpu
+            # Install snac with --no-deps to prevent torch upgrade
+            pip install --target=/deps --no-deps \
+              snac==1.2.1
+            # Install snac dependencies + other packages (upgrade typing-extensions)
+            pip install --target=/deps --upgrade \
+              typing-extensions>=4.12.0 \
+              einops \
+              huggingface-hub \
+              numpy==1.26.4 \
+              fastapi==0.115.6 \
+              uvicorn[standard]==0.34.0 \
+              httpx==0.28.1 \
+              pydantic==2.12.0
+            echo "✅ All CPU-only dependencies installed"
+        volumeMounts:
+        - name: deps
+          mountPath: /deps
+      containers:
+      - name: tts-api
+        image: python:3.10-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            export PYTHONPATH=/deps:$PYTHONPATH
+            python /app/server.py
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: VLLM_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: VLLM_URL
+        - name: API_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: API_PORT
+        - name: MKL_NUM_THREADS
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: MKL_NUM_THREADS
+        - name: OMP_NUM_THREADS
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: OMP_NUM_THREADS
+        - name: TORCH_NUM_THREADS
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: TORCH_NUM_THREADS
+        - name: KMP_BLOCKTIME
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: KMP_BLOCKTIME
+        - name: KMP_AFFINITY
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: KMP_AFFINITY
+        - name: CUDA_VISIBLE_DEVICES
+          valueFrom:
+            configMapKeyRef:
+              name: tts-api-config
+              key: CUDA_VISIBLE_DEVICES
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "4"
+          limits:
+            memory: "8Gi"
+            cpu: "8"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        volumeMounts:
+        - name: deps
+          mountPath: /deps
+          readOnly: true
+        - name: server-code
+          mountPath: /app
+        - name: tts-engine
+          mountPath: /app/tts_engine
+        - name: cache
+          mountPath: /root/.cache
+      volumes:
+      - name: deps
+        emptyDir: {}
+      - name: server-code
+        configMap:
+          name: tts-api-code
+      - name: tts-engine
+        hostPath:
+          path: /home/ubuntu/EI_Stack/Enterprise-Inference/core/tts_engine
+          type: Directory
+      - name: cache
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tts-api
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: tts-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tts-api-external
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: tts-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30800
+    name: http
+
+---
+# Service for VLLM in default namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: svara-tts-vllm
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vllm
+    app.kubernetes.io/instance: svara-tts-cpu
+  ports:
+  - port: 2080
+    targetPort: 2080
+    name: http
