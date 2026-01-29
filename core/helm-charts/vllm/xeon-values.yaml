@@ -243,6 +243,12 @@ modelConfigs:
     tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
     pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
+  "Qwen/Qwen2.5-VL-7B-Instruct":
+    configMapValues:
+     VLLM_SKIP_WARMUP: true
+    extraCmdArgs: ["--max-model-len","33024"]
+    tensor_parallel_size: "1"
+
 defaultModelConfigs:
   configMapValues:
     VLLM_CPU_KVCACHE_SPACE: "40"
