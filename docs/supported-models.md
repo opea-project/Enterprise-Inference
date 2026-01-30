@@ -1,6 +1,13 @@
 ### Xeon and Gaudi Supported Models
 
-The following table lists the pre-validated models for Intel® AI for Enterprise Inference.      
+The following table lists the pre-validated models for Intel® AI for Enterprise Inference.
+
+**Deployment Backends:**
+- **vLLM**: Default backend for LLM inference (direct Kubernetes deployment)
+- **TGI**: Text Generation Inference (direct Kubernetes deployment)
+- **KServe**: Kubernetes-native model serving with autoscaling and serverless capabilities
+- **OVMS**: OpenVINO Model Server for optimized Intel CPU/GPU inference
+- **TEI**: Text Embeddings Inference for embedding models      
 
 ### ✅ **Model Support Matrix**
 

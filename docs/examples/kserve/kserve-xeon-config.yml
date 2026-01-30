@@ -1,0 +1,68 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# KServe Configuration for Single-Node Xeon Deployment
+# This file demonstrates deploying LLM models using KServe with vLLM backend on Intel Xeon
+
+# KServe Operator Settings
+install_kserve: true
+uninstall_kserve: false
+kserve_version: "0.13.0"
+install_kserve_runtimes: true
+configure_intel_runtimes: true
+
+# Deployment Configuration
+kserve_cpu_deployment: true
+kserve_gpu_deployment: false
+kserve_platform: "xeon"
+kserve_backend: "vllm"
+kserve_deployment_method: "helm"
+
+# Models to Deploy
+# Adjust based on your available resources
+kserve_model_name_list:
+  - "meta-llama/Llama-3.2-3B-Instruct"
+  # Uncomment additional models as needed
+  # - "Qwen/Qwen2.5-7B-Instruct"
+  # - "microsoft/Phi-3-mini-4k-instruct"
+
+# Storage Configuration
+kserve_pvc_enabled: true
+kserve_pvc_size: "100Gi"
+kserve_pvc_storage_class: ""  # Empty uses default StorageClass
+
+# Autoscaling Configuration
+# Disable for single-node to maintain predictable resource usage
+kserve_autoscaling_enabled: false
+kserve_autoscaling_min_replicas: 1
+kserve_autoscaling_max_replicas: 1
+
+# Monitoring Configuration
+kserve_service_monitor_enabled: true
+
+# Network Configuration
+kserve_ingress_enabled: true
+kserve_apisix_route_enabled: true
+
+# Model-Specific Configurations
+kserve_model_configs:
+  "meta-llama/Llama-3.2-3B-Instruct":
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    extraCmdArgs:
+      - "--disable-log-requests"
+      - "--enable-prefix-caching"
+      - "--max-num-seqs"
+      - "128"
+      - "--max-num-batched-tokens"
+      - "2048"
+
+# Resource Overrides (Optional)
+# Uncomment to override default resource allocations
+# resources:
+#   limits:
+#     cpu: "16"
+#     memory: 64Gi
+#   requests:
+#     cpu: "8"
+#     memory: 32Gi

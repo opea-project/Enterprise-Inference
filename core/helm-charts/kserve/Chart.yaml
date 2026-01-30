@@ -1,0 +1,17 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v2
+name: kserve
+description: KServe InferenceService Helm chart for vLLM runtime on Intel platforms
+type: application
+version: 1.0.0
+appVersion: "0.13.0"
+keywords:
+  - kserve
+  - vllm
+  - inference
+  - llm
+  - intel
+maintainers:
+  - name: Intel Corporation

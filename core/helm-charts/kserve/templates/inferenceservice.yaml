@@ -1,0 +1,125 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- $modelName := include "kserve.modelName" . }}
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ include "kserve.fullname" . }}
+  labels:
+    {{- include "kserve.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.autoscaling.enabled }}
+    autoscaling.knative.dev/minScale: {{ .Values.autoscaling.minReplicas | quote }}
+    autoscaling.knative.dev/maxScale: {{ .Values.autoscaling.maxReplicas | quote }}
+    autoscaling.knative.dev/target: {{ .Values.autoscaling.targetUtilizationPercentage | quote }}
+    {{- end }}
+spec:
+  predictor:
+    {{- if not .Values.autoscaling.enabled }}
+    minReplicas: {{ .Values.replicaCount }}
+    maxReplicas: {{ .Values.replicaCount }}
+    {{- end }}
+    {{- if .Values.nodeSelector }}
+    nodeSelector:
+      {{- toYaml .Values.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.tolerations }}
+    tolerations:
+      {{- toYaml .Values.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.affinity }}
+    affinity:
+      {{- toYaml .Values.affinity | nindent 6 }}
+    {{- end }}
+    containers:
+      - name: kserve-container
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - python3
+          - -m
+          - vllm.entrypoints.openai.api_server
+        args:
+          {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
+          {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
+          {{- range $modelArgs }}
+          - {{ . | quote }}
+          {{- end }}
+          - "--model"
+          - {{ .Values.LLM_MODEL_ID | quote }}
+          - "--served-model-name"
+          - {{ $modelName | quote }}
+          - "--port"
+          - {{ .Values.port | quote }}
+          - "--dtype"
+          - {{ .Values.dtype | quote }}
+          {{- if .Values.accelDevice }}
+          - "--tensor-parallel-size"
+          - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote }}
+          {{- else }}
+          - "--tensor-parallel-size"
+          - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote }}
+          - "--pipeline-parallel-size"
+          - {{ .Values.pipeline_parallel_size | default (index .Values.modelConfigs $modelName | default dict).pipeline_parallel_size | default .Values.defaultModelConfigs.pipeline_parallel_size | quote }}
+          {{- end }}
+          - "--max-model-len"
+          - {{ .Values.max_model_len | quote }}
+          - "--block-size"
+          - {{ .Values.block_size | quote }}
+          {{- if .Values.accelDevice }}
+          - "--gpu-memory-utilization"
+          - {{ .Values.gpu_memory_utilization | quote }}
+          {{- end }}
+        env:
+          {{- if .Values.accelDevice }}
+          - name: HABANA_VISIBLE_DEVICES
+            value: "all"
+          - name: OMPI_MCA_btl_vader_single_copy_mechanism
+            value: "none"
+          {{- end }}
+          {{- range .Values.env }}
+          - name: {{ .name }}
+            value: {{ .value | quote }}
+          {{- end }}
+        {{- if .Values.envFrom }}
+        envFrom:
+          {{- toYaml .Values.envFrom | nindent 10 }}
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.port }}
+            name: http
+            protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        volumeMounts:
+          {{- if .Values.pvc.enabled }}
+          - name: model-volume
+            mountPath: /data
+          {{- end }}
+          - name: shm
+            mountPath: /dev/shm
+          - name: tmp
+            mountPath: /tmp
+    {{- if or .Values.pvc.enabled }}
+    volumes:
+      {{- if .Values.pvc.enabled }}
+      - name: model-volume
+        persistentVolumeClaim:
+          claimName: {{ include "kserve.fullname" . }}-pvc
+      {{- end }}
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 10Gi
+      - name: tmp
+        emptyDir: {}
+    {{- end }}
+    {{- if .Values.podSecurityContext }}
+    securityContext:
+      {{- toYaml .Values.podSecurityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.runtimeClassName }}
+    runtimeClassName: {{ .Values.runtimeClassName }}
+    {{- end }}

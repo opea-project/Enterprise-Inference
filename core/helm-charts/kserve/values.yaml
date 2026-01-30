@@ -1,0 +1,154 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Default values for KServe InferenceService with vLLM runtime
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Replica configuration
+replicaCount: 1
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetUtilizationPercentage: 80
+
+# Container image for vLLM runtime
+image:
+  repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
+  tag: "v0.10.2"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Model configuration
+LLM_MODEL_ID: "meta-llama/Llama-3.2-3B-Instruct"
+SERVED_MODEL_NAME: ""
+
+# vLLM runtime configuration
+port: 8080
+dtype: "auto"
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+max_model_len: 4096
+block_size: 16
+gpu_memory_utilization: 0.9
+
+# Storage configuration
+storageUri: ""  # Optional: S3, GCS, or PVC path for model weights
+
+# PVC configuration for model storage
+pvc:
+  enabled: true
+  storageClassName: ""
+  size: 100Gi
+  accessModes:
+    - ReadWriteOnce
+
+# Resource configuration
+resources:
+  limits:
+    cpu: "32"
+    memory: 128Gi
+  requests:
+    cpu: "16"
+    memory: 64Gi
+
+# Intel hardware acceleration (empty for CPU, habana.ai/gaudi for Gaudi)
+accelDevice: ""
+accelDeviceCount: 0
+
+# Node affinity and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# APISIX route configuration
+apisixRoute:
+  enabled: false
+  gateway: "genai-gateway"
+  host: ""
+  path: "/v1/*"
+
+# KServe-specific configuration
+kserve:
+  # Runtime version
+  runtimeVersion: "v0.10.2"
+  # Protocol version (v1 or v2)
+  protocolVersion: "v2"
+  # Storage initializer configuration
+  storageInitializer:
+    image: "kserve/storage-initializer:latest"
+  # Transformer configuration (optional)
+  transformer:
+    enabled: false
+  # Explainer configuration (optional)
+  explainer:
+    enabled: false
+
+# Security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1001
+
+# Environment variables
+env: []
+# - name: VLLM_ARGS
+#   value: "--custom-arg"
+
+# ConfigMap and Secret references
+envFrom: []
+
+# Model-specific configurations
+modelConfigs: {}
+defaultModelConfigs:
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  extraCmdArgs:
+    - "--disable-log-requests"
+    - "--enable-prefix-caching"
+
+# Service monitor for Prometheus (requires prometheus-operator)
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+
+# Global settings (inherited from parent charts)
+global:
+  extraEnvConfig: ""
