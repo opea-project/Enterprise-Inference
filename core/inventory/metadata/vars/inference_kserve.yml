@@ -4,6 +4,10 @@
 # KServe Operator Configuration
 ansible_python_interpreter: /usr/bin/python3
 
+# Helm chart paths
+helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
+remote_helm_charts_base: "/tmp/helm-charts"
+
 # KServe version
 kserve_version: "0.13.0"
 

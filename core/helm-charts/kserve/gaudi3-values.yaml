@@ -58,6 +58,9 @@ defaultModelConfigs:
     - "--enforce-eager"
 
 # Security context for Gaudi
+# Note: SYS_PTRACE and IPC_LOCK are required for Habana runtime
+# - SYS_PTRACE: Required for Habana profiler and debugging tools
+# - IPC_LOCK: Required for locking memory for DMA operations
 securityContext:
   capabilities:
     drop:

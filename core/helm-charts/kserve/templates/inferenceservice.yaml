@@ -102,7 +102,6 @@ spec:
             mountPath: /dev/shm
           - name: tmp
             mountPath: /tmp
-    {{- if or .Values.pvc.enabled }}
     volumes:
       {{- if .Values.pvc.enabled }}
       - name: model-volume
@@ -115,7 +114,6 @@ spec:
           sizeLimit: 10Gi
       - name: tmp
         emptyDir: {}
-    {{- end }}
     {{- if .Values.podSecurityContext }}
     securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 6 }}

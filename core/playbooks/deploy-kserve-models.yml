@@ -44,6 +44,14 @@
           run_once: true
           tags: always
 
+        - name: Validate HuggingFace token is provided
+          ansible.builtin.fail:
+            msg: "HuggingFace token is required for model deployment. Please set 'hugging_face_token' in your configuration."
+          when: 
+            - hugging_face_token is not defined or hugging_face_token == ""
+            - kserve_model_name_list | length > 0
+          tags: always
+
         - name: Create/Update Kubernetes Secret for Hugging Face Token
           kubernetes.core.k8s:
             state: present
@@ -186,17 +194,30 @@
         - name: Display installed KServe models
           debug:
             msg: "Installed KServe models: {{ kserve_installed_models.stdout_lines | join(', ') }}"
-          when: kserve_installed_models.stdout_lines | length > 0
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
 
         - name: Uninstall KServe InferenceServices
           ansible.builtin.shell:
             cmd: "helm uninstall {{ item }}"
           loop: "{{ kserve_installed_models.stdout_lines }}"
-          when: kserve_installed_models.stdout_lines | length > 0
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
 
-        - name: Wait for resources to be cleaned up
-          pause:
-            seconds: 10
+        - name: Wait for InferenceServices to be deleted
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            namespace: default
+          register: remaining_isvc
+          until: remaining_isvc.resources | length == 0
+          retries: 30
+          delay: 10
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
 
       when: uninstall_kserve | default(false) | bool
       tags:

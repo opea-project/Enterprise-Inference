@@ -7,7 +7,7 @@ The following table lists the pre-validated models for Intel® AI for Enterprise
 - **TGI**: Text Generation Inference (direct Kubernetes deployment)
 - **KServe**: Kubernetes-native model serving with autoscaling and serverless capabilities
 - **OVMS**: OpenVINO Model Server for optimized Intel CPU/GPU inference
-- **TEI**: Text Embeddings Inference for embedding models      
+- **TEI**: Text Embeddings Inference for embedding models
 
 ### ✅ **Model Support Matrix**
 
