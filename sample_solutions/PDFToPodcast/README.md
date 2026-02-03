@@ -164,7 +164,7 @@ If you're testing with a local inference endpoint using a custom domain (e.g., `
 
 ```bash
 git clone https://github.com/opea-project/Enterprise-Inference.git
-cd sample_solutions/PDFToPodcast
+cd Enterprise-Inference/sample_solutions/PDFToPodcast
 ```
 
 ### Set up the Environment
@@ -292,7 +292,7 @@ For detailed troubleshooting guidance and solutions to common issues, refer to:
 
 ## Additional Info
 
-The following models have been validated with pdf-podcast:
+The following models have been validated with PDFToPodcast:
 
 | Model | Hardware |
 |-------|----------|
