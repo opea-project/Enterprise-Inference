@@ -44,7 +44,7 @@ jobs:
           scanners: 'vuln,misconfig,secret,license'
           ignore-unfixed: true
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           output: 'trivy-reports/trivy_scan_report.txt'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -81,7 +81,7 @@ jobs:
         EOF
       shell: bash
     - name: Run Bandit scan
-      run: bandit -r . -f html -o bandit-report.html || true
+      run: bandit -r . -ll -iii -f html -o bandit-report.html 
     - name: Upload Bandit Report
       uses: actions/upload-artifact@v4
       with:
