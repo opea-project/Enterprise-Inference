@@ -142,7 +142,7 @@ OpenAI API Key for text-to-speech:
 
 ### Local Development Configuration
 
-**For Local Testing Only (Optional)**
+**For Local Testing Only**
 
 If you're testing with a local inference endpoint using a custom domain (e.g., `inference.example.com` mapped to localhost in your hosts file):
 
@@ -163,8 +163,8 @@ If you're testing with a local inference endpoint using a custom domain (e.g., `
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/cld2labs/GenAISamples.git
-cd GenAISamples/pdf-podcast
+git clone https://github.com/opea-project/Enterprise-Inference.git
+cd sample_solutions/PDFToPodcast
 ```
 
 ### Set up the Environment
@@ -213,7 +213,7 @@ No changes needed. Uses default values.
 Start both API and UI services together with Docker Compose:
 
 ```bash
-# From the pdf-podcast directory
+# From the PDFToPodcast directory
 docker compose up --build
 
 # Or run in detached mode (background)
