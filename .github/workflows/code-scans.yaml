@@ -54,6 +54,12 @@ jobs:
         with:
           name: trivy-report
           path: trivy-reports/trivy_scan_report.txt
+      - name: Show Trivy Report in Logs
+        if: failure()
+        run: |
+          echo "========= TRIVY FINDINGS ========="
+          cat trivy-reports/trivy_scan_report.txt
+          echo "================================="
 
 # -----------------------------
 # 2) Bandit Scan
