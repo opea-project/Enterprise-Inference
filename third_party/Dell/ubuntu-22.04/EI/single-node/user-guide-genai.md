@@ -33,7 +33,7 @@ It is designed for new users who may not be familiar with server configuration o
 ## Prerequisites
 Before starting the deployment, ensure your system meets the following requirements.
 
-### 1.System Requirements
+### 1. System Requirements
   		
 | Requirement | Description |
 |--------------|-------------|
