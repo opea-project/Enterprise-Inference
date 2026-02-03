@@ -1,0 +1,65 @@
+services:
+  # Backend Gateway (Python)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
+
+# =============================================================================
+# Usage Instructions:
+# =============================================================================
+#
+# 1. Create .env file in root directory (for Docker Compose variables):
+#    cat > .env << EOF
+#    LOCAL_URL_ENDPOINT=not-needed
+#    EOF
+#
+# 2. Copy backend/.env.example to backend/.env and configure your inference API credentials:
+#    cp backend/.env.example backend/.env
+#    # Edit backend/.env with your INFERENCE_API_ENDPOINT and INFERENCE_API_TOKEN
+#
+# 3. Start the application:
+#    docker compose up -d --build
+#
+# 4. Access the application:
+#    - Frontend: http://localhost:5173
+#    - Backend API: http://localhost:8000
+#    - API Docs: http://localhost:8000/docs
+#
+# 5. View logs:
+#    docker compose logs -f
+#
+# 6. Stop the application:
+#    docker compose down
+#
+# =============================================================================
