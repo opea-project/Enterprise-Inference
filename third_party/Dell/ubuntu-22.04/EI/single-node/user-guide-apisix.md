@@ -47,7 +47,7 @@ Before starting the deployment, ensure your system meets the following requireme
 |  -  **SPI / Preboot Firmware (Gaudi3**)  | ≥1.22.0-fw-61.3.2-sec-3  |
 |  -  **Driver Version** |  ≥1.21.3-f063886 |
 |  -  **NIC Driver Version**  | ≥1.21.3-94c920f  |
-|  -  **Habana Container Runtime** |  ≥ 1.22.1-6  |
+|  -  **Habana Container Runtime** |  ≥ 1.21.3  |
 
 #### Sudo Setup
 
