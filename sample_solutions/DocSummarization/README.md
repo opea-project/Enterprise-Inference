@@ -110,21 +110,22 @@ Before you begin, ensure you have the following installed:
 This application supports multiple inference deployment patterns:
 
 - **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the `litellm_master_key` value from the generated `vault.yml` file
+  
 - **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-
-Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (GenAI Gateway, APISIX Gateway, etc.)
-- INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 ### Local Development Configuration
 
 **For Local Testing Only (Optional)**
 
-If you're testing with a local inference endpoint using a custom domain (e.g., `inference.example.com` mapped to localhost in your hosts file):
+If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
 
 1. Edit `backend/.env` and set:
    ```bash
-   LOCAL_URL_ENDPOINT=inference.example.com
+   LOCAL_URL_ENDPOINT=api.example.com
    ```
    (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
 
@@ -181,7 +182,7 @@ LOCAL_URL_ENDPOINT=not-needed
 EOF
 ```
 
-**Note:** If using a local domain (e.g., `inference.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
+**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
 
 #### Step 2: Create `backend/.env` File
 
@@ -198,7 +199,12 @@ cat > backend/.env << EOF
 # Inference API Configuration
 # INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
 #   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/inference
+#   - For APISIX Gateway: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
+#     Note: APISIX Gateway requires the model name in the URL path
+#
+# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
+#   - For GenAI Gateway: Your GenAI Gateway API key
+#   - For APISIX Gateway: Your APISIX authentication token
 INFERENCE_API_ENDPOINT=https://your-actual-api-endpoint.com
 INFERENCE_API_TOKEN=your-actual-token-here
 
@@ -228,6 +234,7 @@ EOF
 **Important Configuration Notes:**
 
 - **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-actual-api-endpoint.com`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/Llama-3.1-8B-Instruct`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
   - To check available models: `curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"`
