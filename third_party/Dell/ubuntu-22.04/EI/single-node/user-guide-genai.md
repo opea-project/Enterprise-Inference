@@ -18,7 +18,7 @@
 ---
 
 ## Overview
-This guide walks you through the setup and deployment of **Intel® AI for Enterprise Inference** in **single-node** environment.  
+This guide walks you through the setup and deployment of **Intel® AI for Enterprise Inference** in a **single-node** environment.  
 It is designed for new users who may not be familiar with server configuration or AI inference deployment.
 
 **You’ll Learn How To:**
@@ -47,7 +47,7 @@ Before starting the deployment, ensure your system meets the following requireme
 | **Driver Version** |  ≥1.21.3-f063886 |
 | **NIC Driver Version**  | ≥1.21.3-94c920f  |
 | **Habana Container Runtime** |  ≥ 1.21.3  |
-| **Enterprise Inference Version** |	release-1.4.0 |
+| **Enterprise Inference Version** |	release-1.4.0 or newer |
 
 #### Sudo Setup
 
@@ -96,12 +96,17 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
     mkdir -p ~/certs && cd ~/certs
     openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=api.example.com"
     ```
-
     This will generate:
+
     `cert.pem` → certificate
     `key.pem` → private key
 
-2. **Map your DNS to your local IP (only if not registered in DNS):**
+  > **Note:**  
+  > `api.example.com` is used throughout this guide as a sample.
+  > Replace it with **your own fully qualified domain name (FQDN)** wherever it appears.
+
+
+3. **Map your DNS to your local IP (only if not registered in DNS):**
 
     If your domain is not registered in DNS, you can map it manually by editing your /etc/hosts file
     ```bash
@@ -116,7 +121,7 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
 
     Save and exit with CTRL+X → Y → Enter.
 
-    **Important:** This manual mapping is only required if your machine’s hostname is not resolvable via DNS.
+    > **Note:** Replace api.example.com with the URL used to generate certs in above step , and this manual mapping is only required if your machine’s hostname is not resolvable via DNS.
     If your domain is already managed by a DNS provider, skip this step.
 
 ### 4. Hugging Face Token Setup
@@ -135,8 +140,9 @@ This section explains how to deploy Intel® AI for Enterprise Inference on a sin
 ```bash
 git clone https://github.com/opea-project/Enterprise-Inference.git
 cd Enterprise-Inference
-git checkout release-1.4.0
+git checkout ${RELEASE}
 ```
+> **Note:** Update the RELEASE environment variable to point to the desired Enterprise Inference version(for example: release-1.4.0)
 
 ### 2. Configure the Setup Files and Environment
 
@@ -152,7 +158,7 @@ vi core/inventory/inference-config.cfg
 ```
 
 ```
-cluster_url=api.example.com
+cluster_url=api.example.com  # <-- Replace with your own FQDN
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
 keycloak_client_id=api
@@ -161,7 +167,7 @@ keycloak_admin_password=changeme!!
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
-cpu_or_gpu=gaudi3
+cpu_or_gpu=gaudi3 
 vault_pass_code=place-holder-123
 deploy_kubernetes_fresh=on
 deploy_ingress_controller=on
@@ -173,6 +179,8 @@ deploy_ceph=off
 deploy_istio=off
 uninstall_ceph=off
 ```
+> **Note:** Replace cluster_url must match the DNS name.
+
 **Update hosts.yaml File**
 
 Copy the single node preset hosts config file to the working directory:
@@ -184,7 +192,11 @@ cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 
 ### 3. Run the Deployment
 
-Run the setup for Gaudi _(the "models" and "cpu-or-gpu" parameters are only needed if they are not set in inference-config.cfg)_:
+> **Note:**
+> The `--models` argument selects a model using its **numeric ID**  
+> If `--models` is omitted, the installer displays the full model list and prompts you to select a model interactively.
+
+**Run the setup for Gaudi:**
 
 ```bash
 cd core
@@ -192,8 +204,7 @@ chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gaudi3"
 ```
 
-Run the setup for CPU _(the "models" and "cpu-or-gpu" parameters are only needed if they are not set in inference-config.cfg)_:
-
+**Run the setup for CPU:**
 ```bash
 cd core
 chmod +x inference-stack-deploy.sh
@@ -207,7 +218,7 @@ If using Intel® Gaudi® hardware, make sure firmware and drivers are updated be
 ### 4. Verify the Deployment
 Verify Pods Status
 ```bash
-kubectl get pods
+kubectl get pods -A
 ```
 Expected States:
 - All pods Running
