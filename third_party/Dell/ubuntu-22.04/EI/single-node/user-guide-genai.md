@@ -122,7 +122,7 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
     Save and exit with CTRL+X → Y → Enter.
 
     > **Note:** Replace api.example.com with the URL used to generate certs in above step , and this manual mapping is only required if your machine’s hostname is not resolvable via DNS.
-    If your domain is already managed by a DNS provider, skip this step.
+    > If your domain is already managed by a DNS provider, skip this step.
 
 ### 4. Hugging Face Token Setup
   1. Visit huggingface.com and log in (or create an account).
@@ -179,7 +179,7 @@ deploy_ceph=off
 deploy_istio=off
 uninstall_ceph=off
 ```
-> **Note:** Replace cluster_url must match the DNS name.
+> **Note:** Replace cluster_url with your DNS , it must match with DNS used in certs generation.
 
 **Update hosts.yaml File**
 

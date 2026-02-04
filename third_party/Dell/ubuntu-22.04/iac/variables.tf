@@ -56,7 +56,6 @@ variable "static_dns" {
 variable "idrac_endpoint" {
   description = "iDRAC Redfish endpoint URL (e.g., https://100.67.153.16). Can also be set via TF_VAR_idrac_endpoint environment variable."
   type        = string
-  default     = "https://100.67.153.16"
 }
 
 variable "idrac_user" {
