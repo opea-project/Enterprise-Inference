@@ -5,12 +5,22 @@ The system integrates a FastAPI backend, alongside a modern React + Vite + Tailw
 
 ## Table of Contents
 
+- [Code Translation](#code-translation)
+- [Table of Contents](#table-of-contents)
 - [Project Overview](#project-overview)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
+  - [System Requirements](#system-requirements)
+  - [Required API Configuration](#required-api-configuration)
+  - [Local Development Configuration](#local-development-configuration)
+  - [Verify Docker Installation](#verify-docker-installation)
 - [Quick Start Deployment](#quick-start-deployment)
+  - [Clone the Repository](#clone-the-repository)
+  - [Set up the Environment](#set-up-the-environment)
+  - [Running the Application](#running-the-application)
 - [User Interface](#user-interface)
+  - [Stopping the Application](#stopping-the-application)
 - [Troubleshooting](#troubleshooting)
 - [Additional Info](#additional-info)
 
@@ -124,21 +134,22 @@ Before you begin, ensure you have the following installed:
 This application supports multiple inference deployment patterns:
 
 - **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the `litellm_master_key` value from the generated `vault.yml` file
+  
 - **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-
-Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (GenAI Gateway, APISIX Gateway, etc.)
-- INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 ### Local Development Configuration
 
 **For Local Testing Only (Optional)**
 
-If you're testing with a local inference endpoint using a custom domain (e.g., `inference.example.com` mapped to localhost in your hosts file):
+If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
 
 1. Edit `.env` and set:
    ```bash
-   LOCAL_URL_ENDPOINT=inference.example.com
+   LOCAL_URL_ENDPOINT=api.example.com
    ```
    (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
 
@@ -165,8 +176,8 @@ docker ps
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/opea-project/Enterprise-Inference.git
-cd Enterprise-Inference/sample_solutions/CodeTranslation
+git clone https://github.com/cld2labs/GenAISamples.git
+cd GenAISamples/code-translation
 ```
 
 ### Set up the Environment
@@ -182,7 +193,8 @@ BACKEND_PORT=5001
 # Inference API Configuration
 # INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
 #   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/inference
+#   - For APISIX Gateway: https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf
+#     Note: APISIX Gateway requires the model name in the URL path
 #
 # INFERENCE_API_TOKEN: Authentication token/API key for the inference service
 #   - For GenAI Gateway: Your GenAI Gateway API key
@@ -196,14 +208,17 @@ LLM_TEMPERATURE=0.2
 LLM_MAX_TOKENS=4096
 
 # Code Translation Settings
-MAX_CODE_LENGTH=10000
+# MAX_CODE_LENGTH: Maximum input code length in characters
+# Note: For Enterprise Inference with CodeLlama-34b (max tokens: 5196)
+#       Recommended value is 8000-12000 characters (~4000-5000 tokens with prompt overhead)
+MAX_CODE_LENGTH=8000
 MAX_FILE_SIZE=10485760
 
 # CORS Configuration
 CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
 
 # Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like inference.example.com mapped to localhost, set to the domain without https://
+# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
 # Otherwise, set to: not-needed
 LOCAL_URL_ENDPOINT=not-needed
 EOF
@@ -218,7 +233,8 @@ BACKEND_PORT=5001
 # Inference API Configuration
 # INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
 #   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/inference
+#   - For APISIX Gateway: https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf
+#     Note: APISIX Gateway requires the model name in the URL path
 #
 # INFERENCE_API_TOKEN: Authentication token/API key for the inference service
 #   - For GenAI Gateway: Your GenAI Gateway API key
@@ -232,14 +248,17 @@ LLM_TEMPERATURE=0.2
 LLM_MAX_TOKENS=4096
 
 # Code Translation Settings
-MAX_CODE_LENGTH=10000
+# MAX_CODE_LENGTH: Maximum input code length in characters
+# Note: For Enterprise Inference with CodeLlama-34b (max tokens: 5196)
+#       Recommended value is 8000-12000 characters (~4000-5000 tokens with prompt overhead)
+MAX_CODE_LENGTH=8000
 MAX_FILE_SIZE=10485760
 
 # CORS Configuration
 CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
 
 # Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like inference.example.com mapped to localhost, set to the domain without https://
+# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
 # Otherwise, set to: not-needed
 LOCAL_URL_ENDPOINT=not-needed
 ```
@@ -255,7 +274,7 @@ LOCAL_URL_ENDPOINT=not-needed
 Start both API and UI services together with Docker Compose:
 
 ```bash
-# From the CodeTranslation directory
+# From the code-translation directory
 docker compose up --build
 
 # Or run in detached mode (background)
@@ -343,7 +362,7 @@ For comprehensive troubleshooting guidance, common issues, and solutions, refer 
 
 ## Additional Info
 
-The following models have been validated with CodeTranslation:
+The following models have been validated with code-translation:
 
 | Model | Hardware |
 |-------|----------|
