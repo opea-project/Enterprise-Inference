@@ -18,10 +18,11 @@ class APIClient:
     """
 
     def __init__(self):
-        self.base_url = config.INFERENCE_API_ENDPOINT
+        self.embedding_base_url = config.EMBEDDING_API_ENDPOINT
+        self.inference_base_url = config.INFERENCE_MODEL_ENDPOINT
         self.token = config.INFERENCE_API_TOKEN
         self.http_client = httpx.Client(verify=False)
-        logger.info(f"✓ API Client initialized with endpoint: {self.base_url}")
+        logger.info(f"✓ API Client initialized - Embedding: {self.embedding_base_url}, Inference: {self.inference_base_url}")
     
     def get_embedding_client(self):
         """
@@ -32,7 +33,7 @@ class APIClient:
 
         return OpenAI(
             api_key=self.token,
-            base_url=f"{self.base_url}/v1",
+            base_url=f"{self.embedding_base_url}/v1",
             http_client=self.http_client
         )
     
@@ -45,7 +46,7 @@ class APIClient:
 
         return OpenAI(
             api_key=self.token,
-            base_url=f"{self.base_url}/v1",
+            base_url=f"{self.inference_base_url}/v1",
             http_client=self.http_client
         )
     
