@@ -265,6 +265,9 @@ LOCAL_URL_ENDPOINT=not-needed
 
 **Important Configuration Notes:**
 
+- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-api-endpoint.com/deployment`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf`)
+- **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (see [Local Development Configuration](#local-development-configuration))
 
 **Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for the backend service.
