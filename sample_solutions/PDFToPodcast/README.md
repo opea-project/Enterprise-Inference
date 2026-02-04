@@ -125,12 +125,21 @@ docker ps
 
 This application supports multiple inference deployment patterns:
 
-- **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-- **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+**GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the litellm_master_key value from the generated vault.yml file
+
+**APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/deepseek/DeepSeek-R1-Distill-Qwen-32B
+  - Note: APISIX requires the model name in the URL path
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (GenAI Gateway, APISIX Gateway, etc.)
+- INFERENCE_API_ENDPOINT: URL to your inference service (example: https://api.example.com)
 - INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
+- INFERENCE_MODEL_NAME: Model name (default: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B)
 
 **For TTS Service (Audio Generation):**
 
@@ -138,13 +147,13 @@ OpenAI API Key for text-to-speech:
 - Sign up at https://platform.openai.com/
 - Create API key at https://platform.openai.com/api-keys
 - Key format starts with `sk-proj-`
-- Requires access to TTS APIs
+- Requires access to TTS APIs (tts-1-hd model)
 
 ### Local Development Configuration
 
 **For Local Testing Only**
 
-If you're testing with a local inference endpoint using a custom domain (e.g., `inference.example.com` mapped to localhost in your hosts file):
+If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
 
 1. Edit `api/llm-service/.env` and set:
    ```bash
@@ -195,11 +204,7 @@ Available TTS voices: alloy, echo, fable, onyx, nova, shimmer. Default voices ar
 cp api/llm-service/.env.example api/llm-service/.env
 ```
 
-Open `api/llm-service/.env` and configure your inference endpoint:
-
-- Replace `INFERENCE_API_ENDPOINT` with your inference service URL (without /v1)
-- Replace `INFERENCE_API_TOKEN` with your pre-generated bearer token
-- Update `INFERENCE_MODEL_NAME` if different from default (deepseek-ai/DeepSeek-R1-Distill-Qwen-32B)
+Open `api/llm-service/.env` and configure your inference endpoint with the values from the "Required API Keys" section above.
 
 **4. Backend Service Configuration:**
 
@@ -240,16 +245,37 @@ docker compose logs -f backend
 
 # Frontend only
 docker compose logs -f frontend
+
+# Specific service (pdf-service, llm-service, tts-service)
+docker compose logs -f pdf-service
+docker compose logs -f llm-service
+docker compose logs -f tts-service
+```
+
+**Check container status**:
+
+```bash
+# Check status of all containers
+docker compose ps
+
+# Check detailed status with resource usage
+docker stats
+
+# Check if all containers are running and healthy
+docker ps --filter "name=pdf-podcast"
 ```
 
 **Verify the services are running**:
 
 ```bash
-# Check API health
+# Check API health endpoints
 curl http://localhost:8002/health
 
-# Check if containers are running
-docker compose ps
+# Check individual service health
+curl http://localhost:8001/health  # PDF Service
+curl http://localhost:8002/health  # LLM Service
+curl http://localhost:8003/health  # TTS Service
+curl http://localhost:8000/health  # Backend Gateway
 ```
 
 ## User Interface

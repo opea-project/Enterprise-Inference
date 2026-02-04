@@ -41,6 +41,8 @@ services:
     volumes:
       - ./api/tts-service:/app
       - ./api/tts-service/static:/app/static
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
     networks:
       - app_network
     restart: unless-stopped
