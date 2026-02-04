@@ -55,10 +55,8 @@ idrac_endpoint     = "https://100.67.x.x"
 idrac_user         = "root"
 idrac_password     = "calvin"
 idrac_ssl_insecure = true
-
-ubuntu_username = "user"
-ubuntu_hostname = "inference-node"
-use_dhcp        = true
+ubuntu_username    = "user"
+ubuntu_password    = "password"
 ```
 
 **Apply Terraform**
@@ -105,7 +103,7 @@ sudo ./deploy-enterprise-inference.sh \
 | Option |	Description | 
 | -------| ------------ |
 | -u	| OS username |
-| -p  | OS userpassword |
+| -p    | OS userpassword |
 | -t	| Hugging Face token |
 | -g	| gaudi3 or cpu |
 | -m	| Model IDs |
