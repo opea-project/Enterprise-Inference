@@ -113,18 +113,30 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
-- **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-- **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+**GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the litellm_master_key value from the generated vault.yml file
+
+**APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/bge-base-en-v1.5 (for embedding) and https://api.example.com/Llama-3.1-8B-Instruct (for inference)
+  - Note: APISIX requires the model name in the URL path
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (GenAI Gateway, APISIX Gateway, etc.)
+- INFERENCE_API_ENDPOINT: URL to your inference service (example: https://api.example.com)
 - INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
+- EMBEDDING_MODEL_NAME: Embedding model name (default: BAAI/bge-base-en-v1.5)
+- INFERENCE_MODEL_NAME: Inference model name (default: meta-llama/Llama-3.1-8B-Instruct)
+- EMBEDDING_API_ENDPOINT: (Optional, for APISIX only) URL with embedding model in path
+- INFERENCE_MODEL_ENDPOINT: (Optional, for APISIX only) URL with inference model in path
 
 ### Local Development Configuration
 
-**For Local Testing Only (Optional)**
+**For Local Testing Only**
 
-If you're testing with a local inference endpoint using a custom domain (e.g., `inference.example.com` mapped to localhost in your hosts file):
+If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
 
 1. Edit `api/.env` and set:
    ```bash
@@ -176,7 +188,7 @@ LOCAL_URL_ENDPOINT=not-needed
 EOF
 ```
 
-**Note:** If using a local domain (e.g., `inference.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
+**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
 
 #### Step 2: Create `api/.env` File
 
@@ -188,33 +200,36 @@ cp api/.env.example api/.env
 
 Then edit `api/.env` with your actual credentials, **OR** create it directly:
 
+**For GenAI Gateway:**
+
 ```bash
 cat > api/.env << EOF
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/inference
-INFERENCE_API_ENDPOINT=https://your-actual-api-endpoint.com
-INFERENCE_API_TOKEN=your-actual-token-here
+INFERENCE_API_ENDPOINT=https://genai-gateway.example.com
+INFERENCE_API_TOKEN=your-api-key-here
 
-# Model Configuration
-# IMPORTANT: Use the full model names as they appear in your inference service
-# Check available models: curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"
 EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
 INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 
-# Local URL Endpoint (for Docker)
 LOCAL_URL_ENDPOINT=not-needed
 EOF
 ```
 
-**Important Configuration Notes:**
+**For APISIX Gateway:**
 
-- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-actual-api-endpoint.com`)
-- **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
-- **EMBEDDING_MODEL_NAME** and **INFERENCE_MODEL_NAME**: Use the exact model names from your inference service
-  - To check available models: `curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"`
-- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping
+```bash
+cat > api/.env << EOF
+INFERENCE_API_ENDPOINT=https://apisix-gateway.example.com
+INFERENCE_API_TOKEN=your-token-here
+
+EMBEDDING_API_ENDPOINT=https://apisix-gateway.example.com/bge-base-en-v1.5
+INFERENCE_MODEL_ENDPOINT=https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
+
+EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
+INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
+
+LOCAL_URL_ENDPOINT=not-needed
+EOF
+```
 
 **Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./api/.env` (backend) files.
 
@@ -240,10 +255,10 @@ The UI will be available at: `http://localhost:3000`
 docker compose logs -f
 
 # Backend only
-docker compose logs -f backend
+docker compose logs -f multiagent-qna-backend
 
 # Frontend only
-docker compose logs -f frontend
+docker compose logs -f multiagent-qna-frontend
 ```
 
 **Verify the services are running**:
