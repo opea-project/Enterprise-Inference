@@ -25,8 +25,8 @@ ALLOWED_EXTENSIONS = {".pdf"}
 # Code Translation Settings
 SUPPORTED_LANGUAGES = ["java", "c", "cpp", "python", "rust", "go"]
 # MAX_CODE_LENGTH: For Enterprise Inference with CodeLlama-34b (max tokens: 5196)
-# Recommended: 8000-12000 characters (~4000-5000 tokens with prompt overhead)
-MAX_CODE_LENGTH = int(os.getenv("MAX_CODE_LENGTH", "8000"))  # characters
+# Set to 4000 characters to stay safely under the token limit with prompt overhead
+MAX_CODE_LENGTH = int(os.getenv("MAX_CODE_LENGTH", "4000"))  # characters
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))  # Lower temperature for more deterministic code generation
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
 
