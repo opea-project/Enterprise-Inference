@@ -22,14 +22,16 @@ This document contains all common issues encountered during development and thei
    ```
 3. Restart the server
 
-#### "Code too long. Maximum length is 10000 characters"
+#### "Code too long. Maximum length is 8000 characters"
 
 **Solution**:
 
 - The limit exists due to model context window constraints
+  - CodeLlama-34b on Enterprise Inference has a max token limit of 5196
+  - 8000 characters ≈ 4000-5000 tokens including prompt overhead
 - Break your code into smaller modules
 - Translate one class or function at a time
-- Or adjust `MAX_CODE_LENGTH` in `.env` if needed
+- Or adjust `MAX_CODE_LENGTH` in `.env` if your deployment supports higher limits (up to ~12000 characters max)
 
 #### "Source language not supported"
 
@@ -120,7 +122,7 @@ npm run dev
 
 ### Character Counter Not Updating
 
-**Problem**: Character counter shows 0 / 10,000 even with code
+**Problem**: Character counter shows 0 / 8,000 even with code
 
 **Solution**:
 
