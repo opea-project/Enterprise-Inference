@@ -22,16 +22,16 @@ This document contains all common issues encountered during development and thei
    ```
 3. Restart the server
 
-#### "Code too long. Maximum length is 8000 characters"
+#### "Code too long. Maximum length is 4000 characters"
 
 **Solution**:
 
 - The limit exists due to model context window constraints
   - CodeLlama-34b on Enterprise Inference has a max token limit of 5196
-  - 8000 characters ≈ 4000-5000 tokens including prompt overhead
+  - 4000 characters stays safely under the token limit including prompt overhead
 - Break your code into smaller modules
 - Translate one class or function at a time
-- Or adjust `MAX_CODE_LENGTH` in `.env` if your deployment supports higher limits (up to ~12000 characters max)
+- Or adjust `MAX_CODE_LENGTH` in `.env` if your deployment supports higher limits
 
 #### "Source language not supported"
 
