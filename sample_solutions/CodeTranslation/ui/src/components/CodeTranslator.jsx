@@ -127,8 +127,8 @@ export default function CodeTranslator({
             <label className="block text-sm font-medium text-gray-700">
               Source Code ({LANGUAGE_LABELS[sourceLanguage]})
             </label>
-            <span className={`text-xs ${sourceCode.length > 10000 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-              {sourceCode.length.toLocaleString()} / 10,000 characters
+            <span className={`text-xs ${sourceCode.length > 8000 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+              {sourceCode.length.toLocaleString()} / 8,000 characters
             </span>
           </div>
           <textarea
@@ -136,12 +136,12 @@ export default function CodeTranslator({
             onChange={(e) => setSourceCode(e.target.value)}
             placeholder={`Enter your ${sourceLanguage} code here...`}
             className={`w-full h-96 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm resize-none ${
-              sourceCode.length > 10000 ? 'border-red-500' : 'border-gray-300'
+              sourceCode.length > 8000 ? 'border-red-500' : 'border-gray-300'
             }`}
           />
-          {sourceCode.length > 10000 && (
+          {sourceCode.length > 8000 && (
             <p className="text-xs text-red-600 mt-1">
-              Code exceeds maximum length. Please reduce to 10,000 characters or less.
+              Code exceeds maximum length. Please reduce to 8,000 characters or less.
             </p>
           )}
         </div>
@@ -183,7 +183,7 @@ export default function CodeTranslator({
       {/* Translate Button */}
       <button
         onClick={handleTranslate}
-        disabled={isTranslating || !sourceCode.trim() || sourceCode.length > 10000}
+        disabled={isTranslating || !sourceCode.trim() || sourceCode.length > 8000}
         className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
       >
         {isTranslating ? (
@@ -202,8 +202,8 @@ export default function CodeTranslator({
       {/* Info Note */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-xs text-gray-600">
-          <span className="font-semibold">Note:</span> The 10,000 character limit is due to CodeLlama-34b's
-          context window (16K tokens). This ensures optimal translation quality and prevents timeouts.
+          <span className="font-semibold">Note:</span> The 8,000 character limit is due to CodeLlama-34b's
+          max token limit (5196 tokens) on Enterprise Inference. This ensures optimal translation quality and prevents errors.
           For larger files, consider breaking them into smaller modules.
         </p>
       </div>
