@@ -155,26 +155,26 @@ git checkout ${RELEASE}
 ### 2. Configure the Setup Files and Environment
 
 **Update inference-config.cfg:**
-Update configuration files for single node deployment. Note that changes to the users and passwords in this file will impact the verification step settings in section 4 below.
-
-* Production installations should set your own values
-* Add your Hugging Face token
-* Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
-* Set deploy_genai_gateway to on, and make deploy_keycloak_apisix to off
 
 ```bash
 vi core/inventory/inference-config.cfg
 ```
 
-Sample default values (insert your token) for a full deployment of the inference stack with Llama-8B model.
+> **Note:** Update configuration files for single node deployment. Note that changes to the users and passwords in this file will impact the verification step settings in section 4 below.
+* Replace cluster_url with your DNS , it must match with DNS used in certs generation.
+* Set keycloak `keycloak_client_id` `keycloak_admin_user` `keycloak_admin_password` values
+* Add your Hugging Face token
+* Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
+* Set deploy_keycloak_apisix to on and Set deploy_genai_gateway to off
+
 
 ```
-cluster_url=api.example.com  # <-- Replace with your own FQDN
+cluster_url=api.example.com
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=my-client-id   # <-- Replace with Keycloak client ID
-keycloak_admin_user=your-keycloak-admin-user   # <-- Replace with your keycloack admin username
-keycloak_admin_password=changeme   # <-- Replace with your keycloack admin password
+keycloak_client_id=my-client-id  
+keycloak_admin_user=your-keycloak-admin-user   
+keycloak_admin_password=changeme 
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
@@ -190,7 +190,6 @@ deploy_ceph=off
 deploy_istio=off
 uninstall_ceph=off
 ```
-> **Note:** Replace cluster_url with your DNS , it must match with DNS used in certs generation.
 
 To support non-interactive execution of inference-stack-deploy.sh, create a file named "core/inentory/.become-passfile" with your user's sudo password:
 
@@ -273,6 +272,8 @@ echo $TOKEN
 If a valid token is returned (long JWT string), the environment is ready for inference testing.
 
 **Run a test query for Gaudi:**
+> Note: Replace ${BASE_URL} with your DNS
+
 ```bash
 curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
 -X POST \
