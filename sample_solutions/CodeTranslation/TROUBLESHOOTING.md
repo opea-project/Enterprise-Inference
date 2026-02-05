@@ -122,7 +122,7 @@ npm run dev
 
 ### Character Counter Not Updating
 
-**Problem**: Character counter shows 0 / 8,000 even with code
+**Problem**: Character counter shows 0 / 4,000 even with code
 
 **Solution**:
 
