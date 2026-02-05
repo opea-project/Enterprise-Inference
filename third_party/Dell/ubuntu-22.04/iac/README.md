@@ -109,12 +109,28 @@ sudo ./deploy-enterprise-inference.sh \
 | -m	| Model IDs |
 | -b	| Repo branch (default: release-1.4.0) |
 | -r	| Resume from last checkpoint |
+| -d    | keycloak or genai, by default set to keycloak |
+| -o    | off or on, by default observability set to off |
 
 **Resume After Failure**
 
 The deployment script is resume-safe. If a failure occurs, simply rerun the script with the -r flag:
 ```bash
-sudo ./deploy-enterprise-inference.sh -r
+sudo ./deploy-enterprise-inference.sh \
+-u user \
+-p Linux123! \
+-t hf_XXXXXXXXXXXX \
+-g gaudi3 \
+-m "1" \
+-r
+```
+
+**To uninstall this deployment**
+
+Below command will delete pods, uninstalls Enterprise Inference stack and state file
+
+```bash
+sudo ./deploy-enterprise-inference.sh -u user uninstall
 ```
 
 **State is tracked in:**
