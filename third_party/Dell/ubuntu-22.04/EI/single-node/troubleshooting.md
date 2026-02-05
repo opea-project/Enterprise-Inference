@@ -70,9 +70,9 @@ Before re-running deployment, verify and update your inference-config.cfg:
 cluster_url=api.example.com
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=api
-keycloak_admin_user=api-admin
-keycloak_admin_password=changeme!!
+keycloak_client_id=my-client-id   # <-- Replace with your Keycloak client ID
+keycloak_admin_user=your-keycloak-admin-user   # <-- Replace with your keycloak admin username
+keycloak_admin_password=changeme   # <-- Replace with your keycloak admin password
 vault_pass_code=place-holder-123
 deploy_kubernetes_fresh=on
 deploy_ingress_controller=on
