@@ -252,23 +252,25 @@ kubectl get apisixroutes
 
 ### 5. Test the Inference
 
-**Environment Setup**
-```bash
-export CLUSTER_URL=api.example.com                   
-export BASE_URL=https://api.example.com         
-export KEYCLOAK_REALM=master
-export KEYCLOAK_CLIENT_ID=api
-export KEYCLOAK_CLIENT_SECRET=$(bash scripts/keycloak-fetch-client-secret.sh api.example.com api-admin 'changeme!!' api | awk -F': ' '/Client secret:/ {print $2}')
-```
-
 **Obtain Access Token**
 
+Before generating the access token, ensure all Keycloak-related values are correctly set in the `Enterprise-Inference/core/scripts/generate-token.sh` and these values must match with keycloak values in `Enterprise-Inference/core/inventory/inference-config.cfg` .
+
 ```bash
-export TOKEN=$(curl -k -X POST $BASE_URL/token \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d "grant_type=client_credentials&client_id=${KEYCLOAK_CLIENT_ID}&client_secret=${KEYCLOAK_CLIENT_SECRET}" \
-  | jq -r .access_token)
+cd Enterprise-Inference/core/scripts
+chmod +x generate-token.sh
+./generate-token.sh
 ```
+
+**Verify the Token**
+
+After the script completes successfully, confirm that the token is available in your shell:
+
+```bash
+echo $TOKEN
+```
+
+If a valid token is returned (long JWT string), the environment is ready for inference testing.
 
 **Run a test query for Gaudi:**
 ```bash
