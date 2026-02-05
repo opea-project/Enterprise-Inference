@@ -151,12 +151,11 @@ git checkout ${RELEASE}
 ```bash
 vi core/inventory/inference-config.cfg
 ```
-> **Note:** Update configuration files for single node deployment. Note that changes to the users and passwords in this file will impact the verification step settings in section 4 below.
-* Replace cluster_url with your DNS , it must match with DNS used in certs generation.
-* Set keycloak `keycloak_client_id` `keycloak_admin_user` `keycloak_admin_password` values
-* Add your Hugging Face token
-* Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
-* Set deploy_genai_gateway to on, and deploy_keycloak_apisix to off
+> **Note:** Update configuration files for single node genai deployment, Below are the changes needed.
+> * Replace cluster_url with your DNS , it must match with DNS used in certs generation.
+> * Add your Hugging Face token
+> * Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
+> * Set deploy_genai_gateway to on, and deploy_keycloak_apisix to off
 
 ```
 cluster_url=api.example.com  # <-- Replace with your own FQDN
