@@ -154,41 +154,13 @@ EOF
 
 #### Step 2: Create `api/.env` File
 
-You can either copy from the example file:
+Copy from the example file and edit with your actual credentials:
 
 ```bash
 cp api/.env.example api/.env
 ```
 
-Then edit `api/.env` with your actual credentials, **OR** create it directly:
-
-```bash
-cat > api/.env << EOF
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
-#     Note: APISIX Gateway requires the model name in the URL path
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-#   - For GenAI Gateway: Your GenAI Gateway API key
-#   - For APISIX Gateway: Your APISIX authentication token
-INFERENCE_API_ENDPOINT=https://your-actual-api-endpoint.com
-INFERENCE_API_TOKEN=your-actual-token-here
-
-# Model Configuration
-# IMPORTANT: Use the full model names as they appear in your inference service
-# Check available models: curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"
-#
-# EMBEDDING_ENDPOINT: For APISIX/Keycloak, you need a separate endpoint for embeddings
-#   Example: EMBEDDING_ENDPOINT=https://apisix-gateway.example.com/bge-base-en-v1.5
-EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
-INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-
-# Local URL Endpoint (for Docker)
-LOCAL_URL_ENDPOINT=not-needed
-EOF
-```
+Then edit `api/.env` to set your `INFERENCE_API_ENDPOINT` and `INFERENCE_API_TOKEN`.
 
 **Important Configuration Notes:**
 
