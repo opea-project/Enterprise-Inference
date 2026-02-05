@@ -29,6 +29,7 @@ export IDRAC_PASS=calvin
 ```
 **Mount ISO**
 ```bash
+chmod +x mount-iso.sh
 ./mount-iso.sh
 ```
 ---
@@ -47,7 +48,10 @@ Key Notes
 
 **Terraform Variables**
 
-Update your terraform variables in 'terraform.tfvars'
+The following variables must be explicitly provided in 'terraform.tfvars' for the Ubuntu installer boot workflow to function correctly.
+
+While additional variables exist with default values defined in variables.tf, these credentials and endpoints are mandatory and have no safe defaults.
+
 
 Example (terraform.tfvars):
 ```bash
@@ -179,7 +183,7 @@ free -h
 **2. Enterprise Inference Services**
 Verify all inference services are running.
 ```bash
-kubectl get pods
+kubectl get pods -A
 ```
 Expected:
 - All services in RUNNING state
