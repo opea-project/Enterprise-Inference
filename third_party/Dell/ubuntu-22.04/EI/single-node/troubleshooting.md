@@ -67,7 +67,7 @@ Deployment fails due to incorrect or missing configuration values.
 **Fix:**
 Before re-running deployment, verify and update your inference-config.cfg:
 ```bash
-cluster_url=api.example.com
+cluster_url=api.example.com  # <-- Replace with cluster url
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
 keycloak_client_id=my-client-id   # <-- Replace with your Keycloak client ID
