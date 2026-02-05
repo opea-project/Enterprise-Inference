@@ -206,18 +206,15 @@ cp api/llm-service/.env.example api/llm-service/.env
 
 Open `api/llm-service/.env` and configure your inference endpoint with the values from the "Required API Keys" section above.
 
-If using a local domain (e.g., `api.example.com` mapped to localhost), also set:
-```bash
-LOCAL_URL_ENDPOINT=api.example.com
-```
-For public domains, leave the default value `not-needed`.
+**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), also edit `LOCAL_URL_ENDPOINT` and replace `not-needed` with your domain name (without `https://`).
 
 **4. Backend Service Configuration:**
 
 ```bash
 cp .env.example .env
 ```
-No changes needed. Uses default values.
+
+**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), edit `.env` and replace `not-needed` with your domain name (without `https://`).
 
 ### Running the Application
 
