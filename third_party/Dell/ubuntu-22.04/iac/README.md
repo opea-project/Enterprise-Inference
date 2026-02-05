@@ -46,6 +46,25 @@ Key Notes
 - Power reset is forced using redfish_power
 - Boot mode (UEFI/Legacy) is not configurable on 17G servers
 
+**Terraform Installation (Client Machine)**
+
+Terraform is executed from a client machine (such as your laptop or a jump host), not from the target server or iDRAC.
+
+Install Terraform on the machine where you will run the Terraform commands.
+
+Download Terraform:
+https://developer.hashicorp.com/terraform/install
+
+Choose the package for your operating system and follow the installation instructions.
+
+Verify Installation
+```bash
+terraform version
+```
+Terraform should return a version without errors.
+
+If Terraform is not found, ensure the installation directory is added to your system PATH.
+
 **Terraform Variables**
 
 The following variables must be explicitly provided in 'terraform.tfvars' for the Ubuntu installer boot workflow to function correctly.
@@ -117,7 +136,8 @@ sudo ./deploy-enterprise-inference.sh \
 -p Linux123! \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
--m "1"
+-m "1" \
+-a "replace-with-your-dns"
 ```
  
 | Option |	Description | 
@@ -131,6 +151,7 @@ sudo ./deploy-enterprise-inference.sh \
 | -r	| Resume from last checkpoint |
 | -d    | keycloak or genai, by default set to keycloak |
 | -o    | off or on, by default observability set to off |
+| -a    | Cluster URL/ FQDN |
 
 **Resume After Failure**
 
@@ -142,6 +163,7 @@ sudo ./deploy-enterprise-inference.sh \
 -t hf_XXXXXXXXXXXX \
 -g gaudi3 \
 -m "1" \
+-a "replace-with-your-dns"
 -r
 ```
 
