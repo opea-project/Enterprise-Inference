@@ -28,6 +28,29 @@ decoding failed due to the following error(s):
 2. If using a local domain (e.g., `inference.example.com`), replace `not-needed` with your domain name (without `https://`)
 3. Restart Docker Compose: `docker compose down && docker compose up`
 
+### Error: "Network is unreachable" or "Connection refused" with custom domain
+
+**Problem**:
+```
+httpcore.ConnectError: [Errno 101] Network is unreachable
+httpcore.ConnectError: [Errno 111] Connection refused
+```
+
+**Cause**: Docker's `host-gateway` cannot resolve to your API server IP address.
+
+**Solution**:
+
+Update `docker-compose.yml` line 17 to use your API server's actual IP:
+```yaml
+# Change from:
+- "${LOCAL_URL_ENDPOINT}:host-gateway"
+
+# To:
+- "${LOCAL_URL_ENDPOINT}:YOUR_API_SERVER_IP"
+```
+
+Then restart: `docker compose down && docker compose up`
+
 ### Error: "404 Not Found" when uploading PDF
 
 **Problem**:
