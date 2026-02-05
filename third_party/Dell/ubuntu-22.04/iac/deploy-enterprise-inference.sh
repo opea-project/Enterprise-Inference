@@ -689,7 +689,7 @@ main() {
         cd certs
 
         if [[ ! -f "cert.pem" ]] || [[ ! -f "key.pem" ]]; then
-            su "${USERNAME}" -c "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=api.example.com'"
+            su "${USERNAME}" -c "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=${CLUSTER_URL}'"
             log_success "SSL certificates created"
         else
             log_info "SSL certificates already exist"
