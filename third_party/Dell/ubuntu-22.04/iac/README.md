@@ -94,7 +94,13 @@ This script performs **all post-OS configuration** and deploys the **Enterprise 
     - SSH, sudo, certificates
     - Final inference stack deployment
 
-**Required Parameters**
+**Change permission to your file**
+
+```bash
+chmod +x deploy-enterprise-inference.sh
+```
+**Required Parameters to run the script**
+
 ```bash
 sudo ./deploy-enterprise-inference.sh \
 -u user \
