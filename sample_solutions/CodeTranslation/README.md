@@ -176,8 +176,8 @@ docker ps
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/cld2labs/GenAISamples.git
-cd GenAISamples/code-translation
+git clone https://github.com/opea-project/Enterprise-Inference.git
+cd Enterprise-Inference/sample_solutions/CodeTranslation
 ```
 
 ### Set up the Environment
