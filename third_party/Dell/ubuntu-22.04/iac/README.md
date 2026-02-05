@@ -52,12 +52,12 @@ Terraform is executed from a client machine (such as your laptop or a jump host)
 
 Install Terraform on the machine where you will run the Terraform commands.
 
-Download Terraform:
+**Download Terraform:**
 https://developer.hashicorp.com/terraform/install
 
 Choose the package for your operating system and follow the installation instructions.
 
-Verify Installation
+**Verify Installation**
 ```bash
 terraform version
 ```
