@@ -294,10 +294,10 @@ The UI will be available at: `http://localhost:3000`
 docker compose logs -f
 
 # Backend only
-docker compose logs -f backend
+docker compose logs -f code-trans-backend
 
 # Frontend only
-docker compose logs -f frontend
+docker compose logs -f code-trans-frontend
 ```
 
 **Verify the services are running**:
