@@ -48,7 +48,7 @@ Key Notes
 
 **Terraform Installation (Client Machine)**
 
-Terraform is executed from a client machine (such as your laptop or a jump host), not from the target server or iDRAC.
+> **Note:** Terraform is executed from a client machine (such as your laptop or a jump host), not from the target server or iDRAC.
 
 Install Terraform on the machine where you will run the Terraform commands.
 
@@ -61,9 +61,7 @@ Choose the package for your operating system and follow the installation instruc
 ```bash
 terraform version
 ```
-Terraform should return a version without errors.
-
-If Terraform is not found, ensure the installation directory is added to your system PATH.
+Terraform should return a version without errors. If Terraform is not found, ensure the installation directory is added to your system PATH.
 
 **Terraform Variables**
 
