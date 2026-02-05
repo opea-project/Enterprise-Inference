@@ -131,7 +131,7 @@ This application supports multiple inference deployment patterns:
   - The API key is the litellm_master_key value from the generated vault.yml file
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-  - URL format: https://api.example.com/deepseek/DeepSeek-R1-Distill-Qwen-32B
+  - URL format: https://api.example.com/DeepSeek-R1-Distill-Qwen-32B
   - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
@@ -205,6 +205,12 @@ cp api/llm-service/.env.example api/llm-service/.env
 ```
 
 Open `api/llm-service/.env` and configure your inference endpoint with the values from the "Required API Keys" section above.
+
+If using a local domain (e.g., `api.example.com` mapped to localhost), also set:
+```bash
+LOCAL_URL_ENDPOINT=api.example.com
+```
+For public domains, leave the default value `not-needed`.
 
 **4. Backend Service Configuration:**
 
