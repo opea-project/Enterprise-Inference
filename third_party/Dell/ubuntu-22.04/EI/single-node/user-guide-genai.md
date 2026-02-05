@@ -148,22 +148,23 @@ git checkout ${RELEASE}
 
 **Update inference-config.cfg**
 
-* Production installations should set your own values
-* Add your Hugging Face token
-* Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
-* Set deploy_genai_gateway to on, and make deploy_keycloak_apisix to off
-
 ```bash
 vi core/inventory/inference-config.cfg
 ```
+> **Note:** Update configuration files for single node deployment. Note that changes to the users and passwords in this file will impact the verification step settings in section 4 below.
+* Replace cluster_url with your DNS , it must match with DNS used in certs generation.
+* Set keycloak `keycloak_client_id` `keycloak_admin_user` `keycloak_admin_password` values
+* Add your Hugging Face token
+* Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
+* Set deploy_genai_gateway to on, and deploy_keycloak_apisix to off
 
 ```
 cluster_url=api.example.com  # <-- Replace with your own FQDN
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=my-client-id   # <-- Replace with Keycloak client ID
-keycloak_admin_user=your-keycloak-admin-user   # <-- Replace with your keycloack admin username
-keycloak_admin_password=changeme   # <-- Replace with your keycloack admin password
+keycloak_client_id=my-client-id   
+keycloak_admin_user=your-keycloak-admin-user   
+keycloak_admin_password=changeme   
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
@@ -179,7 +180,6 @@ deploy_ceph=off
 deploy_istio=off
 uninstall_ceph=off
 ```
-> **Note:** Replace cluster_url with your DNS , it must match with DNS used in certs generation.
 
 **Update hosts.yaml File**
 
