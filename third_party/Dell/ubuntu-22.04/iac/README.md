@@ -76,9 +76,19 @@ It will prompt for the user inputs during the installation, provide your inputs 
 
 ## 3.Post-OS Enterprise Inference Deployment
 
-Once OS is installed, login to your machine and run the post-os installations below.
+Once OS is installed, Download the deploy-enterprise-inference.sh script to your machine using either wget or curl.
 
-**Script:** [iac/deploy-enterprise-inference.sh](./deploy-enterprise-inference.sh)
+```bash
+wget -O deploy-enterprise-inference.sh \
+https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/refs/heads/cld2labs/ubuntu22.04-deployment-scripts/third_party/Dell/ubuntu-22.04/iac/deploy-enterprise-inference.sh
+```
+or
+
+```bash
+curl -fsSL \
+https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/refs/heads/cld2labs/ubuntu22.04-deployment-scripts/third_party/Dell/ubuntu-22.04/iac/deploy-enterprise-inference.sh \
+-o deploy-enterprise-inference.sh
+```
 
 This script performs **all post-OS configuration** and deploys the **Enterprise Inference stack** on a **single node**.
 
