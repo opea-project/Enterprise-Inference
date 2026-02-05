@@ -161,9 +161,9 @@ vi core/inventory/inference-config.cfg
 cluster_url=api.example.com  # <-- Replace with your own FQDN
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=api
-keycloak_admin_user=api-admin
-keycloak_admin_password=changeme!!
+keycloak_client_id=my-client-id   # <-- Replace with Keycloak client ID
+keycloak_admin_user=your-keycloak-admin-user   # <-- Replace with your keycloack admin username
+keycloak_admin_password=changeme   # <-- Replace with your keycloack admin password
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
