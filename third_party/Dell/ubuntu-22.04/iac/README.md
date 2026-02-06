@@ -125,7 +125,6 @@ sudo ./deploy-enterprise-inference.sh \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
 -m "1" \
--a "replace-with-your-dns"
 ```
  
 | Option |	Description | 
@@ -139,7 +138,6 @@ sudo ./deploy-enterprise-inference.sh \
 | -r	| Resume from last checkpoint |
 | -d    | keycloak or genai, by default set to keycloak |
 | -o    | off or on, by default observability set to off |
-| -a    | Cluster URL/ FQDN |
 
 **Resume After Failure**
 
@@ -151,7 +149,6 @@ sudo ./deploy-enterprise-inference.sh \
 -t hf_XXXXXXXXXXXX \
 -g gaudi3 \
 -m "1" \
--a "replace-with-your-dns"
 -r
 ```
 
