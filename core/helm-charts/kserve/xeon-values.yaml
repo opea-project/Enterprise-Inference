@@ -1,0 +1,44 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Values for KServe vLLM on Intel Xeon CPUs
+
+image:
+  repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
+  tag: "v0.10.2"
+  pullPolicy: IfNotPresent
+
+# CPU-specific configurations
+accelDevice: ""
+accelDeviceCount: 0
+
+# vLLM CPU optimizations
+dtype: "auto"
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+max_model_len: 4096
+
+# Resource allocation for Xeon
+resources:
+  limits:
+    cpu: "32"
+    memory: 128Gi
+  requests:
+    cpu: "16"
+    memory: 64Gi
+
+# Node selector for CPU nodes
+nodeSelector:
+  intel.feature.node.kubernetes.io/cpu-cpuid.AVX512VNNI: "true"
+
+# Model configurations optimized for CPU
+defaultModelConfigs:
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  extraCmdArgs:
+    - "--disable-log-requests"
+    - "--enable-prefix-caching"
+    - "--max-num-seqs"
+    - "256"
+    - "--max-num-batched-tokens"
+    - "4096"

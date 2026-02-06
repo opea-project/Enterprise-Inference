@@ -1,0 +1,229 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy KServe Operator for Inference Services
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_kserve.yml"
+    - "{{ lookup('env', 'PWD') }}/config/inference_env.yml"
+  roles:
+    - role: inference-tools
+  tasks:
+    - name: Print active tags for this task
+      debug:
+        var: ansible_run_tags
+      tags: always
+      run_once: true
+
+    - name: Display KServe deployment configuration
+      debug:
+        msg:
+          - "==================================================================="
+          - "KServe Operator Deployment Configuration"
+          - "==================================================================="
+          - "KServe Version: {{ kserve_version }}"
+          - "Install KServe: {{ install_kserve }}"
+          - "Uninstall KServe: {{ uninstall_kserve }}"
+      tags: always
+      run_once: true
+
+    - name: Install KServe Operator
+      block:
+        - name: Check if KServe CRDs exist
+          kubernetes.core.k8s_info:
+            kind: CustomResourceDefinition
+            name: inferenceservices.serving.kserve.io
+          register: kserve_crd_check
+          failed_when: false
+
+        - name: Display KServe installation status
+          debug:
+            msg: "KServe CRDs {{ 'already exist' if kserve_crd_check.resources else 'not found, will install' }}"
+
+        - name: Install KServe using kubectl
+          when: not kserve_crd_check.resources
+          block:
+            - name: Apply KServe CRDs
+              kubernetes.core.k8s:
+                definition: "{{ lookup('url', 'https://github.com/kserve/kserve/releases/download/v' + kserve_version + '/kserve.yaml', split_lines=False) }}"
+                state: present
+              register: kserve_install
+
+            - name: Wait for KServe controller to be ready
+              kubernetes.core.k8s_info:
+                kind: Deployment
+                name: kserve-controller-manager
+                namespace: kserve
+              register: kserve_controller
+              until: 
+                - kserve_controller.resources | length > 0
+                - kserve_controller.resources[0].status.readyReplicas | default(0) > 0
+              retries: 30
+              delay: 10
+
+            - name: Install KServe built-in ClusterServingRuntimes
+              kubernetes.core.k8s:
+                definition: "{{ lookup('url', 'https://github.com/kserve/kserve/releases/download/v' + kserve_version + '/kserve-runtimes.yaml', split_lines=False) }}"
+                state: present
+              when: install_kserve_runtimes | default(true)
+
+        - name: Verify KServe installation
+          kubernetes.core.k8s_info:
+            kind: Deployment
+            name: kserve-controller-manager
+            namespace: kserve
+          register: kserve_verify
+
+        - name: Display KServe installation result
+          debug:
+            msg: "KServe controller is {{ 'running' if kserve_verify.resources and kserve_verify.resources[0].status.readyReplicas | default(0) > 0 else 'not ready' }}"
+
+      when: install_kserve | default(false) | bool
+      tags:
+        - install
+        - kserve
+
+    - name: Configure KServe for Intel platforms
+      block:
+        - name: Create Intel-optimized ClusterServingRuntime for vLLM on Xeon
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: serving.kserve.io/v1alpha1
+              kind: ClusterServingRuntime
+              metadata:
+                name: vllm-xeon-runtime
+              spec:
+                supportedModelFormats:
+                  - name: vllm
+                    version: "1"
+                    autoSelect: true
+                containers:
+                  - name: kserve-container
+                    image: "{{ kserve_vllm_xeon_image }}"
+                    command:
+                      - python3
+                      - -m
+                      - vllm.entrypoints.openai.api_server
+                    args:
+                      - --model
+                      - "{{.Name}}"
+                      - --port
+                      - "8080"
+                    resources:
+                      limits:
+                        cpu: "32"
+                        memory: 128Gi
+                      requests:
+                        cpu: "16"
+                        memory: 64Gi
+
+        - name: Create Intel-optimized ClusterServingRuntime for vLLM on Gaudi
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: serving.kserve.io/v1alpha1
+              kind: ClusterServingRuntime
+              metadata:
+                name: vllm-gaudi-runtime
+              spec:
+                supportedModelFormats:
+                  - name: vllm
+                    version: "1"
+                    autoSelect: true
+                containers:
+                  - name: kserve-container
+                    image: "{{ kserve_vllm_gaudi_image }}"
+                    command:
+                      - python3
+                      - -m
+                      - vllm.entrypoints.openai.api_server
+                    args:
+                      - --model
+                      - "{{.Name}}"
+                      - --port
+                      - "8080"
+                      - --dtype
+                      - "bfloat16"
+                    resources:
+                      limits:
+                        habana.ai/gaudi: 1
+                        cpu: "32"
+                        memory: 256Gi
+                      requests:
+                        habana.ai/gaudi: 1
+                        cpu: "16"
+                        memory: 128Gi
+                    env:
+                      - name: HABANA_VISIBLE_DEVICES
+                        value: "all"
+          when: deploy_gaudi_runtime | default(true)
+
+        - name: Display runtime configuration result
+          debug:
+            msg: "Intel-optimized KServe runtimes configured successfully"
+
+      when: 
+        - install_kserve | default(false) | bool
+        - configure_intel_runtimes | default(true) | bool
+      tags:
+        - install
+        - kserve
+        - configure
+
+    - name: Uninstall KServe Operator
+      block:
+        - name: Check if KServe namespace exists
+          kubernetes.core.k8s_info:
+            kind: Namespace
+            name: kserve
+          register: kserve_ns_check
+
+        - name: Delete KServe InferenceServices in all namespaces
+          kubernetes.core.k8s:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            namespace: "{{ item }}"
+            state: absent
+          loop: "{{ kserve_namespaces | default(['default', 'kserve']) }}"
+          when: kserve_ns_check.resources | length > 0
+          ignore_errors: true
+
+        - name: Wait for InferenceServices to be fully deleted
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            namespace: "{{ item }}"
+          register: remaining_isvcs
+          until: remaining_isvcs.resources | length == 0
+          retries: 30
+          delay: 10
+          loop: "{{ kserve_namespaces | default(['default', 'kserve']) }}"
+          when: kserve_ns_check.resources | length > 0
+          ignore_errors: true
+
+        - name: Remove KServe CRDs and components
+          kubernetes.core.k8s:
+            definition: "{{ lookup('url', 'https://github.com/kserve/kserve/releases/download/v' + kserve_version + '/kserve.yaml', split_lines=False) }}"
+            state: absent
+          when: kserve_ns_check.resources | length > 0
+
+        - name: Delete KServe namespace
+          kubernetes.core.k8s:
+            kind: Namespace
+            name: kserve
+            state: absent
+          when: kserve_ns_check.resources | length > 0
+
+        - name: Display uninstall result
+          debug:
+            msg: "KServe operator uninstalled successfully"
+
+      when: uninstall_kserve | default(false) | bool
+      tags:
+        - uninstall
+        - kserve

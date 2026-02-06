@@ -1,0 +1,28 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.apisixRoute.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "kserve.fullname" . }}
+  labels:
+    {{- include "kserve.labels" . | nindent 4 }}
+spec:
+  http:
+    - name: {{ include "kserve.fullname" . }}-route
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.host | quote }}
+        paths:
+          - {{ .Values.apisixRoute.path }}
+      backends:
+        - serviceName: {{ include "kserve.fullname" . }}
+          servicePort: {{ .Values.service.port }}
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            regex_uri:
+              - "^/{{ include "kserve.fullname" . }}/(.*)"
+              - "/$1"
+{{- end }}

@@ -1,0 +1,72 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Values for KServe vLLM on Intel Gaudi3 AI Accelerators
+
+image:
+  repository: vault.habana.ai/gaudi-docker/1.19.0/ubuntu22.04/habanalabs/pytorch-installer-2.5.1
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Gaudi3-specific configurations
+accelDevice: "habana.ai/gaudi"
+accelDeviceCount: 1
+
+# vLLM Gaudi3 optimizations
+dtype: "bfloat16"
+tensor_parallel_size: 1
+max_model_len: 16384
+gpu_memory_utilization: 0.95
+
+# Resource allocation for Gaudi3
+resources:
+  limits:
+    habana.ai/gaudi: 1
+    cpu: "48"
+    memory: 512Gi
+    hugepages-2Mi: "40960Mi"
+  requests:
+    habana.ai/gaudi: 1
+    cpu: "24"
+    memory: 256Gi
+    hugepages-2Mi: "40960Mi"
+
+# Runtime class for Gaudi
+runtimeClassName: habana
+
+# Node selector for Gaudi3 nodes
+nodeSelector:
+  node.kubernetes.io/instance-type: gaudi3
+
+# Tolerations for Gaudi nodes
+tolerations:
+  - key: "habana.ai/gaudi"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Model configurations optimized for Gaudi3
+defaultModelConfigs:
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  extraCmdArgs:
+    - "--disable-log-requests"
+    - "--enable-prefix-caching"
+    - "--max-num-seqs"
+    - "1024"
+    - "--max-num-batched-tokens"
+    - "16384"
+    - "--enforce-eager"
+
+# Security context for Gaudi
+# Note: SYS_PTRACE and IPC_LOCK are required for Habana runtime
+# - SYS_PTRACE: Required for Habana profiler and debugging tools
+# - IPC_LOCK: Required for locking memory for DMA operations
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+      - SYS_PTRACE
+      - IPC_LOCK
+  allowPrivilegeEscalation: false

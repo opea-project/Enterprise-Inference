@@ -1,0 +1,65 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# KServe Operator Configuration
+ansible_python_interpreter: /usr/bin/python3
+
+# Helm chart paths
+helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
+remote_helm_charts_base: "/tmp/helm-charts"
+
+# KServe version
+kserve_version: "0.13.0"
+
+# Installation flags
+install_kserve: false
+uninstall_kserve: false
+install_kserve_runtimes: true
+configure_intel_runtimes: true
+
+# Runtime configurations
+deploy_gaudi_runtime: true
+
+# KServe vLLM images
+kserve_vllm_xeon_image: "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.10.2"
+kserve_vllm_gaudi_image: "vault.habana.ai/gaudi-docker/1.18.0/ubuntu22.04/habanalabs/pytorch-installer-2.5.1:latest"
+
+# Namespaces to check for InferenceServices during uninstall
+kserve_namespaces:
+  - default
+  - kserve
+  - intel-inference
+
+# KServe model deployment settings
+kserve_model_name_list: []
+kserve_deployment_method: "helm"  # Options: helm, kubectl
+kserve_backend: "vllm"  # Options: vllm, tgi, custom
+
+# Helm chart configuration
+kserve_helm_chart_path: "{{ lookup('env', 'PWD') }}/helm-charts/kserve"
+kserve_helm_release_prefix: "kserve"
+
+# Storage configuration
+kserve_pvc_enabled: true
+kserve_pvc_size: "100Gi"
+kserve_pvc_storage_class: ""
+
+# Autoscaling configuration
+kserve_autoscaling_enabled: false
+kserve_autoscaling_min_replicas: 1
+kserve_autoscaling_max_replicas: 4
+
+# Monitoring configuration
+kserve_service_monitor_enabled: false
+
+# Network configuration
+kserve_ingress_enabled: false
+kserve_apisix_route_enabled: false
+
+# Model-specific configurations
+kserve_model_configs: {}
+
+# Platform-specific settings
+kserve_cpu_deployment: false
+kserve_gpu_deployment: false
+kserve_platform: "xeon"  # Options: xeon, gaudi, gaudi3

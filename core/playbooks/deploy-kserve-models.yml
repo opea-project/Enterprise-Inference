@@ -1,0 +1,249 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy/Remove KServe Inference Services
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_kserve.yml"
+    - "{{ lookup('env', 'PWD') }}/config/inference_env.yml"
+  roles:
+    - role: inference-tools
+  tasks:
+    - name: Print active tags for this task
+      debug:
+        var: ansible_run_tags
+      tags: always
+      run_once: true
+
+    - name: Display KServe model deployment configuration
+      debug:
+        msg:
+          - "==================================================================="
+          - "KServe Model Deployment Configuration"
+          - "==================================================================="
+          - "Platform: {{ kserve_platform }}"
+          - "CPU Deployment: {{ kserve_cpu_deployment }}"
+          - "GPU Deployment: {{ kserve_gpu_deployment }}"
+          - "Models to Deploy: {{ kserve_model_name_list }}"
+          - "Backend: {{ kserve_backend }}"
+          - "Deployment Method: {{ kserve_deployment_method }}"
+      tags: always
+      run_once: true
+
+    - name: Setup Environment
+      block:
+        - name: Copy Helm charts to remote location
+          ansible.builtin.copy:
+            src: "{{ helm_charts_base }}"
+            dest: "/tmp/"
+            mode: preserve
+          run_once: true
+          tags: always
+
+        - name: Validate HuggingFace token is provided
+          ansible.builtin.fail:
+            msg: "HuggingFace token is required for model deployment. Please set 'hugging_face_token' in your configuration."
+          when: 
+            - hugging_face_token is not defined or hugging_face_token == ""
+            - kserve_model_name_list | length > 0
+          tags: always
+
+        - name: Create/Update Kubernetes Secret for Hugging Face Token
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: hf-token
+                namespace: default
+              type: Opaque
+              stringData:
+                token: "{{ hugging_face_token }}"
+          when: hugging_face_token is defined and hugging_face_token != ""
+          tags: always
+
+    - name: Deploy KServe Model on Xeon CPUs
+      block:
+        - name: Set platform-specific values file
+          set_fact:
+            kserve_values_file: "{{ remote_helm_charts_base }}/kserve/xeon-values.yaml"
+
+        - name: Display deployment details
+          debug:
+            msg:
+              - "Deploying KServe InferenceService for {{ item }}"
+              - "Values file: {{ kserve_values_file }}"
+              - "Platform: Xeon CPU"
+
+        - name: Deploy KServe InferenceService using Helm
+          ansible.builtin.shell:
+            cmd: |
+              helm upgrade --install {{ kserve_helm_release_prefix }}-{{ item | regex_replace('[^a-zA-Z0-9-]', '-') | lower }} \
+                "{{ remote_helm_charts_base }}/kserve" \
+                -f {{ kserve_values_file }} \
+                --set LLM_MODEL_ID="{{ item }}" \
+                --set SERVED_MODEL_NAME="{{ item | basename }}" \
+                --set pvc.enabled={{ kserve_pvc_enabled }} \
+                --set pvc.size={{ kserve_pvc_size }} \
+                --set autoscaling.enabled={{ kserve_autoscaling_enabled }} \
+                --set serviceMonitor.enabled={{ kserve_service_monitor_enabled }} \
+                --set ingress.enabled={{ kserve_ingress_enabled }} \
+                --set apisixRoute.enabled={{ kserve_apisix_route_enabled }} \
+                --namespace default \
+                --create-namespace
+          loop: "{{ kserve_model_name_list }}"
+          when: 
+            - kserve_model_name_list | length > 0
+            - kserve_deployment_method == 'helm'
+
+        - name: Wait for InferenceService to be ready
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            name: "{{ kserve_helm_release_prefix }}-{{ item | regex_replace('[^a-zA-Z0-9-]', '-') | lower }}"
+            namespace: default
+          register: inference_service_status
+          until:
+            - inference_service_status.resources | length > 0
+            - inference_service_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | list | length > 0
+            - (inference_service_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | first).status == 'True'
+          retries: 30
+          delay: 10
+          loop: "{{ kserve_model_name_list }}"
+          when: kserve_model_name_list | length > 0
+
+      when:
+        - kserve_cpu_deployment | bool
+        - kserve_platform == "xeon"
+      tags:
+        - deploy
+        - xeon
+        - cpu
+
+    - name: Deploy KServe Model on Gaudi Accelerators
+      block:
+        - name: Set platform-specific values file for Gaudi
+          set_fact:
+            kserve_values_file: "{{ remote_helm_charts_base }}/kserve/{{ 'gaudi3-values.yaml' if kserve_platform == 'gaudi3' else 'gaudi-values.yaml' }}"
+
+        - name: Display deployment details
+          debug:
+            msg:
+              - "Deploying KServe InferenceService for {{ item }}"
+              - "Values file: {{ kserve_values_file }}"
+              - "Platform: {{ kserve_platform | upper }}"
+
+        - name: Deploy KServe InferenceService using Helm
+          ansible.builtin.shell:
+            cmd: |
+              helm upgrade --install {{ kserve_helm_release_prefix }}-{{ item | regex_replace('[^a-zA-Z0-9-]', '-') | lower }} \
+                "{{ remote_helm_charts_base }}/kserve" \
+                -f {{ kserve_values_file }} \
+                --set LLM_MODEL_ID="{{ item }}" \
+                --set SERVED_MODEL_NAME="{{ item | basename }}" \
+                --set pvc.enabled={{ kserve_pvc_enabled }} \
+                --set pvc.size={{ kserve_pvc_size }} \
+                --set autoscaling.enabled={{ kserve_autoscaling_enabled }} \
+                --set serviceMonitor.enabled={{ kserve_service_monitor_enabled }} \
+                --set ingress.enabled={{ kserve_ingress_enabled }} \
+                --set apisixRoute.enabled={{ kserve_apisix_route_enabled }} \
+                --namespace default \
+                --create-namespace
+          loop: "{{ kserve_model_name_list }}"
+          when: 
+            - kserve_model_name_list | length > 0
+            - kserve_deployment_method == 'helm'
+
+        - name: Wait for InferenceService to be ready
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            name: "{{ kserve_helm_release_prefix }}-{{ item | regex_replace('[^a-zA-Z0-9-]', '-') | lower }}"
+            namespace: default
+          register: inference_service_status
+          until:
+            - inference_service_status.resources | length > 0
+            - inference_service_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | list | length > 0
+            - (inference_service_status.resources[0].status.conditions | selectattr('type', 'equalto', 'Ready') | first).status == 'True'
+          retries: 30
+          delay: 10
+          loop: "{{ kserve_model_name_list }}"
+          when: kserve_model_name_list | length > 0
+
+      when:
+        - kserve_gpu_deployment | bool
+        - kserve_platform in ['gaudi', 'gaudi3']
+      tags:
+        - deploy
+        - gaudi
+        - gpu
+
+    - name: Uninstall KServe Models
+      block:
+        - name: List installed KServe InferenceServices
+          ansible.builtin.shell:
+            cmd: "helm list --short | grep '{{ kserve_helm_release_prefix }}-'"
+          register: kserve_installed_models
+          failed_when: false
+
+        - name: Display installed KServe models
+          debug:
+            msg: "Installed KServe models: {{ kserve_installed_models.stdout_lines | join(', ') }}"
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
+
+        - name: Uninstall KServe InferenceServices
+          ansible.builtin.shell:
+            cmd: "helm uninstall {{ item }}"
+          loop: "{{ kserve_installed_models.stdout_lines }}"
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
+
+        - name: Wait for InferenceServices to be deleted
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            namespace: default
+          register: remaining_isvc
+          until: remaining_isvc.resources | length == 0
+          retries: 30
+          delay: 10
+          when: 
+            - kserve_installed_models.stdout_lines is defined
+            - kserve_installed_models.stdout_lines | length > 0
+
+      when: uninstall_kserve | default(false) | bool
+      tags:
+        - uninstall
+        - kserve
+
+    - name: List Installed KServe Models
+      block:
+        - name: Get all KServe InferenceServices
+          kubernetes.core.k8s_info:
+            api_version: serving.kserve.io/v1beta1
+            kind: InferenceService
+            namespace: default
+          register: all_inference_services
+
+        - name: Display deployed KServe models
+          debug:
+            msg: "Deployed KServe InferenceServices: {{ all_inference_services.resources | map(attribute='metadata.name') | list | join(', ') }}"
+          when: all_inference_services.resources | length > 0
+
+      tags:
+        - list
+        - kserve
+
+    - name: Clean up remote helm charts directory
+      tags: always
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}"
+        state: absent

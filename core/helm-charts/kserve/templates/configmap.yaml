@@ -1,0 +1,21 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kserve.fullname" . }}-config
+  labels:
+    {{- include "kserve.labels" . | nindent 4 }}
+data:
+  MODEL_ID: {{ .Values.LLM_MODEL_ID | quote }}
+  SERVED_MODEL_NAME: {{ include "kserve.modelName" . | quote }}
+  PORT: {{ .Values.port | quote }}
+  DTYPE: {{ .Values.dtype | quote }}
+  MAX_MODEL_LEN: {{ .Values.max_model_len | quote }}
+  TENSOR_PARALLEL_SIZE: {{ .Values.tensor_parallel_size | quote }}
+  {{- if not .Values.accelDevice }}
+  PIPELINE_PARALLEL_SIZE: {{ .Values.pipeline_parallel_size | quote }}
+  {{- end }}
+  {{- if .Values.accelDevice }}
+  GPU_MEMORY_UTILIZATION: {{ .Values.gpu_memory_utilization | quote }}
+  {{- end }}

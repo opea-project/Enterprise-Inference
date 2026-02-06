@@ -1,0 +1,87 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# KServe Configuration for Gaudi Deployment
+# This file demonstrates deploying LLM models using KServe with vLLM backend on Intel Gaudi
+
+# KServe Operator Settings
+install_kserve: true
+uninstall_kserve: false
+kserve_version: "0.13.0"
+install_kserve_runtimes: true
+configure_intel_runtimes: true
+deploy_gaudi_runtime: true
+
+# Deployment Configuration
+kserve_cpu_deployment: false
+kserve_gpu_deployment: true
+kserve_platform: "gaudi"  # Use "gaudi3" for Gaudi3 accelerators
+kserve_backend: "vllm"
+kserve_deployment_method: "helm"
+
+# Models to Deploy
+# Larger models can be deployed on Gaudi with better performance
+kserve_model_name_list:
+  - "meta-llama/Llama-3.1-8B-Instruct"
+  # Uncomment additional models as needed
+  # - "Qwen/Qwen2.5-14B-Instruct"
+  # - "mistralai/Mixtral-8x7B-Instruct-v0.1"
+
+# Storage Configuration
+kserve_pvc_enabled: true
+kserve_pvc_size: "200Gi"  # Larger for bigger models
+kserve_pvc_storage_class: ""
+
+# Autoscaling Configuration
+# Enable for dynamic scaling based on load
+kserve_autoscaling_enabled: true
+kserve_autoscaling_min_replicas: 1
+kserve_autoscaling_max_replicas: 4
+kserve_autoscaling_target_utilization: 80
+
+# Monitoring Configuration
+kserve_service_monitor_enabled: true
+
+# Network Configuration
+kserve_ingress_enabled: true
+kserve_apisix_route_enabled: true
+
+# Model-Specific Configurations
+kserve_model_configs:
+  "meta-llama/Llama-3.1-8B-Instruct":
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    extraCmdArgs:
+      - "--disable-log-requests"
+      - "--enable-prefix-caching"
+      - "--max-num-seqs"
+      - "512"
+      - "--max-num-batched-tokens"
+      - "8192"
+      - "--enforce-eager"
+      - "--dtype"
+      - "bfloat16"
+  "Qwen/Qwen2.5-14B-Instruct":
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    extraCmdArgs:
+      - "--disable-log-requests"
+      - "--enable-prefix-caching"
+      - "--max-num-seqs"
+      - "256"
+      - "--max-num-batched-tokens"
+      - "4096"
+      - "--enforce-eager"
+      - "--dtype"
+      - "bfloat16"
+
+# Gaudi-Specific Settings
+# Node selector for Gaudi nodes
+nodeSelector:
+  node.kubernetes.io/instance-type: gaudi
+
+# Tolerations for Gaudi nodes
+tolerations:
+  - key: "habana.ai/gaudi"
+    operator: "Exists"
+    effect: "NoSchedule"
