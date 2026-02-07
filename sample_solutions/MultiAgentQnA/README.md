@@ -192,44 +192,97 @@ EOF
 
 #### Step 2: Create `api/.env` File
 
-You can either copy from the example file:
+This application requires an `api/.env` file for proper configuration. Create it with the commands below:
 
 ```bash
-cp api/.env.example api/.env
-```
-
-Then edit `api/.env` with your actual credentials, **OR** create it directly:
-
-**For GenAI Gateway:**
-
-```bash
+# Create the api/.env file
 cat > api/.env << EOF
-INFERENCE_API_ENDPOINT=https://genai-gateway.example.com
-INFERENCE_API_TOKEN=your-api-key-here
+# Inference API Configuration
+# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
+#
+# **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+#   - URL format: https://genai-gateway.example.com
+#   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh] script
+#   - The API key is the litellm_master_key value from the generated vault.yml file
+#
+# **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+#   - For APISIX, include the model name in the INFERENCE_API_ENDPOINT path
+#   - Example: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
+#   - Set EMBEDDING_API_ENDPOINT separately for the embedding model
+#   - Example: https://apisix-gateway.example.com/bge-base-en-v1.5
+#   - To generate the APISIX authentication token, use the [generate-token.sh] script
+#   - The token is generated using Keycloak client credentials
+#
+# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
+INFERENCE_API_ENDPOINT=https://your-api.example.com/
+INFERENCE_API_TOKEN=your-pre-generated-token-here
 
+# Model Configuration
 EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
 INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 
+# APISIX Gateway Endpoints
+# Uncomment and set these when using APISIX Gateway:
+# IMPORTANT: Use exact APISIX route paths:
+# Example routes: /bge-base-en-v1.5/* and /Llama-3.1-8B-Instruct/*
+# INFERENCE_API_ENDPOINT=https://api.example.com/Llama-3.1-8B-Instruct
+# EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5
+
+# Local URL Endpoint (only needed for non-public domains)
+# If using a local domain like api.example.com mapped to localhost:
+#   Set this to: api.example.com (domain without https://)
+# If using a public domain, set any placeholder value like: not-needed
 LOCAL_URL_ENDPOINT=not-needed
 EOF
 ```
 
-**For APISIX Gateway:**
+Or manually create `api/.env` with:
 
 ```bash
-cat > api/.env << EOF
-INFERENCE_API_ENDPOINT=https://apisix-gateway.example.com
-INFERENCE_API_TOKEN=your-token-here
+# Inference API Configuration
+# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
+#
+# **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+#   - URL format: https://genai-gateway.example.com
+#   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh] script
+#   - The API key is the litellm_master_key value from the generated vault.yml file
+#
+# **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+#   - For APISIX, include the model name in the INFERENCE_API_ENDPOINT path
+#   - Example: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
+#   - Set EMBEDDING_API_ENDPOINT separately for the embedding model
+#   - Example: https://apisix-gateway.example.com/bge-base-en-v1.5
+#   - To generate the APISIX authentication token, use the [generate-token.sh] script
+#   - The token is generated using Keycloak client credentials
+#
+# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
+INFERENCE_API_ENDPOINT=https://your-api.example.com/
+INFERENCE_API_TOKEN=your-pre-generated-token-here
 
-EMBEDDING_API_ENDPOINT=https://apisix-gateway.example.com/bge-base-en-v1.5
-INFERENCE_MODEL_ENDPOINT=https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
-
+# Model Configuration
 EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
 INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 
+# APISIX Gateway Endpoints
+# Uncomment and set these when using APISIX Gateway:
+# IMPORTANT: Use exact APISIX route paths:
+# Example routes: /bge-base-en-v1.5/* and /Llama-3.1-8B-Instruct/*
+# INFERENCE_API_ENDPOINT=https://your-api-endpoint.com/Llama-3.1-8B-Instruct
+# EMBEDDING_API_ENDPOINT=https://your-api-endpoint.com/bge-base-en-v1.5
+
+# Local URL Endpoint (only needed for non-public domains)
+# If using a local domain like api.example.com mapped to localhost:
+#   Set this to: api.example.com (domain without https://)
+# If using a public domain, set any placeholder value like: not-needed
 LOCAL_URL_ENDPOINT=not-needed
-EOF
 ```
+
+**Important Configuration Notes:**
+
+- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-api-endpoint.com/deployment`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/Llama-3.1-8B-Instruct`)
+- **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
+- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (see [Local Development Configuration](#local-development-configuration))
 
 **Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./api/.env` (backend) files.
 
