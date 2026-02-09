@@ -20,6 +20,7 @@
 #   -o, --observability    Enable observability: 'on' or 'off' (default: off)
 #   -r, --resume            Resume from checkpoint (auto-detected if state file exists)
 #   -s, --state-file        State file path (default: /tmp/ei-deploy.state)
+#   -a, --api-fqdn          API FQDN for hosts and cert (default: api.example.com)
 #   -h, --help              Show this help message
 #
 # Example:
@@ -34,7 +35,7 @@ USERNAME="Replace-with-your-username"
 HF_TOKEN="Replace-with-your-hugging face token"
 USER_PASSWORD="Replace-with-your-user-password"
 GPU_TYPE="Enter gaudi3/cpu based on your deployment"
-MODELS="Enter Model number"
+MODELS=""
 DEPLOYMENT_MODE="keycloak"
 DEPLOY_OBSERVABILITY="off"
 KEYCLOAK_CLIENT_ID="api"
@@ -44,6 +45,7 @@ FIRMWARE_VERSION="1.22.1"
 STATE_FILE="/tmp/ei-deploy.state"
 BRANCH="release-1.4.0"
 REPO_URL="https://github.com/opea-project/Enterprise-Inference"
+API_FQDN="api.example.com"
 RESUME=false
 ACTION="deploy"
 
@@ -93,6 +95,10 @@ log_warn() {
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed -e 's/[&|\\]/\\&/g'
 }
 
 # Hugging Face token checks for selected model numbers
@@ -162,16 +168,29 @@ check_hf_token_access() {
 
 update_inference_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
+        local hf_token_escaped models_escaped gpu_type_escaped
+        local keycloak_client_id_escaped keycloak_admin_user_escaped keycloak_admin_password_escaped
+        local deploy_keycloak_apisix_escaped deploy_genai_gateway_escaped deploy_observability_escaped
+
+        hf_token_escaped=$(escape_sed_replacement "${HF_TOKEN}")
+        gpu_type_escaped=$(escape_sed_replacement "${GPU_TYPE}")
+        keycloak_client_id_escaped=$(escape_sed_replacement "${KEYCLOAK_CLIENT_ID}")
+        keycloak_admin_user_escaped=$(escape_sed_replacement "${KEYCLOAK_ADMIN_USER}")
+        keycloak_admin_password_escaped=$(escape_sed_replacement "${KEYCLOAK_ADMIN_PASSWORD}")
+        deploy_keycloak_apisix_escaped=$(escape_sed_replacement "${DEPLOY_KEYCLOAK_APISIX}")
+        deploy_genai_gateway_escaped=$(escape_sed_replacement "${DEPLOY_GENAI_GATEWAY}")
+        deploy_observability_escaped=$(escape_sed_replacement "${DEPLOY_OBSERVABILITY}")
+
         sed -i -E \
-            -e 's/^[[:space:]]*hugging_face_token[[:space:]]*=.*/hugging_face_token='${HF_TOKEN}'/' \
-            -e 's/^[[:space:]]*models[[:space:]]*=.*/models='${MODELS}'/' \
-            -e 's/^[[:space:]]*cpu_or_gpu[[:space:]]*=.*/cpu_or_gpu='${GPU_TYPE}'/' \
-            -e 's/^[[:space:]]*keycloak_client_id[[:space:]]*=.*/keycloak_client_id='${KEYCLOAK_CLIENT_ID}'/' \
-            -e 's/^[[:space:]]*keycloak_admin_user[[:space:]]*=.*/keycloak_admin_user='${KEYCLOAK_ADMIN_USER}'/' \
-            -e 's/^[[:space:]]*keycloak_admin_password[[:space:]]*=.*/keycloak_admin_password='${KEYCLOAK_ADMIN_PASSWORD}'/' \
-            -e 's/^[[:space:]]*deploy_keycloak_apisix[[:space:]]*=.*/deploy_keycloak_apisix='${DEPLOY_KEYCLOAK_APISIX}'/' \
-            -e 's/^[[:space:]]*deploy_genai_gateway[[:space:]]*=.*/deploy_genai_gateway='${DEPLOY_GENAI_GATEWAY}'/' \
-            -e 's/^[[:space:]]*deploy_observability[[:space:]]*=.*/deploy_observability='${DEPLOY_OBSERVABILITY}'/' \
+            -e "s|^[[:space:]]*hugging_face_token[[:space:]]*=.*|hugging_face_token=${hf_token_escaped}|" \
+            -e "s|^[[:space:]]*models[[:space:]]*=.*|models=|" \
+            -e "s|^[[:space:]]*cpu_or_gpu[[:space:]]*=.*|cpu_or_gpu=${gpu_type_escaped}|" \
+            -e "s|^[[:space:]]*keycloak_client_id[[:space:]]*=.*|keycloak_client_id=${keycloak_client_id_escaped}|" \
+            -e "s|^[[:space:]]*keycloak_admin_user[[:space:]]*=.*|keycloak_admin_user=${keycloak_admin_user_escaped}|" \
+            -e "s|^[[:space:]]*keycloak_admin_password[[:space:]]*=.*|keycloak_admin_password=${keycloak_admin_password_escaped}|" \
+            -e "s|^[[:space:]]*deploy_keycloak_apisix[[:space:]]*=.*|deploy_keycloak_apisix=${deploy_keycloak_apisix_escaped}|" \
+            -e "s|^[[:space:]]*deploy_genai_gateway[[:space:]]*=.*|deploy_genai_gateway=${deploy_genai_gateway_escaped}|" \
+            -e "s|^[[:space:]]*deploy_observability[[:space:]]*=.*|deploy_observability=${deploy_observability_escaped}|" \
             "$CONFIG_FILE"
         log_info "Updated inference-config.cfg with models='${MODELS}' and cpu_or_gpu=${GPU_TYPE}"
     else
@@ -195,13 +214,14 @@ Required Options (uninstall):
 Optional Options:
   -p, --password         User sudo password for Ansible (default: Linux123!)
   -g, --gpu-type         GPU type: 'gaudi3' or 'cpu' (default: gaudi3)
-  -m, --models           Model IDs to deploy, comma-separated (default: "1")
+  -m, --models           Model IDs to deploy, comma-separated (default: empty)
   -b, --branch            Git branch to clone (default: dell-deploy)
   -f, --firmware-version Firmware version (default: 1.22.1)
   -d, --deployment-mode  Deployment mode: 'keycloak' or 'genai' (default: keycloak)
   -o, --observability    Enable observability: 'on' or 'off' (default: off)
   -s, --state-file        State file path (default: /tmp/ei-deploy.state)
   -r, --resume            Force resume from checkpoint
+  -a, --api-fqdn          API FQDN for hosts and cert (default: api.example.com)
   -h, --help              Show this help message
 
 Notes:
@@ -260,6 +280,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -s|--state-file)
             STATE_FILE="$2"
+            shift 2
+            ;;
+        -a|--api-fqdn)
+            API_FQDN="$2"
             shift 2
             ;;
         -r|--resume)
@@ -543,22 +567,7 @@ main() {
         fi
         if [[ "$GPU_TYPE" == "cpu" ]] || [[ "$GPU_TYPE" == "gaudi3" ]]; then
             CONFIG_FILE="/home/${USERNAME}/Enterprise-Inference/core/inventory/inference-config.cfg"
-                if [[ -f "$CONFIG_FILE" ]]; then
-                        sed -i -E \
-                        -e 's/^[[:space:]]*hugging_face_token[[:space:]]*=.*/hugging_face_token='${HF_TOKEN}'/' \
-                        -e 's/^[[:space:]]*models[[:space:]]*=.*/models='${MODELS}'/' \
-                        -e 's/^[[:space:]]*cpu_or_gpu[[:space:]]*=.*/cpu_or_gpu='${GPU_TYPE}'/' \
-                        -e 's/^[[:space:]]*keycloak_client_id[[:space:]]*=.*/keycloak_client_id='${KEYCLOAK_CLIENT_ID}'/' \
-                        -e 's/^[[:space:]]*keycloak_admin_user[[:space:]]*=.*/keycloak_admin_user='${KEYCLOAK_ADMIN_USER}'/' \
-                        -e 's/^[[:space:]]*keycloak_admin_password[[:space:]]*=.*/keycloak_admin_password='${KEYCLOAK_ADMIN_PASSWORD}'/' \
-                        -e 's/^[[:space:]]*deploy_keycloak_apisix[[:space:]]*=.*/deploy_keycloak_apisix='${DEPLOY_KEYCLOAK_APISIX}'/' \
-                        -e 's/^[[:space:]]*deploy_genai_gateway[[:space:]]*=.*/deploy_genai_gateway='${DEPLOY_GENAI_GATEWAY}'/' \
-                        -e 's/^[[:space:]]*deploy_observability[[:space:]]*=.*/deploy_observability='${DEPLOY_OBSERVABILITY}'/' \
-                        "$CONFIG_FILE"
-                        log_info "Updated inference-config.cfg with models='${MODELS}' and cpu_or_gpu=${GPU_TYPE}"
-                else
-                log_warn "inference-config.cfg not found at $CONFIG_FILE, skipping update."
-            fi
+            update_inference_config
         fi
 
         # ------------------------------------------------------------
@@ -567,11 +576,14 @@ main() {
         if [[ "$GPU_TYPE" == "cpu" ]]; then
             log_info "CPU-only mode detected — disabling NRI and CPU balloons"
 
+            # Normalize file: always end with newline
+            sed -i -e '$a\' "$CONFIG_FILE"
+
             # Update if keys exist
             sed -i -E \
-              -e 's/^[[:space:]]*enable_nri[[:space:]]*=.*/enable_nri=false/' \
-              -e 's/^[[:space:]]*enable_cpu_balloons[[:space:]]*=.*/enable_cpu_balloons=false/' \
-              "$CONFIG_FILE" || true
+            -e 's/^[[:space:]]*enable_nri[[:space:]]*=.*/enable_nri=false/' \
+            -e 's/^[[:space:]]*enable_cpu_balloons[[:space:]]*=.*/enable_cpu_balloons=false/' \
+            "$CONFIG_FILE" || true
 
             # Append if keys do not exist
             grep -q '^enable_nri=' "$CONFIG_FILE" || echo 'enable_nri=false' >> "$CONFIG_FILE"
@@ -631,9 +643,9 @@ main() {
     # Step 5: Add hostname to /etc/hosts
     if ! skip_if_completed "hosts_file"; then
         log_info "Step 5: Adding hostname to /etc/hosts..."
-        if ! grep -q "api.example.com" /etc/hosts; then
+        if ! grep -q "${API_FQDN}" /etc/hosts; then
             echo "" >> /etc/hosts
-            echo "127.0.0.1 api.example.com" >> /etc/hosts
+            echo "127.0.0.1 ${API_FQDN}" >> /etc/hosts
             log_success "Hostname added to /etc/hosts"
         else
             log_info "Hostname already in /etc/hosts"
@@ -689,7 +701,7 @@ main() {
         cd certs
 
         if [[ ! -f "cert.pem" ]] || [[ ! -f "key.pem" ]]; then
-            su "${USERNAME}" -c "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=${CLUSTER_URL}'"
+            su "${USERNAME}" -c "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=${API_FQDN}'"
             log_success "SSL certificates created"
         else
             log_info "SSL certificates already exist"
@@ -776,7 +788,7 @@ main() {
         log_info "Parameters: --models '${MODELS}' --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token <token>"
 
         # Run the deployment script
-        if [[ "$FORCE_INTERACTIVE_DEPLOY" == true ]]; then
+        if [[ "$FORCE_INTERACTIVE_DEPLOY" == true || -z "${MODELS}" ]]; then
             log_info "State file indicates a prior deployment; running interactively"
             CONFIG_FILE="/home/${USERNAME}/Enterprise-Inference/core/inventory/inference-config.cfg"
             update_inference_config
@@ -787,7 +799,7 @@ main() {
             }
         else
             # Using echo to provide input: "1" for "Provision Enterprise Inference Cluster", "yes" for confirmation
-            su "${USERNAME}" -c "cd /home/${USERNAME}/Enterprise-Inference/core && echo -e '1\nyes' | bash ./inference-stack-deploy.sh --models '${MODELS}' --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
+            su "${USERNAME}" -c "cd /home/${USERNAME}/Enterprise-Inference/core && echo -e '1\n${MODELS}\nyes' | bash ./inference-stack-deploy.sh --models '${MODELS}' --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
                 log_error "Enterprise Inference Stack deployment failed!"
                 log_warn "You can resume by running this script again with -r flag"
                 exit 1
@@ -798,12 +810,11 @@ main() {
         save_state "deploy_stack"
     fi
 
-    # Cleanup state file on successful completion
+    # Keep state file on successful completion for future resumes
     if [[ -f "$STATE_FILE" ]]; then
-        rm -f "$STATE_FILE"
-        log_info "State file cleaned up"
+        log_info "State file retained for future resumes"
     fi
-
+    
     log_success "=========================================="
     log_success "Deployment completed successfully!"
     log_success "=========================================="
