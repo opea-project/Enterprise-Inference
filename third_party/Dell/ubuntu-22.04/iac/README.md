@@ -124,6 +124,7 @@ sudo ./deploy-enterprise-inference.sh \
 -p Linux123! \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
+-a cluster-url \
 -m "1" \
 ```
  
@@ -135,6 +136,7 @@ sudo ./deploy-enterprise-inference.sh \
 | -g	| gaudi3 or cpu |
 | -m	| Model IDs |
 | -b	| Repo branch (default: release-1.4.0) |
+| -a    | cluster -url  |
 | -r	| Resume from last checkpoint |
 | -d    | keycloak or genai, by default set to keycloak |
 | -o    | off or on, by default observability set to off |
@@ -148,6 +150,7 @@ sudo ./deploy-enterprise-inference.sh \
 -p Linux123! \
 -t hf_XXXXXXXXXXXX \
 -g gaudi3 \
+-a cluster-url \
 -m "1" \
 -r
 ```
