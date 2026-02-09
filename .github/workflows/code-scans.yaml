@@ -87,7 +87,9 @@ jobs:
         EOF
       shell: bash
     - name: Run Bandit scan
-      run: bandit -r . -ll -iii -f html -o bandit-report.html 
+      run: |
+        bandit -r . -ll -iii -f screen
+        bandit -r . -ll -iii -f html -o bandit-report.html
     - name: Upload Bandit Report
       uses: actions/upload-artifact@v4
       with:
