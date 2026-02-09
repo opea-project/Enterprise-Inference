@@ -12,6 +12,10 @@ RUN npm install
 # Copy the rest of the application files
 COPY . .
 
+RUN groupadd -r nodeuser && useradd -r -g nodeuser nodeuser
+RUN chown -R nodeuser:nodeuser /app
+USER nodeuser
+
 # Expose the port the app runs on
 EXPOSE 3000
 
