@@ -14,7 +14,7 @@ class APIClient:
     def __init__(self):
         self.base_url = config.INFERENCE_API_ENDPOINT
         self.token = config.INFERENCE_API_TOKEN
-        self.http_client = httpx.Client(verify=False)
+        self.http_client = httpx.Client() if self.token else None
         logger.info(f"✓ API Client initialized with endpoint: {self.base_url}")
 
     def get_inference_client(self):

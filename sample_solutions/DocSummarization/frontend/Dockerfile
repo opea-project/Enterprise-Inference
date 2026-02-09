@@ -17,7 +17,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 # Create nginx config with increased file upload limit and no-cache headers
 RUN echo 'server { \
-    listen 80; \
+    listen 8080; \
     server_name localhost; \
     client_max_body_size 500M; \
     \
@@ -54,6 +54,18 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+# Create a non-root user and adjust permissions
+RUN adduser -D -u 1000 appuser && \
+    chown -R appuser:appuser /usr/share/nginx/html && \
+    chown -R appuser:appuser /var/cache/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    chown -R appuser:appuser /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
+
+# Switch to non-root user
+USER appuser
+
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
