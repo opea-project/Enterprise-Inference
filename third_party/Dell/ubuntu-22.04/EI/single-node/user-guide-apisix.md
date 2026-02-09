@@ -8,11 +8,10 @@
   - [3. DNS and SSL/TLS Setup](#3-dns-and-ssltls-setup)
   - [4. Hugging Face Token Setup](#4-hugging-face-token-setup)
 - [Single Node Deployment Guide](#single-node-deployment-guide)
-  - [1. Clone the Repository](#1-clone-the-repository)
-  - [2. Configure the Setup Files and Environment](#2-configure-the-setup-files-and-environment)
-  - [3. Run the Deployment](#3-run-the-deployment)
-  - [4. Verify the Deployment](#4-verify-the-deployment)
-  - [5. Test the Inference](#5-test-the-inference)
+  - [1. Configure the Setup Files and Environment](#2-configure-the-setup-files-and-environment)
+  - [2. Run the Deployment](#3-run-the-deployment)
+  - [3. Verify the Deployment](#4-verify-the-deployment)
+  - [4. Test the Inference](#5-test-the-inference)
 - [Troubleshooting](#troubleshooting)
 - [Summary](#summary)
 
@@ -140,24 +139,15 @@ This section explains how to deploy Intel® AI for Enterprise Inference on a sin
 
 ---
 
-### 1. Clone the Repository
 
-```bash
-cd ~
-git clone https://github.com/opea-project/Enterprise-Inference.git
-cd Enterprise-Inference
-git checkout ${RELEASE}
-```
-> **Note:** Update the RELEASE environment variable to point to the desired Enterprise Inference version(for example: release-1.4.0)
-
----
-
-### 2. Configure the Setup Files and Environment
+### 1. Configure the Setup Files and Environment
 
 **Update inference-config.cfg:**
 
+Clone the repository, If repo is not downloaded on target machine.
+
 ```bash
-vi core/inventory/inference-config.cfg
+vi Enterprise-Inference/core/inventory/inference-config.cfg
 ```
 
 > **Note:** Update configuration files for single node apisix deployment, Below are the changes needed.
@@ -206,7 +196,7 @@ cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 > Note: The ansible_user field is set to ubuntu by default. Change it to the actual username used.
 
 
-### 3. Run the Deployment
+### 2. Run the Deployment
 
 > **Note:**
 > The `--models` argument selects a model using its **numeric ID**  
@@ -231,7 +221,7 @@ chmod +x inference-stack-deploy.sh
 When prompted, choose option **1) Provision Enterprise Inference Cluster** and confirm **Yes** to start installation.
 If using Intel® Gaudi® hardware, make sure firmware and drivers are updated before running this script.
 
-### 4. Verify the Deployment
+### 3. Verify the Deployment
 
 Verify Pods Status
 ```bash
@@ -249,7 +239,7 @@ kubectl get apisixroutes
 
 ---
 
-### 5. Test the Inference
+### 4. Test the Inference
 
 **Obtain Access Token**
 
