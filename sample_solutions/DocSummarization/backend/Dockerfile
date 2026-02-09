@@ -2,9 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Create a non-root user and group
-RUN groupadd --system app && useradd --system --gid app app
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
@@ -19,10 +16,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY --chown=app:app . .
+COPY . .
 
-# Switch to the non-root user
-USER app
+# Create a non-root user and change ownership
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8000
