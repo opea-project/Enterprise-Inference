@@ -82,8 +82,8 @@ jobs:
       run: |
         cat > .bandit << 'EOF'
         [bandit]
-        exclude_dirs = ['tests', 'test', 'venv', '.venv', 'node_modules']
-        skips = ['B101', 'B601']
+        exclude_dirs = tests,test,venv,.venv,node_modules
+        skips = B101
         EOF
       shell: bash
     - name: Run Bandit scan
