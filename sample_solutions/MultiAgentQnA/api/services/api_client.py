@@ -21,7 +21,7 @@ class APIClient:
         self.embedding_base_url = config.EMBEDDING_API_ENDPOINT
         self.inference_base_url = config.INFERENCE_API_ENDPOINT
         self.token = config.INFERENCE_API_TOKEN
-        self.http_client = httpx.Client()
+        self.http_client = httpx.Client(verify=config.VERIFY_SSL)
         logger.info(f"✓ API Client initialized - Embedding: {self.embedding_base_url}, Inference: {self.inference_base_url}")
     
     def get_embedding_client(self):
