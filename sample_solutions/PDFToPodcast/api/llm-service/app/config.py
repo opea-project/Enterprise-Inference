@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     MAX_TOKENS: int = 4000
     MAX_RETRIES: int = 3
 
+    # SSL Verification Settings
+    VERIFY_SSL: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True
