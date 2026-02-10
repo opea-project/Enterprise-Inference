@@ -28,6 +28,9 @@ INFERENCE_MODEL_NAME = os.getenv("INFERENCE_MODEL_NAME", "meta-llama/Llama-3.1-8
 if not INFERENCE_API_TOKEN:
     raise ValueError("INFERENCE_API_TOKEN must be set in environment variables")
 
+# SSL Verification Settings
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+
 # Application Settings
 APP_TITLE = "RAG QnA Chatbot"
 APP_DESCRIPTION = "A RAG-based chatbot API using LangChain and FAISS"
