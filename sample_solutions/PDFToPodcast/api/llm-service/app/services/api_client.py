@@ -18,7 +18,7 @@ class APIClient:
     def __init__(self):
         self.endpoint = settings.INFERENCE_API_ENDPOINT
         self.token = settings.INFERENCE_API_TOKEN
-        self.http_client = httpx.Client() if self.token else None
+        self.http_client = httpx.Client(verify=settings.VERIFY_SSL) if self.token else None
 
     def get_inference_client(self):
         """
