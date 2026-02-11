@@ -65,7 +65,7 @@ Two options:
 Deployment fails due to incorrect or missing configuration values.
 
 **Fix:**
-Before re-running deployment, verify and update your inference-config.cfg:
+Before re-running deployment, verify and update your inference-config.cfg. These values must match your actual deployment environment.
 ```bash
 cluster_url=api.example.com  # <-- Replace with cluster url
 cert_file=~/certs/cert.pem
