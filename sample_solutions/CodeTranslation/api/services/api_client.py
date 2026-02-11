@@ -2,6 +2,7 @@
 API Client for inference API calls
 """
 
+from enum import verify
 import logging
 import httpx
 from typing import Optional
@@ -18,7 +19,7 @@ class APIClient:
     def __init__(self):
         self.endpoint = config.INFERENCE_API_ENDPOINT
         self.token = config.INFERENCE_API_TOKEN
-        self.http_client = httpx.Client() if self.token else None
+        self.http_client = httpx.Client(verify=config.VERIFY_SSL) if self.token else None
 
     def get_inference_client(self):
         """
