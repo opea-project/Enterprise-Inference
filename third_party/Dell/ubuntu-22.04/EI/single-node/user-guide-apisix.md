@@ -8,10 +8,10 @@
   - [3. DNS and SSL/TLS Setup](#3-dns-and-ssltls-setup)
   - [4. Hugging Face Token Setup](#4-hugging-face-token-setup)
 - [Single Node Deployment Guide](#single-node-deployment-guide)
-  - [1. Configure the Setup Files and Environment](#2-configure-the-setup-files-and-environment)
-  - [2. Run the Deployment](#3-run-the-deployment)
-  - [3. Verify the Deployment](#4-verify-the-deployment)
-  - [4. Test the Inference](#5-test-the-inference)
+  - [1. Configure the Setup Files and Environment](#1-configure-the-setup-files-and-environment)
+  - [2. Run the Deployment](#2-run-the-deployment)
+  - [3. Verify the Deployment](#3-verify-the-deployment)
+  - [4. Test the Inference](#4-test-the-inference)
 - [Troubleshooting](#troubleshooting)
 - [Summary](#summary)
 
@@ -199,7 +199,7 @@ cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 ### 2. Run the Deployment
 
 > **Note:**
-> The `--models` argument selects a model using its **numeric ID**  
+> The '--models' argument allows you to specify one or more models by their numeric ID. [full list of available model IDs](../../iac/README.md#pre-integrated-models-list)
 > If `--models` is omitted, the installer displays the full model list and prompts you to select a model interactively.
 
 Run the setup for Gaudi 
@@ -248,7 +248,7 @@ Before generating the access token, ensure all Keycloak-related values are corre
 ```bash
 cd Enterprise-Inference/core/scripts
 chmod +x generate-token.sh
-./generate-token.sh
+. generate-token.sh
 ```
 
 **Verify the Token**
@@ -256,6 +256,7 @@ chmod +x generate-token.sh
 After the script completes successfully, confirm that the token is available in your shell:
 
 ```bash
+echo $BASE_URL
 echo $TOKEN
 ```
 
