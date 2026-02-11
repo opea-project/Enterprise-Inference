@@ -157,14 +157,14 @@ class RAGService:
         try:
             # Save FAISS index
             faiss.write_index(self.index, os.path.join(self.vector_store_path, "index.faiss"))
-            
-            # Save documents as a simple format (JSON would be better but keeping it simple)
-            import pickle
-            with open(os.path.join(self.vector_store_path, "documents.pkl"), "wb") as f:
-                pickle.dump(self.documents, f)
-            
+
+            # Save documents as JSON (safer than pickle)
+            import json
+            with open(os.path.join(self.vector_store_path, "documents.json"), "w", encoding="utf-8") as f:
+                json.dump(self.documents, f, ensure_ascii=False, indent=2)
+
             logger.info(f"Index saved to {self.vector_store_path}")
-            
+
         except Exception as e:
             logger.error(f"Error saving index: {str(e)}")
             raise
@@ -172,29 +172,29 @@ class RAGService:
     def load_index(self) -> bool:
         """
         Load FAISS index from disk
-        
+
         Returns:
             True if loaded successfully, False otherwise
         """
         try:
             faiss_path = os.path.join(self.vector_store_path, "index.faiss")
-            docs_path = os.path.join(self.vector_store_path, "documents.pkl")
-            
+            docs_path = os.path.join(self.vector_store_path, "documents.json")
+
             if not os.path.exists(faiss_path) or not os.path.exists(docs_path):
                 logger.warning("No existing index found")
                 return False
-            
+
             # Load FAISS index
             self.index = faiss.read_index(faiss_path)
-            
-            # Load documents
-            import pickle
-            with open(docs_path, "rb") as f:
-                self.documents = pickle.load(f)
-            
+
+            # Load documents from JSON (safer than pickle)
+            import json
+            with open(docs_path, "r", encoding="utf-8") as f:
+                self.documents = json.load(f)
+
             logger.info(f"Loaded index with {self.index.ntotal} vectors")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error loading index: {str(e)}")
             return False
