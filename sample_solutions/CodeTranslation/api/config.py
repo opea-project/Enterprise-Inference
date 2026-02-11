@@ -30,6 +30,9 @@ MAX_CODE_LENGTH = int(os.getenv("MAX_CODE_LENGTH", "4000"))  # characters
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))  # Lower temperature for more deterministic code generation
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
 
+# SSL Verification Settings
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+
 # CORS Settings
 CORS_ALLOW_ORIGINS = ["*"]  # Update with specific origins in production
 CORS_ALLOW_CREDENTIALS = True
