@@ -43,6 +43,9 @@ MAX_PDF_SIZE = int(os.getenv("MAX_PDF_SIZE", str(50 * 1024 * 1024)))  # 50MB
 MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "100"))  # Maximum pages to process from PDF
 WARN_PDF_PAGES = 50  # Warn user if PDF has more than this many pages
 
+# SSL Verification Settings
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+
 # CORS Settings
 CORS_ALLOW_ORIGINS = ["*"]  # Update with specific origins in production
 CORS_ALLOW_CREDENTIALS = True
