@@ -22,7 +22,7 @@ jobs:
 # -----------------------------
   trivy_scan:
     name: Trivy Vulnerability Scan
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       TRIVY_REPORT_FORMAT: table
       TRIVY_SCAN_TYPE: fs
@@ -66,7 +66,7 @@ jobs:
 # -----------------------------
   bandit_scan:
     name: Bandit security scan
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - name: Checkout
       uses: actions/checkout@v4
