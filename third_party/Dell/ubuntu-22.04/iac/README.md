@@ -134,7 +134,7 @@ sudo ./deploy-enterprise-inference.sh \
 | -p    | OS userpassword |
 | -t	| Hugging Face token |
 | -g	| gaudi3 or cpu |
-| -m	| Model IDs |
+| -m	| Choose model ID from [Pre-Integrated Models List](#pre-integrated-models-list) , based on your deployment type (gaudi or cpu) |
 | -b	| Repo branch (default: release-1.4.0) |
 | -a    | cluster -url  |
 | -r	| Resume from last checkpoint |
@@ -269,6 +269,52 @@ if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/singl
 if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-node/user-guide-genai.md#5-test-the-inference) for generating api-key and testing the inference
 
 ---
+## Additional Information
+
+### Pre-Integrated Models List
+
+Enterprise Inference provides a set of pre-integrated and validated models optimized for performance and stability. These models can be deployed directly using the Enterprise Inference catalog.
+
+**Pre-Integrated Gaudi Models**
+
+**Model ID**   | **Model**                                  |
+----------------|:------------------------------------------:|
+1               | meta-llama/Llama-3.1-8B-Instruct           |
+2               | meta-llama/Llama-3.1-70B-Instruct          |
+3               | meta-llama/Llama-3.1-405B-Instruct         |
+4               | meta-llama/Llama-3.3-70B-Instruct          |
+5               | meta-llama/Llama-4-Scout-17B-16E-Instruct  |
+6               | Qwen/Qwen2.5-32B-Instruct                  |
+7               | deepseek-ai/DeepSeek-R1-Distill-Qwen-32B   |
+8               | deepseek-ai/DeepSeek-R1-Distill-Llama-8B   |
+9               | mistralai/Mixtral-8x7B-Instruct-v0.1       |
+10              | mistralai/Mistral-7B-Instruct-v0.3         |
+11              | BAAI/bge-base-en-v1.5                      |
+12              | BAAI/bge-reranker-base                     |
+13              | codellama/CodeLlama-34b-Instruct-hf        |
+14              | tiiuae/Falcon3-7B-Instruct                 |
+
+**Pre-Integrated CPU Models**
+
+ **Model ID**   | **Model**                                  |
+----------------|:------------------------------------------:|
+21               |   meta-llama/Llama-3.1-8B-Instruct  |  
+22               |   meta-llama/Llama-3.2-3B-Instruct  |   
+23               |   deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |   
+24               |   deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |   
+25              |   Qwen/Qwen3-1.7B  |
+26              |   Qwen/Qwen3-4B-Instruct-2507 |
+
+
+### Model Deployment
+
+If an Enterprise Inference cluster is already deployed, you can use the interactive deployment script to manage models, including:
+
+ - Deploying additional models from the Enterprise Inference model catalog
+ - Deploying custom models directly from Hugging Face
+ - Undeploying existing models from the cluster
+
+Refer to the [Model Deployment guide](./model-deployment.md) and run the interactive inference-stack-deploy.sh script to perform these operations.
 
 ## Summary
 

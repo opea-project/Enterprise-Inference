@@ -38,9 +38,9 @@ GPU_TYPE="Enter gaudi3/cpu based on your deployment"
 MODELS=""
 DEPLOYMENT_MODE="keycloak"
 DEPLOY_OBSERVABILITY="off"
-KEYCLOAK_CLIENT_ID="my-client-id"
-KEYCLOAK_ADMIN_USER="your-keycloak-admin-user"
-KEYCLOAK_ADMIN_PASSWORD="changeme"
+KEYCLOAK_CLIENT_ID="api"
+KEYCLOAK_ADMIN_USER="api-admin"
+KEYCLOAK_ADMIN_PASSWORD="changeme!!"
 FIRMWARE_VERSION="1.22.1"
 STATE_FILE="/tmp/ei-deploy.state"
 BRANCH="release-1.4.0"
@@ -792,14 +792,14 @@ main() {
             log_info "State file indicates a prior deployment; running interactively"
             CONFIG_FILE="/home/${USERNAME}/Enterprise-Inference/core/inventory/inference-config.cfg"
             update_inference_config
-            su "${USERNAME}" -c "cd /home/${USERNAME}/Enterprise-Inference/core && bash ./inference-stack-deploy.sh --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
+            sudo -u "${USERNAME}" -H bash -c "cd /home/${USERNAME}/Enterprise-Inference/core && bash ./inference-stack-deploy.sh --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
                 log_error "Enterprise Inference Stack deployment failed!"
                 log_warn "You can resume by running this script again with -r flag"
                 exit 1
             }
         else
             # Using echo to provide input: "1" for "Provision Enterprise Inference Cluster", "yes" for confirmation
-            su "${USERNAME}" -c "cd /home/${USERNAME}/Enterprise-Inference/core && echo -e '1\n${MODELS}\nyes' | bash ./inference-stack-deploy.sh --models '${MODELS}' --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
+            sudo -u "${USERNAME}" -H bash -c "cd /home/${USERNAME}/Enterprise-Inference/core && echo -e '1\n${MODELS}\nyes' | bash ./inference-stack-deploy.sh --models '${MODELS}' --cpu-or-gpu '${GPU_TYPE}' --hugging-face-token ${HUGGINGFACE_TOKEN}" || {
                 log_error "Enterprise Inference Stack deployment failed!"
                 log_warn "You can resume by running this script again with -r flag"
                 exit 1
