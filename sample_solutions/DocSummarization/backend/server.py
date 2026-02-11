@@ -81,7 +81,7 @@ async def startup_event():
 if __name__ == "__main__":
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - Binding to all interfaces is intentional for Docker container
         port=config.SERVICE_PORT,
         timeout_keep_alive=300
     )
