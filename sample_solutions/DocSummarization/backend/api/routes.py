@@ -9,6 +9,7 @@ from typing import Optional
 import os
 import logging
 import json
+import tempfile
 
 from services import pdf_service, llm_service
 import config
@@ -84,14 +85,18 @@ async def summarize_document(
 
         # ========== File Upload (Documents) ==========
         if files:
-            # Save file temporarily
-            temp_path = f"/tmp/{files.filename}"
+            # Save file temporarily using secure temp file
             filename_lower = files.filename.lower()
             logger.info(f"Saving uploaded file: {files.filename}, type={type}")
 
-            with open(temp_path, "wb") as buffer:
+            # Get file extension for temp file
+            _, file_ext = os.path.splitext(files.filename)
+
+            # Create temporary file with proper cleanup
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
                 content = await files.read()
-                buffer.write(content)
+                temp_file.write(content)
+                temp_path = temp_file.name
 
             try:
                 # ===== Document Processing (PDF/DOC/DOCX/TXT) =====
