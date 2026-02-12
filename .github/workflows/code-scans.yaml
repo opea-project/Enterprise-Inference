@@ -131,18 +131,26 @@ jobs:
       - name: Create report directory
         run: mkdir -p clamav-reports
 
-      - name: Run ClamAV Scan
-        uses: djdefi/clamav-action@v0.2
-        id: clamav
-        with:
-          scan-dir: "."
-          exclude-dir: ".git|tests|.pytest_cache|__pycache__|.venv"
-
-      - name: Save ClamAV Report
-        if: always()
+      - name: Install ClamAV
         run: |
-          echo "ClamAV Scan Results" > clamav-reports/clamav_scan_report.txt
-          echo "Scan completed at $(date)" >> clamav-reports/clamav_scan_report.txt
+          sudo apt-get update
+          sudo apt-get install -y clamav clamav-daemon
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam || true
+          sudo systemctl start clamav-freshclam || true
+
+      - name: Run ClamAV Scan
+        id: clamav
+        continue-on-error: true
+        run: |
+          clamscan -r \
+            --exclude-dir=".git" \
+            --exclude-dir="tests" \
+            --exclude-dir=".pytest_cache" \
+            --exclude-dir="__pycache__" \
+            --exclude-dir=".venv" \
+            --exclude-dir="node_modules" \
+            . | tee clamav-reports/clamav_scan_report.txt
 
       - name: Upload Report
         if: always()
