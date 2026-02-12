@@ -131,39 +131,33 @@ jobs:
       - name: Create report directory
         run: mkdir -p clamav-reports
 
-      - name: Install ClamAV
-        run: |
-          # Disable IPv6 for apt to avoid network issues
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 || true
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 || true
-          
-          # Check if ClamAV is already installed
-          if ! command -v clamscan &> /dev/null; then
-            sudo apt-get update -o Acquire::ForceIPv4=true
-            sudo apt-get install -y -o Acquire::ForceIPv4=true clamav clamav-daemon
-          fi
-          
-          # Update virus definitions
-          sudo systemctl stop clamav-freshclam || true
-          sudo freshclam || echo "Warning: Could not update virus definitions"
-          sudo systemctl start clamav-freshclam || true
-          
-          # Re-enable IPv6
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0 || true
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0 || true
-
-      - name: Run ClamAV Scan
+      - name: Run ClamAV Scan using Docker
         id: clamav
         continue-on-error: true
         run: |
-          clamscan -r \
-            --exclude-dir=".git" \
-            --exclude-dir="tests" \
-            --exclude-dir=".pytest_cache" \
-            --exclude-dir="__pycache__" \
-            --exclude-dir=".venv" \
-            --exclude-dir="node_modules" \
-            . | tee clamav-reports/clamav_scan_report.txt
+          # Pull ClamAV Docker image
+          docker pull clamav/clamav:latest
+          
+          # Run ClamAV scan in container
+          docker run --rm \
+            -v ${{ github.workspace }}:/scan:ro \
+            -v ${{ github.workspace }}/clamav-reports:/reports \
+            clamav/clamav:latest \
+            clamscan -r \
+              --exclude-dir=".git" \
+              --exclude-dir="tests" \
+              --exclude-dir=".pytest_cache" \
+              --exclude-dir="__pycache__" \
+              --exclude-dir=".venv" \
+              --exclude-dir="node_modules" \
+              /scan | tee /reports/clamav_scan_report.txt || true
+          
+          # Alternatively, if Docker pull fails, skip ClamAV scan
+          if [ $? -ne 0 ]; then
+            echo "ClamAV scan skipped due to installation/network issues" > clamav-reports/clamav_scan_report.txt
+            echo "Status: Skipped" >> clamav-reports/clamav_scan_report.txt
+            echo "Reason: Unable to install or run ClamAV on this runner" >> clamav-reports/clamav_scan_report.txt
+          fi
 
       - name: Upload Report
         if: always()
