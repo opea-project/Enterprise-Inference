@@ -133,11 +133,24 @@ jobs:
 
       - name: Install ClamAV
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clamav clamav-daemon
+          # Disable IPv6 for apt to avoid network issues
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 || true
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 || true
+          
+          # Check if ClamAV is already installed
+          if ! command -v clamscan &> /dev/null; then
+            sudo apt-get update -o Acquire::ForceIPv4=true
+            sudo apt-get install -y -o Acquire::ForceIPv4=true clamav clamav-daemon
+          fi
+          
+          # Update virus definitions
           sudo systemctl stop clamav-freshclam || true
-          sudo freshclam || true
+          sudo freshclam || echo "Warning: Could not update virus definitions"
           sudo systemctl start clamav-freshclam || true
+          
+          # Re-enable IPv6
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0 || true
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0 || true
 
       - name: Run ClamAV Scan
         id: clamav
