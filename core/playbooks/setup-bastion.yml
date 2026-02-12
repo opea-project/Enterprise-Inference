@@ -464,6 +464,1210 @@
       when: not kubeconfig_check.stat.exists
       tags: kubeconfig
 
+    #############################################################
+    # BROWNFIELD DEPLOYMENT PRECHECKS
+    #############################################################
+
+    - name: Run Brownfield Deployment Prechecks
+      block:
+        - name: Display precheck start message
+          debug:
+            msg:
+              - "========================================"
+              - "BROWNFIELD DEPLOYMENT PRECHECKS"
+              - "========================================"
+              - "Running comprehensive validation checks for brownfield deployment"
+              - "This includes OS, storage, ingress, DNS, node labels, and resource checks"
+          tags: precheck
+
+        # OS and System Prechecks
+        - name: Gather system facts for OS validation
+          setup:
+            gather_subset:
+              - '!all'
+              - '!min'
+              - distribution
+              - distribution_version
+              - distribution_major_version
+              - os_family
+              - kernel
+          tags: precheck
+
+        - name: Validate deployment machine OS
+          assert:
+            that:
+              - ansible_distribution == "Ubuntu"
+              - ansible_distribution_version is version('22.04', '>=')
+            fail_msg: |
+              PRECHECK FAILED: Unsupported OS on deployment machine
+              Current OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+              Supported: Ubuntu 22.04 or higher
+            success_msg: "[PASS] Deployment machine OS validation passed: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          ignore_errors: yes
+          register: os_check
+          tags: precheck
+
+        - name: Display OS check result
+          debug:
+            msg: "{{ '[PASS] OS Check: PASSED' if os_check is succeeded else '[WARN] OS Check: WARNING - Unsupported OS detected' }}"
+          tags: precheck
+
+        # Cluster Connection and Platform Detection Prechecks
+        - name: Verify cluster connection is available
+          block:
+            - name: Test cluster API connectivity
+              command: kubectl cluster-info --request-timeout=10s
+              register: cluster_info_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Display cluster connectivity result
+              debug:
+                msg: "{{ '[PASS] Cluster API Connection: ACCESSIBLE' if cluster_info_check.rc == 0 else '[FAIL] Cluster API Connection: FAILED - Cannot reach cluster' }}"
+              tags: precheck
+
+            - name: Get cluster version information
+              shell: kubectl version -o json | jq -r '.serverVersion.gitVersion'
+              register: k8s_version_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: cluster_info_check.rc == 0
+              tags: precheck
+
+            - name: Display Kubernetes version
+              debug:
+                msg: "[PASS] Kubernetes Version: {{ k8s_version_check.stdout }}"
+              when: cluster_info_check.rc == 0 and k8s_version_check.rc == 0
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists
+
+        # Storage Class Prechecks
+        - name: Check for available StorageClasses
+          block:
+            - name: Get all StorageClasses
+              command: kubectl get storageclass -o json
+              register: storage_class_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Parse StorageClass information
+              set_fact:
+                storage_classes: "{{ (storage_class_check.stdout | from_json)['items'] | map(attribute='metadata.name') | list }}"
+                default_storage_class: "{{ (storage_class_check.stdout | from_json)['items'] | selectattr('metadata.annotations.storageclass.kubernetes.io/is-default-class', 'defined') | selectattr('metadata.annotations.storageclass.kubernetes.io/is-default-class', 'equalto', 'true') | map(attribute='metadata.name') | first | default('') }}"
+              when: storage_class_check.rc == 0
+              tags: precheck
+
+            - name: Validate StorageClass availability
+              assert:
+                that:
+                  - storage_classes is defined
+                  - storage_classes | length > 0
+                fail_msg: |
+                  [CRITICAL] No StorageClass found in cluster
+                  At least one StorageClass is required for PVC provisioning
+                  Models require minimum 250GB storage
+                success_msg: "[PASS] StorageClass Check: {{ storage_classes | length }} StorageClass(es) available"
+              when: storage_class_check.rc == 0
+              ignore_errors: yes
+              register: storage_class_validation
+              tags: precheck
+
+            - name: Display StorageClass details
+              debug:
+                msg:
+                  - "Available StorageClasses: {{ storage_classes | join(', ') }}"
+                  - "Default StorageClass: {{ default_storage_class if default_storage_class else 'None (must be specified in PVC)' }}"
+              when: storage_class_check.rc == 0 and storage_classes is defined
+              tags: precheck
+
+            # Test PVC creation and binding
+            - name: Create test PVC to validate storage provisioning
+              kubernetes.core.k8s:
+                state: present
+                definition:
+                  apiVersion: v1
+                  kind: PersistentVolumeClaim
+                  metadata:
+                    name: test-pvc-precheck
+                    namespace: default
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 1Gi
+                    storageClassName: "{{ default_storage_class if default_storage_class else storage_classes[0] }}"
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: storage_class_check.rc == 0 and storage_classes is defined and storage_classes | length > 0
+              register: test_pvc_creation
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Create test Pod to consume the PVC (forces binding for WaitForFirstConsumer)
+              kubernetes.core.k8s:
+                state: present
+                definition:
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: test-pod-precheck
+                    namespace: default
+                  spec:
+                    restartPolicy: Never
+                    volumes:
+                      - name: test-volume
+                        persistentVolumeClaim:
+                          claimName: test-pvc-precheck
+                    containers:
+                      - name: pvc-checker
+                        image: busybox:1.36
+                        command: ["/bin/sh", "-c", "echo pvc-precheck >/data/out && sleep 120"]
+                        volumeMounts:
+                          - name: test-volume
+                            mountPath: /data
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_pvc_creation is succeeded
+              register: test_pod_creation
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Wait for test PVC to be bound (max 90 seconds)
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: PersistentVolumeClaim
+                name: test-pvc-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              register: test_pvc_status
+              until: test_pvc_status.resources[0].status.phase == "Bound"
+              retries: 18
+              delay: 5
+              when: test_pvc_creation is succeeded
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Wait for test Pod to be running (max 90 seconds)
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: Pod
+                name: test-pod-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              register: test_pod_status
+              until: test_pod_status.resources[0].status.phase in ["Running", "Succeeded"]
+              retries: 18
+              delay: 5
+              when: test_pod_creation is succeeded
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display test PVC status
+              debug:
+                msg:
+                  - "{{ '[PASS] Test PVC: Bound' if test_pvc_status is succeeded else '[WARN] Test PVC: Not bound within timeout' }}"
+                  - "{{ 'PVC Phase: ' + test_pvc_status.resources[0].status.phase if test_pvc_status.resources is defined and test_pvc_status.resources | length > 0 else 'PVC Phase: Unknown' }}"
+                  - "{{ 'StorageClass Used: ' + (default_storage_class if default_storage_class else storage_classes[0]) if storage_classes is defined else '' }}"
+              when: test_pvc_creation is defined
+              tags: precheck
+
+            - name: Display test Pod status
+              debug:
+                msg:
+                  - "{{ '[PASS] Test Pod: Running/Succeeded' if test_pod_status is succeeded else '[WARN] Test Pod: Pending/Failed within timeout' }}"
+                  - "{{ 'Pod Phase: ' + test_pod_status.resources[0].status.phase if test_pod_status.resources is defined and test_pod_status.resources | length > 0 else 'Pod Phase: Unknown' }}"
+              when: test_pod_creation is defined
+              tags: precheck
+
+            - name: Describe test PVC for troubleshooting
+              command: kubectl describe pvc test-pvc-precheck -n default
+              register: test_pvc_describe
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_pvc_creation is succeeded and test_pvc_status is failed
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display PVC troubleshooting info
+              debug:
+                msg: "{{ test_pvc_describe.stdout_lines }}"
+              when:
+                - test_pvc_describe is defined
+                - test_pvc_describe is not skipped
+                - test_pvc_describe.rc is defined
+                - test_pvc_describe.rc == 0
+              tags: precheck
+
+            - name: Describe test Pod for troubleshooting
+              command: kubectl describe pod test-pod-precheck -n default
+              register: test_pod_describe
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_pod_creation is succeeded and test_pod_status is failed
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display Pod troubleshooting info
+              debug:
+                msg: "{{ test_pod_describe.stdout_lines }}"
+              when:
+                - test_pod_describe is defined
+                - test_pod_describe is not skipped
+                - test_pod_describe.rc is defined
+                - test_pod_describe.rc == 0
+              tags: precheck
+
+            - name: Clean up test Pod
+              kubernetes.core.k8s:
+                state: absent
+                api_version: v1
+                kind: Pod
+                name: test-pod-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_pod_creation is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Clean up test PVC
+              kubernetes.core.k8s:
+                state: absent
+                api_version: v1
+                kind: PersistentVolumeClaim
+                name: test-pvc-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_pvc_creation is defined
+              ignore_errors: yes
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists and cluster_info_check is defined and cluster_info_check.rc == 0
+
+        # Ingress/Route Controller Prechecks
+        - name: Check Ingress Controller for Vanilla Kubernetes
+          block:
+            - name: Check for IngressClass resources
+              command: kubectl get ingressclass -o json
+              register: ingress_class_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Parse IngressClass information
+              set_fact:
+                ingress_classes: "{{ (ingress_class_check.stdout | from_json)['items'] | map(attribute='metadata.name') | list }}"
+                default_ingress_class: "{{ (ingress_class_check.stdout | from_json)['items'] | selectattr('metadata.annotations.ingressclass.kubernetes.io/is-default-class', 'defined') | selectattr('metadata.annotations.ingressclass.kubernetes.io/is-default-class', 'equalto', 'true') | map(attribute='metadata.name') | first | default('') }}"
+              when: ingress_class_check.rc == 0
+              tags: precheck
+
+            - name: Check for common ingress controllers (NGINX)
+              shell: kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.name | test("ingress-nginx|nginx-ingress")) | "\(.metadata.namespace)/\(.metadata.name)"'
+              register: nginx_ingress_pods
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Display ingress controller information
+              debug:
+                msg:
+                  - "{{ '[PASS] IngressClass Found: ' + (ingress_classes | join(', ')) if ingress_classes is defined and ingress_classes | length > 0 else '[WARN] No IngressClass found' }}"
+                  - "{{ 'Default IngressClass: ' + default_ingress_class if default_ingress_class else 'No default IngressClass (will need deploy_ingress_controller=on)' }}"
+                  - "{{ '[PASS] NGINX Ingress Controller pods: ' + nginx_ingress_pods.stdout if nginx_ingress_pods.stdout else 'No NGINX ingress pods detected' }}"
+              when: ingress_class_check.rc == 0
+              tags: precheck
+
+            # Test NGINX Ingress Controller connectivity
+            - name: Get NGINX Ingress Controller service endpoint
+              shell: |
+                kubectl get svc -A -l app.kubernetes.io/name=ingress-nginx -o json 2>/dev/null | \
+                jq -r '.items[0] | "\(.metadata.namespace)/\(.metadata.name):\(.spec.ports[] | select(.name=="http") | .port)"' 2>/dev/null || \
+                kubectl get svc -n ingress-nginx ingress-nginx-controller -o json 2>/dev/null | \
+                jq -r '"\(.metadata.namespace)/\(.metadata.name):\(.spec.ports[] | select(.name=="http") | .port)"' 2>/dev/null || \
+                echo "not-found"
+              register: nginx_ingress_endpoint
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: nginx_ingress_pods.stdout
+              tags: precheck
+
+            - name: Parse NGINX Ingress endpoint
+              set_fact:
+                nginx_namespace: "{{ nginx_ingress_endpoint.stdout.split('/')[0] }}"
+                nginx_service: "{{ nginx_ingress_endpoint.stdout.split('/')[1].split(':')[0] }}"
+                nginx_port: "{{ nginx_ingress_endpoint.stdout.split(':')[1] }}"
+              when: nginx_ingress_endpoint is defined and nginx_ingress_endpoint.stdout != "not-found" and nginx_ingress_pods.stdout
+              tags: precheck
+
+            - name: Test NGINX Ingress Controller connectivity
+              shell: |
+                kubectl run test-curl-nginx --image=curlimages/curl:latest --rm -i --restart=Never --timeout=30s -- \
+                curl -s -o /dev/null -w "%{http_code}" http://{{ nginx_service }}.{{ nginx_namespace }}.svc.cluster.local:{{ nginx_port }} --max-time 10 || echo "000"
+              register: nginx_connectivity_test
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: nginx_service is defined and nginx_namespace is defined and nginx_port is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display NGINX Ingress connectivity test result
+              debug:
+                msg:
+                  - "{{ '[PASS] NGINX Ingress Connectivity: Reachable (HTTP ' + nginx_connectivity_test.stdout.strip() + ')' if nginx_connectivity_test is defined and nginx_connectivity_test.stdout.strip() in ['200', '404', '503'] else '[WARN] NGINX Ingress Connectivity: Not reachable or timeout' }}"
+                  - "Endpoint tested: http://{{ nginx_service }}.{{ nginx_namespace }}.svc.cluster.local:{{ nginx_port }}"
+              when: nginx_connectivity_test is defined
+              tags: precheck
+
+            # Functional Test: Create test Ingress to verify external accessibility
+            - name: Create test web server pod for ingress validation
+              kubernetes.core.k8s:
+                state: present
+                definition:
+                  apiVersion: v1
+                  kind: Pod
+                  metadata:
+                    name: test-ingress-web
+                    namespace: default
+                    labels:
+                      app: test-ingress-web
+                  spec:
+                    restartPolicy: Never
+                    containers:
+                      - name: nginx
+                        image: nginx:alpine
+                        ports:
+                          - containerPort: 80
+                        command: ["/bin/sh", "-c"]
+                        args:
+                          - |
+                            echo "Ingress test successful - $(date)" > /usr/share/nginx/html/index.html
+                            nginx -g 'daemon off;'
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: ingress_classes is defined and ingress_classes | length > 0
+              register: test_ingress_pod_creation
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Create test service for ingress validation
+              kubernetes.core.k8s:
+                state: present
+                definition:
+                  apiVersion: v1
+                  kind: Service
+                  metadata:
+                    name: test-ingress-web
+                    namespace: default
+                  spec:
+                    selector:
+                      app: test-ingress-web
+                    ports:
+                      - protocol: TCP
+                        port: 80
+                        targetPort: 80
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_pod_creation is succeeded
+              register: test_ingress_service_creation
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Wait for test ingress pod to be running (max 60 seconds)
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: Pod
+                name: test-ingress-web
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              register: test_ingress_pod_status
+              until: test_ingress_pod_status.resources[0].status.phase == "Running"
+              retries: 12
+              delay: 5
+              when: test_ingress_pod_creation is succeeded
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Create test Ingress resource
+              kubernetes.core.k8s:
+                state: present
+                definition:
+                  apiVersion: networking.k8s.io/v1
+                  kind: Ingress
+                  metadata:
+                    name: test-ingress-precheck
+                    namespace: default
+                    annotations:
+                      nginx.ingress.kubernetes.io/rewrite-target: /
+                  spec:
+                    ingressClassName: "{{ default_ingress_class if default_ingress_class else ingress_classes[0] }}"
+                    rules:
+                      - http:
+                          paths:
+                            - path: /test-ingress
+                              pathType: Prefix
+                              backend:
+                                service:
+                                  name: test-ingress-web
+                                  port:
+                                    number: 80
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_service_creation is succeeded and test_ingress_pod_status is succeeded
+              register: test_ingress_creation
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Wait for Ingress to get an address/hostname (max 60 seconds)
+              kubernetes.core.k8s_info:
+                api_version: networking.k8s.io/v1
+                kind: Ingress
+                name: test-ingress-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              register: test_ingress_status
+              until: >
+                test_ingress_status.resources[0].status.loadBalancer.ingress is defined and
+                test_ingress_status.resources[0].status.loadBalancer.ingress | length > 0
+              retries: 12
+              delay: 5
+              when: test_ingress_creation is succeeded
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Extract Ingress address
+              set_fact:
+                ingress_address: >-
+                  {{ test_ingress_status.resources[0].status.loadBalancer.ingress[0].ip 
+                     if test_ingress_status.resources[0].status.loadBalancer.ingress[0].ip is defined 
+                     else test_ingress_status.resources[0].status.loadBalancer.ingress[0].hostname }}
+              when: test_ingress_status is succeeded and test_ingress_status.resources[0].status.loadBalancer.ingress is defined
+              tags: precheck
+
+            - name: Test external Ingress accessibility
+              uri:
+                url: "http://{{ ingress_address }}/test-ingress"
+                method: GET
+                return_content: yes
+                status_code: [200, 404]
+                timeout: 30
+              register: ingress_external_test
+              when: ingress_address is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display Ingress functional test results
+              debug:
+                msg:
+                  - "{{ '[PASS] Ingress Resource: Created and assigned address' if test_ingress_status is succeeded and ingress_address is defined else '[WARN] Ingress Resource: No address assigned' }}"
+                  - "{{ 'Ingress Address: ' + ingress_address if ingress_address is defined else 'Ingress Address: Not available' }}"
+                  - "{{ '[PASS] External Ingress Accessibility: Reachable (HTTP ' + (ingress_external_test.status | string) + ')' if ingress_external_test is succeeded else '[WARN] External Ingress Accessibility: Not reachable or timeout' }}"
+                  - "{{ 'IngressClass Used: ' + (default_ingress_class if default_ingress_class else ingress_classes[0]) if ingress_classes is defined else '' }}"
+              when: test_ingress_creation is defined
+              tags: precheck
+
+            - name: Describe test Ingress for troubleshooting
+              command: kubectl describe ingress test-ingress-precheck -n default
+              register: test_ingress_describe
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_creation is succeeded and (test_ingress_status is failed or ingress_external_test is failed)
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display Ingress troubleshooting info
+              debug:
+                msg: "{{ test_ingress_describe.stdout_lines }}"
+              when:
+                - test_ingress_describe is defined
+                - test_ingress_describe is not skipped
+                - test_ingress_describe.rc is defined
+                - test_ingress_describe.rc == 0
+              tags: precheck
+
+            - name: Clean up test Ingress
+              kubernetes.core.k8s:
+                state: absent
+                api_version: networking.k8s.io/v1
+                kind: Ingress
+                name: test-ingress-precheck
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_creation is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Clean up test Service
+              kubernetes.core.k8s:
+                state: absent
+                api_version: v1
+                kind: Service
+                name: test-ingress-web
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_service_creation is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Clean up test Pod
+              kubernetes.core.k8s:
+                state: absent
+                api_version: v1
+                kind: Pod
+                name: test-ingress-web
+                namespace: default
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: test_ingress_pod_creation is defined
+              ignore_errors: yes
+              tags: precheck
+
+          when: 
+            - kubeconfig_check.stat.exists 
+            - cluster_info_check is defined and cluster_info_check.rc == 0
+            - is_vanilla_k8s is defined and is_vanilla_k8s
+
+        # OpenShift Route Controller Prechecks
+        - name: Check OpenShift Router
+          block:
+            - name: Check for OpenShift router pods
+              command: kubectl get pods -n openshift-ingress -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default -o json
+              register: openshift_router_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Parse OpenShift router status
+              set_fact:
+                router_pods: "{{ (openshift_router_check.stdout | from_json)['items'] | map(attribute='metadata.name') | list }}"
+                router_ready: "{{ (openshift_router_check.stdout | from_json)['items'] | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Running') | list | length }}"
+              when: openshift_router_check.rc == 0
+              tags: precheck
+
+            - name: Display OpenShift router status
+              debug:
+                msg:
+                  - "{{ '[PASS] OpenShift Router: ' + (router_ready | string) + ' pod(s) running' if router_ready is defined and router_ready | int > 0 else '[FAIL] OpenShift Router: Not running or not found' }}"
+                  - "Router pods: {{ router_pods | join(', ') if router_pods is defined else 'None' }}"
+              when: openshift_router_check.rc == 0
+              tags: precheck
+
+            - name: Check route.openshift.io API availability
+              command: kubectl api-resources --api-group=route.openshift.io
+              register: route_api_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Display route API status
+              debug:
+                msg: "{{ '[PASS] OpenShift Route API: Available' if route_api_check.rc == 0 else '[FAIL] OpenShift Route API: Not available' }}"
+              tags: precheck
+
+            # Test OpenShift Router connectivity
+            - name: Get OpenShift Router service endpoint
+              shell: |
+                kubectl get svc -n openshift-ingress router-default -o json 2>/dev/null | \
+                jq -r '"\(.metadata.namespace)/\(.metadata.name):\(.spec.ports[] | select(.name=="http") | .port)"' 2>/dev/null || \
+                kubectl get svc -n openshift-ingress -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default -o json 2>/dev/null | \
+                jq -r '.items[0] | "\(.metadata.namespace)/\(.metadata.name):\(.spec.ports[] | select(.name=="http") | .port)"' 2>/dev/null || \
+                echo "not-found"
+              register: router_endpoint
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: openshift_router_check.rc == 0 and router_ready is defined and router_ready | int > 0
+              tags: precheck
+
+            - name: Parse OpenShift Router endpoint
+              set_fact:
+                router_namespace: "{{ router_endpoint.stdout.split('/')[0] }}"
+                router_service: "{{ router_endpoint.stdout.split('/')[1].split(':')[0] }}"
+                router_port: "{{ router_endpoint.stdout.split(':')[1] }}"
+              when: router_endpoint is defined and router_endpoint.stdout != "not-found"
+              tags: precheck
+
+            - name: Test OpenShift Router connectivity
+              shell: |
+                kubectl run test-curl-router --image=curlimages/curl:latest --rm -i --restart=Never --timeout=30s -- \
+                curl -s -o /dev/null -w "%{http_code}" http://{{ router_service }}.{{ router_namespace }}.svc.cluster.local:{{ router_port }} --max-time 10 || echo "000"
+              register: router_connectivity_test
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: router_service is defined and router_namespace is defined and router_port is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display OpenShift Router connectivity test result
+              debug:
+                msg:
+                  - "{{ '[PASS] OpenShift Router Connectivity: Reachable (HTTP ' + router_connectivity_test.stdout.strip() + ')' if router_connectivity_test is defined and router_connectivity_test.stdout.strip() in ['200', '404', '503'] else '[WARN] OpenShift Router Connectivity: Not reachable or timeout' }}"
+                  - "Endpoint tested: http://{{ router_service }}.{{ router_namespace }}.svc.cluster.local:{{ router_port }}"
+              when: router_connectivity_test is defined
+              tags: precheck
+
+          when: 
+            - kubeconfig_check.stat.exists 
+            - cluster_info_check is defined and cluster_info_check.rc == 0
+            - is_openshift is defined and is_openshift
+
+        # EKS-Specific Prechecks
+        - name: Check EKS-specific requirements
+          block:
+            - name: Check for AWS Load Balancer Controller
+              shell: kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.name | test("aws-load-balancer-controller")) | "\(.metadata.namespace)/\(.metadata.name)"'
+              register: alb_controller_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Check for EBS CSI Driver
+              command: kubectl get csidriver ebs.csi.aws.com
+              register: ebs_csi_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/ubuntu/.kube/config"
+              tags: precheck
+
+            - name: Check AWS credentials in environment
+              shell: |
+                if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+                  echo "configured"
+                else
+                  echo "missing"
+                fi
+              register: aws_creds_check
+              changed_when: false
+              tags: precheck
+
+            - name: Check if inference-config.cfg exists for EKS certificate validation
+              stat:
+                path: "{{ playbook_dir }}/../inventory/inference-config.cfg"
+              register: eks_config_file_check
+              tags: precheck
+
+            - name: Read AWS certificate ARN from inference-config.cfg
+              shell: grep '^aws_certificate_arn=' {{ playbook_dir }}/../inventory/inference-config.cfg | cut -d'=' -f2- | tr -d ' \t\r\n'
+              register: aws_cert_arn_output
+              when: eks_config_file_check.stat.exists
+              changed_when: false
+              failed_when: false
+              tags: precheck
+
+            - name: Set AWS certificate ARN fact
+              set_fact:
+                aws_certificate_arn_value: "{{ aws_cert_arn_output.stdout | default('') | trim }}"
+              when: aws_cert_arn_output is defined and aws_cert_arn_output.stdout is defined
+              tags: precheck
+
+            - name: Set empty AWS certificate ARN fact if not found
+              set_fact:
+                aws_certificate_arn_value: ""
+              when: aws_cert_arn_output is not defined or aws_cert_arn_output.stdout is not defined
+              tags: precheck
+
+            - name: Validate AWS certificate ARN for ALB (EKS)
+              assert:
+                that:
+                  - aws_certificate_arn_value is defined
+                  - aws_certificate_arn_value | length > 0
+                  - aws_certificate_arn_value is match('^arn:aws:acm:[a-z0-9-]+:\\d{12}:certificate/.+')
+                fail_msg: |
+                  [FAIL] ALB certificate ARN missing or invalid for EKS.
+                  Set aws_certificate_arn in inference-config.cfg (DEFAULT section) to a valid ACM certificate ARN.
+                success_msg: "[PASS] ALB certificate ARN is configured"
+              register: aws_certificate_arn_validation
+              when: eks_config_file_check.stat.exists
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Determine AWS region for ACM validation
+              set_fact:
+                aws_region_value: "{{ (lookup('env', 'AWS_REGION') | default('', true)) or (lookup('env', 'AWS_DEFAULT_REGION') | default('', true)) }}"
+              tags: precheck
+
+            - name: Display EKS-specific checks
+              debug:
+                msg:
+                  - "{{ '[PASS] AWS Load Balancer Controller: Found - ' + alb_controller_check.stdout if alb_controller_check.stdout else '\033[1;31m[FAIL]\033[0m AWS Load Balancer Controller: Not found' }}"
+                  - "{{ '[PASS] EBS CSI Driver: Installed' if ebs_csi_check.rc == 0 else '\033[1;31m[FAIL]\033[0m EBS CSI Driver: Not found' }}"
+                  - "{{ '[PASS] AWS Credentials: Configured in environment' if aws_creds_check.stdout == 'configured' else '\033[1;31m[FAIL]\033[0m AWS Credentials: Missing (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)' }}"
+                  - "{{ '[PASS] ALB TLS Certificate ARN: ' + aws_certificate_arn_value if (aws_certificate_arn_validation is defined and aws_certificate_arn_validation is succeeded and aws_certificate_arn_value is defined and aws_certificate_arn_value | length > 0) else '\033[1;31m[FAIL]\033[0m ALB TLS Certificate ARN: Missing/invalid in inference-config.cfg' }}"
+                  - >-
+                    {% if aws_certificate_arn_value is not defined or aws_certificate_arn_value | length == 0 %}
+                    \033[1;31m[FAIL]\033[0m ACM Certificate Validation: ARN missing in inference-config.cfg
+                    {% elif aws_region_value is not defined or aws_region_value | length == 0 %}
+                    \033[1;31m[FAIL]\033[0m ACM Certificate Validation: AWS_REGION/AWS_DEFAULT_REGION not set for validation
+                    {% elif acm_certificate_status is defined and acm_certificate_status is succeeded and (acm_certificate_status.stdout | trim) == 'ISSUED' %}
+                    [PASS] ACM Certificate Validation: Found and ISSUED in {{ aws_region_value }}
+                    {% else %}
+                    \033[1;31m[FAIL]\033[0m ACM Certificate Validation: Not found or not ISSUED in {{ aws_region_value | default('unknown region') }}
+                    {% endif %}
+              tags: precheck
+
+            # Test AWS Load Balancer Controller connectivity
+            - name: Get AWS Load Balancer Controller webhook service
+              shell: |
+                kubectl get svc -A -l app.kubernetes.io/name=aws-load-balancer-controller -o json 2>/dev/null | \
+                jq -r '.items[0] | "\(.metadata.namespace)/\(.metadata.name):\(.spec.ports[0].port)"' 2>/dev/null || \
+                echo "not-found"
+              register: alb_controller_endpoint
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: alb_controller_check.stdout
+              tags: precheck
+
+            - name: Parse AWS Load Balancer Controller endpoint
+              set_fact:
+                alb_namespace: "{{ alb_controller_endpoint.stdout.split('/')[0] }}"
+                alb_service: "{{ alb_controller_endpoint.stdout.split('/')[1].split(':')[0] }}"
+                alb_port: "{{ alb_controller_endpoint.stdout.split(':')[1] }}"
+              when: alb_controller_endpoint is defined and alb_controller_endpoint.stdout != "not-found"
+              tags: precheck
+
+            - name: Test AWS Load Balancer Controller webhook connectivity
+              shell: |
+                kubectl run test-curl-alb --image=curlimages/curl:latest --rm -i --restart=Never --timeout=30s -- \
+                curl -s -o /dev/null -w "%{http_code}" -k https://{{ alb_service }}.{{ alb_namespace }}.svc.cluster.local:{{ alb_port }}/healthz --max-time 10 || echo "000"
+              register: alb_connectivity_test
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: alb_service is defined and alb_namespace is defined and alb_port is defined
+              ignore_errors: yes
+              tags: precheck
+
+            - name: Display AWS Load Balancer Controller connectivity test result
+              debug:
+                msg:
+                  - "{{ '[PASS] AWS LB Controller Connectivity: Reachable (HTTP ' + alb_connectivity_test.stdout.strip() + ')' if alb_connectivity_test is defined and alb_connectivity_test.stdout.strip() in ['200', '404'] else '[WARN] AWS LB Controller Connectivity: Not reachable or timeout' }}"
+                  - "Endpoint tested: https://{{ alb_service }}.{{ alb_namespace }}.svc.cluster.local:{{ alb_port }}/healthz"
+              when: alb_connectivity_test is defined
+              tags: precheck
+
+          when: 
+            - kubeconfig_check.stat.exists 
+            - cluster_info_check is defined and cluster_info_check.rc == 0
+            - detected_platform is defined and 'EKS' in detected_platform
+
+        # Istio Service Mesh Prechecks
+        - name: Check for existing Istio installation
+          block:
+            - name: Check if istio-system namespace exists
+              command: kubectl get namespace istio-system -o json
+              register: istio_namespace_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Check for istiod deployment
+              command: kubectl get deployment -n istio-system istiod -o json
+              register: istiod_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: istio_namespace_check.rc == 0
+              tags: precheck
+
+            - name: Parse Istio deployment status
+              set_fact:
+                istio_installed: "{{ istio_namespace_check.rc == 0 and istiod_check is defined and istiod_check is not skipped and istiod_check.rc is defined and istiod_check.rc == 0 }}"
+                istiod_replicas: "{{ (istiod_check.stdout | from_json).status.replicas | default(0) if istiod_check is defined and istiod_check is not skipped and istiod_check.rc is defined and istiod_check.rc == 0 else 0 }}"
+                istiod_ready_replicas: "{{ (istiod_check.stdout | from_json).status.readyReplicas | default(0) if istiod_check is defined and istiod_check is not skipped and istiod_check.rc is defined and istiod_check.rc == 0 else 0 }}"
+              when: istio_namespace_check is defined
+              tags: precheck
+
+            - name: Check for Istio version (if installed)
+              shell: |
+                kubectl get deployment istiod -n istio-system -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oP '(?<=:)[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"
+              register: istio_version_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              when: istio_installed is defined and istio_installed
+              tags: precheck
+
+            - name: Get deploy_istio config value
+              shell: grep '^deploy_istio=' {{ playbook_dir }}/../inventory/inference-config.cfg | cut -d'=' -f2
+              register: deploy_istio_config
+              failed_when: false
+              changed_when: false
+              tags: precheck
+
+            - name: Display Istio detection results
+              debug:
+                msg: "{{ istio_messages | reject('equalto', '') | list }}"
+              vars:
+                istio_messages:
+                  - "========================================="
+                  - "ISTIO SERVICE MESH DETECTION"
+                  - "========================================="
+                  - "{{ 'Status: Istio is already installed in the cluster' if istio_installed else 'Status: No Istio installation detected' }}"
+                  - "{{ 'Namespace: istio-system (exists)' if istio_namespace_check.rc == 0 else 'Namespace: istio-system (not found)' }}"
+                  - "{{ 'Istiod Deployment: ' + (istiod_ready_replicas | string) + '/' + (istiod_replicas | string) + ' replicas ready' if istio_installed else 'Istiod Deployment: Not found' }}"
+                  - "{{ 'Istio Version: ' + istio_version_check.stdout if istio_installed and istio_version_check is defined and istio_version_check.stdout != 'unknown' else 'Istio Version: Not applicable' }}"
+                  - ""
+                  - "Current Configuration: deploy_istio={{ deploy_istio_config.stdout if deploy_istio_config.stdout else 'not set' }}"
+                  - ""
+                  - "{{ 'IMPORTANT - When Istio is already installed:' if istio_installed else ('NOTE - Istio is not supported on OpenShift through this automation' if (is_openshift is defined and is_openshift) else 'NOTE - If you want to use Istio (EKS/Vanilla K8s only):') }}"
+                  - "{{ '  • Configuration will be auto-updated to deploy_istio=off' if istio_installed else ('' if (is_openshift is defined and is_openshift) else '  • Set deploy_istio=on in inference-config.cfg') }}"
+                  - "{{ '  • Deployment will use the existing Istio mesh' if istio_installed else ('' if (is_openshift is defined and is_openshift) else '  • Automation will install Istio during deployment') }}"
+                  - "{{ '  • Existing Istio configuration will be preserved' if istio_installed else '' }}"
+                  - "{{ '  • Ensure compatibility with existing version (recommended: 1.20+)' if istio_installed else '' }}"
+                  - "{{ '  • Verify ingress gateway and network policies are configured' if istio_installed else '' }}"
+                  - "========================================="
+              when: istio_namespace_check is defined
+              tags: precheck
+
+            - name: Auto-update inference-config.cfg when Istio is already installed
+              lineinfile:
+                path: "{{ playbook_dir }}/../inventory/inference-config.cfg"
+                regexp: '^deploy_istio='
+                line: 'deploy_istio=off'
+                create: no
+              when: 
+                - istio_installed is defined
+                - istio_installed
+              tags: precheck
+
+            - name: Display Istio conflict auto-resolution
+              debug:
+                msg:
+                  - "========================================="
+                  - "ISTIO CONFLICT AUTO-RESOLVED"
+                  - "========================================="
+                  - "Detected: Istio is already installed in the cluster (version {{ istio_version_check.stdout if istio_version_check is defined and istio_version_check.stdout != 'unknown' else 'detected' }})"
+                  - ""
+                  - "ACTION TAKEN:"
+                  - "  Automatically set deploy_istio=off in inference-config.cfg"
+                  - "  to use the existing Istio service mesh."
+                  - ""
+                  - "IMPORTANT - SIDE EFFECTS TO BE AWARE OF:"
+                  - "  1. Deployment will NOT install or modify Istio"
+                  - "  2. Existing Istio configuration will be preserved"
+                  - "  3. Application will use the existing Istio mesh"
+                  - "  4. Ensure existing Istio version is compatible (recommended: 1.20+)"
+                  - "  5. Verify Istio ingress gateway is properly configured"
+                  - "  6. Network policies may need manual adjustment for Istio ambient mode"
+                  - ""
+                  - "STATUS:"
+                  - "  Previous config: deploy_istio={{ deploy_istio_config.stdout if deploy_istio_config.stdout else 'not set' }}"
+                  - "  Updated config: deploy_istio=off"
+                  - ""
+                  - "Proceeding with deployment using existing Istio installation..."
+                  - "========================================="
+              when: 
+                - istio_installed is defined
+                - istio_installed
+              tags: precheck
+
+          when: 
+            - kubeconfig_check.stat.exists 
+            - cluster_info_check is defined and cluster_info_check.rc == 0
+
+        # Node Label Prechecks
+        - name: Check required node labels
+          block:
+            - name: Check for nodes with ei-infra-eligible label
+              shell: kubectl get nodes -l ei-infra-eligible=true -o json | jq -r '.items | length'
+              register: infra_nodes_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Check for nodes with ei-inference-eligible label
+              shell: kubectl get nodes -l ei-inference-eligible=true -o json | jq -r '.items | length'
+              register: inference_nodes_check
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Get node names with labels
+              shell: |
+                echo "=== Infra Nodes (ei-infra-eligible=true) ==="
+                kubectl get nodes -l ei-infra-eligible=true -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type --no-headers 2>/dev/null || echo "None"
+                echo ""
+                echo "=== Inference Nodes (ei-inference-eligible=true) ==="
+                kubectl get nodes -l ei-inference-eligible=true -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type --no-headers 2>/dev/null || echo "None"
+              register: labeled_nodes_list
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Validate node labels
+              debug:
+                msg:
+                  - "{{ '[PASS] Infrastructure Nodes (ei-infra-eligible=true): ' + infra_nodes_check.stdout + ' node(s) found' if infra_nodes_check.stdout | int > 0 else '[FAIL] No nodes with ei-infra-eligible=true label found' }}"
+                  - "{{ '[PASS] Inference Nodes (ei-inference-eligible=true): ' + inference_nodes_check.stdout + ' node(s) found' if inference_nodes_check.stdout | int > 0 else '[FAIL] No nodes with ei-inference-eligible=true label found' }}"
+                  - "{{ labeled_nodes_list.stdout_lines | join('\n') }}"
+              tags: precheck
+
+            - name: Assert required node labels exist
+              assert:
+                that:
+                  - infra_nodes_check.stdout | int > 0
+                  - inference_nodes_check.stdout | int > 0
+                fail_msg: |
+                  ========================================
+                  CRITICAL: Missing Required Node Labels
+                  ========================================
+                  Required node labels for workload scheduling:
+                    - ei-infra-eligible=true (for Keycloak, APISIX, GenAI Gateway, Observability)
+                    - ei-inference-eligible=true (for LLM model workloads)
+                  
+                  Current state:
+                    - ei-infra-eligible=true nodes: {{ infra_nodes_check.stdout }}
+                    - ei-inference-eligible=true nodes: {{ inference_nodes_check.stdout }}
+                  
+                  Without proper labels, pods will remain in Pending state!
+                  
+                  To add labels, run:
+                    kubectl label nodes <infra-node-name> ei-infra-eligible=true
+                    kubectl label nodes <inference-node-name> ei-inference-eligible=true
+                  
+                  Or use the automated labeling playbook:
+                    ansible-playbook playbooks/label-nodes.yml
+                  ========================================
+                success_msg: "[PASS] Required node labels are properly configured"
+              register: node_labels_validation
+              ignore_errors: yes
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists and cluster_info_check is defined and cluster_info_check.rc == 0
+
+        # Resource Availability Prechecks
+        - name: Check cluster resource availability
+          block:
+            - name: Get total cluster resources
+              shell: |
+                kubectl top nodes 2>/dev/null || kubectl get nodes -o json | jq -r '.items[] | "\(.metadata.name): CPU=\(.status.capacity.cpu) Memory=\(.status.capacity.memory)"'
+              register: cluster_resources
+              failed_when: false
+              changed_when: false
+              become_user: "{{ setup_user }}"
+              environment:
+                KUBECONFIG: "/home/{{ setup_user }}/.kube/config"
+              tags: precheck
+
+            - name: Display cluster resources
+              debug:
+                msg:
+                  - "Cluster Resource Summary:"
+                  - "{{ cluster_resources.stdout_lines | join('\n') }}"
+              when: cluster_resources.rc == 0
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists and cluster_info_check is defined and cluster_info_check.rc == 0
+
+        # Configuration File Validation
+        - name: Validate inference configuration file
+          block:
+            - name: Check if inference-config.cfg exists
+              stat:
+                path: "{{ playbook_dir }}/../inventory/inference-config.cfg"
+              register: config_file_check
+              tags: precheck
+
+            - name: Read and validate configuration parameters
+              shell: |
+                CONFIG_FILE="{{ playbook_dir }}/../inventory/inference-config.cfg"
+                if [ -f "$CONFIG_FILE" ]; then
+                  echo "=== Required Configuration Parameters ==="
+                  echo "cluster_url: $(grep '^cluster_url=' $CONFIG_FILE | cut -d'=' -f2)"
+                  echo "cert_file: $(grep '^cert_file=' $CONFIG_FILE | cut -d'=' -f2)"
+                  echo "key_file: $(grep '^key_file=' $CONFIG_FILE | cut -d'=' -f2)"
+                  echo ""
+                  echo "=== Deployment Flags ==="
+                  echo "deploy_ingress_controller: $(grep '^deploy_ingress_controller=' $CONFIG_FILE | cut -d'=' -f2)"
+                  echo "deploy_llm_models: $(grep '^deploy_llm_models=' $CONFIG_FILE | cut -d'=' -f2)"
+                  echo "models: $(grep '^models=' $CONFIG_FILE | cut -d'=' -f2)"
+                else
+                  echo "Configuration file not found"
+                fi
+              register: config_validation
+              failed_when: false
+              changed_when: false
+              tags: precheck
+
+            - name: Display configuration validation
+              debug:
+                msg: "{{ config_validation.stdout_lines }}"
+              when: config_file_check.stat.exists
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists
+
+        # DNS Resolution Precheck (if cluster_url is configured)
+        - name: Check DNS resolution for cluster URL
+          block:
+            - name: Get cluster_url from config
+              shell: grep '^cluster_url=' {{ playbook_dir }}/../inventory/inference-config.cfg | cut -d'=' -f2
+              register: cluster_url_value
+              failed_when: false
+              changed_when: false
+              tags: precheck
+
+            - name: Test DNS resolution
+              shell: |
+                if [ -n "{{ cluster_url_value.stdout }}" ]; then
+                  nslookup {{ cluster_url_value.stdout }} 2>/dev/null || host {{ cluster_url_value.stdout }} 2>/dev/null || echo "DNS resolution failed"
+                fi
+              register: dns_check
+              failed_when: false
+              changed_when: false
+              when: cluster_url_value.stdout is defined and cluster_url_value.stdout != ""
+              tags: precheck
+
+            - name: Display DNS check result
+              debug:
+                msg:
+                  - "DNS Check for {{ cluster_url_value.stdout }}:"
+                  - "{{ dns_check.stdout if dns_check is defined else 'Skipped - no cluster_url configured' }}"
+              when: cluster_url_value.stdout is defined and cluster_url_value.stdout != ""
+              tags: precheck
+
+          when: kubeconfig_check.stat.exists
+
+        # Precheck Summary
+        - name: Display comprehensive precheck summary
+          debug:
+            msg: "{{ messages | reject('equalto', '') | list }}"
+          vars:
+            messages:
+              - "========================================"
+              - "BROWNFIELD DEPLOYMENT PRECHECK SUMMARY"
+              - "========================================"
+              - "{{ '[PASS]' if os_check is succeeded else '[FAIL]' }} Deployment Machine OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+              - "{{ '[PASS]' if cluster_info_check is defined and cluster_info_check.rc == 0 else '[FAIL]' }} Cluster API Connection: {{ 'Connected' if cluster_info_check is defined and cluster_info_check.rc == 0 else 'Failed' }}"
+              - "{{ '[PASS]' if detected_platform is defined else '[INFO]' }} Detected Platform: {{ detected_platform if detected_platform is defined else 'Unknown' }}"
+              - "{{ '[PASS]' if storage_classes is defined and storage_classes | length > 0 else '[FAIL]' }} StorageClass: {{ storage_classes | length if storage_classes is defined else 0 }} available"
+              - "{{ '[PASS]' if (is_openshift is defined and is_openshift and route_api_check is defined and route_api_check.rc == 0) or (is_vanilla_k8s is defined and is_vanilla_k8s and ingress_classes is defined and ingress_classes | length > 0) or (detected_platform is defined and 'EKS' in detected_platform and alb_controller_check is defined and alb_controller_check.stdout) else '[INFO]' }} Ingress/Router: {{ 'OpenShift Router OK' if is_openshift is defined and is_openshift else ('IngressClass available' if ingress_classes is defined and ingress_classes | length > 0 else ('ALB Controller OK' if detected_platform is defined and 'EKS' in detected_platform and alb_controller_check is defined and alb_controller_check.stdout else 'Check required')) }}"
+              - "{{ '[INFO]' if istio_installed is defined and istio_installed else '[INFO]' }} Istio Service Mesh: {{ 'Installed (v' + istio_version_check.stdout + ') - recommend deploy_istio=off' if istio_installed is defined and istio_installed and istio_version_check is defined and istio_version_check.stdout != 'unknown' else ('Installed - recommended to set deploy_istio=off to avoid conflicts' if istio_installed is defined and istio_installed else 'Not installed') }}"
+              - "{{ (('[PASS]' if aws_certificate_arn_validation is defined and aws_certificate_arn_validation is succeeded else '[FAIL]') + ' EKS Certificate ARN: ' + ('Configured' if aws_certificate_arn_value is defined and aws_certificate_arn_value else 'Missing in inference-config.cfg')) if (detected_platform is defined and 'EKS' in detected_platform) else '' }}"
+              - "{{ '[PASS]' if infra_nodes_check is defined and infra_nodes_check.stdout | int > 0 else '[FAIL]' }} Node Labels (ei-infra-eligible): {{ infra_nodes_check.stdout if infra_nodes_check is defined else 'N/A' }} nodes"
+              - "{{ '[PASS]' if inference_nodes_check is defined and inference_nodes_check.stdout | int > 0 else '[FAIL]' }} Node Labels (ei-inference-eligible): {{ inference_nodes_check.stdout if inference_nodes_check is defined else 'N/A' }} nodes"
+              - "{{ 'All critical prechecks passed!' if (cluster_info_check is defined and cluster_info_check.rc == 0 and storage_classes is defined and storage_classes | length > 0 and infra_nodes_check is defined and infra_nodes_check.stdout | int > 0 and inference_nodes_check is defined and inference_nodes_check.stdout | int > 0 and (detected_platform is not defined or 'EKS' not in detected_platform or (aws_certificate_arn_validation is defined and aws_certificate_arn_validation is succeeded))) else 'CRITICAL: Some prechecks failed - review above for details' }}"
+              - "========================================"
+          tags: precheck
+
+        - name: Fail if critical prechecks failed
+          fail:
+            msg: |
+              ========================================
+              DEPLOYMENT BLOCKED: Critical Prechecks Failed
+              ========================================
+              One or more critical prechecks have failed. Please review the summary above and resolve the issues before proceeding with deployment.
+              
+              Common issues to check:
+              1. Cluster API connection - verify KUBECONFIG is correct
+              2. Storage classes - ensure at least one StorageClass exists
+              3. Node labels - verify nodes are labeled with ei-infra-eligible=true and ei-inference-eligible=true
+              4. EKS certificate ARN - verify aws_certificate_arn in inference-config.cfg (for EKS clusters)
+              5. Ingress controller - verify ingress controller or ALB controller is deployed
+              
+              To apply node labels automatically, run:
+                ansible-playbook playbooks/label-nodes.yml
+              
+              Cannot proceed with deployment until all critical checks pass.
+              ========================================
+          when: >
+            kubeconfig_check.stat.exists and (
+              (cluster_info_check is not defined or cluster_info_check.rc != 0) or
+              (storage_classes is not defined or storage_classes | length == 0) or
+              (infra_nodes_check is not defined or infra_nodes_check.stdout | int == 0) or
+              (inference_nodes_check is not defined or inference_nodes_check.stdout | int == 0) or
+              (detected_platform is defined and 'EKS' in detected_platform and (aws_certificate_arn_validation is not defined or aws_certificate_arn_validation is failed))
+            )
+          tags: precheck
+
+      when: kubeconfig_check.stat.exists
+      tags: precheck
+
     - name: Add Kubernetes tools to PATH in bashrc
       lineinfile:
         path: /home/{{ setup_user }}/.bashrc

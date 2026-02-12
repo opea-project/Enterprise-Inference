@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Create Keycloak TLS secret
@@ -55,16 +55,16 @@
     - name: Display the output
       debug:
         msg: "Secret {{ secret_name }} created."
-    - name: Retrieve number of Inference Infrastructure Nodes
-      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra --no-headers | wc -l
+    - name: Retrieve number of Infrastructure Nodes (ei-infra-eligible)
+      ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true --no-headers | wc -l
       register: inference_node_count
       changed_when: false
-    - name: Set Keycloak Replicas based upon Inference Infra Nodes
+    - name: Set Keycloak Replicas based upon Infrastructure Nodes
       set_fact:
         inference_infra_replica_count: "{{ inference_node_count.stdout | int if inference_node_count.stdout | int > 0 else 1 }}"
-    - name: Display the number of Inference Infrastructure Nodes
+    - name: Display the number of Infrastructure Nodes
       debug:
-        msg: "Number of inference-infra node configured: {{ inference_infra_replica_count }}"
+        msg: "Number of ei-infra-eligible nodes configured: {{ inference_infra_replica_count }}"
       run_once: true
       when: deploy_keycloak == "yes"
     - name: Delete genai-gateway-ingress resource
@@ -102,32 +102,36 @@
               persistence:
                 enabled: true
                 size: 8Gi
+              tolerations:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+                  effect: NoSchedule
+                - key: node-role.kubernetes.io/master
+                  operator: Exists
+                  effect: NoSchedule
+              affinity:
+                nodeAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    nodeSelectorTerms:
+                    - matchExpressions:
+                      - key: ei-infra-eligible
+                        operator: In
+                        values: ["true"]
             volumePermissions:
               enabled: true
               image:
                 repository: bitnamilegacy/os-shell
-                tag: 12-debian-12-r48 
-            tolerations:
-              - key: node-role.kubernetes.io/control-plane
-                operator: Exists
-                effect: NoSchedule
-              - key: node-role.kubernetes.io/master
-                operator: Exists
-                effect: NoSchedule
-            affinity:
-              nodeAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  nodeSelectorTerms:
-                  - matchExpressions:
-                    - key: role
-                      operator: In
-                      values: ["infra"]
-                  - matchExpressions:
-                    - key: node-role.kubernetes.io/control-plane
-                      operator: Exists
+                tag: 12-debian-12-r48
           production: true
           proxy: edge
           replicaCount: "{{ inference_infra_replica_count | int }}"
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1500m"
           extraEnvVars:
             - name: KC_CACHE
               value: ispn
@@ -183,9 +187,9 @@
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                 - matchExpressions:
-                  - key: role
+                  - key: ei-infra-eligible
                     operator: In
-                    values: ["infra"]
+                    values: ["true"]
                 - matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: Exists
@@ -291,10 +295,11 @@
             annotations:
               alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
               alb.ingress.kubernetes.io/certificate-arn: "{{ aws_certificate_arn | default('') }}"
-              alb.ingress.kubernetes.io/group.name: keycloak-apisix
+              alb.ingress.kubernetes.io/group.name: ei-eks
               alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
               alb.ingress.kubernetes.io/scheme: internet-facing
               alb.ingress.kubernetes.io/target-type: ip
+              alb.ingress.kubernetes.io/group.order: '3'
           spec:
             ingressClassName: alb
             rules:

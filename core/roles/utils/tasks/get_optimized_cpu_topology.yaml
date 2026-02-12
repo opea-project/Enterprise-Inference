@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 ---
@@ -28,17 +28,9 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
-                    - key: role
+                    - key: ei-inference-eligible
                       operator: In
-                      values: ["inference"]
-                  - matchExpressions:
-                    - key: role
-                      operator: In
-                      values: ["inference-xeon"]
-                  - matchExpressions:
-                    - key: role
-                      operator: In
-                      values: ["inference-cpu"]
+                      values: ["true"]
             tolerations:
               - operator: Exists # Allow scheduling on any node including master
             securityContext:
@@ -225,6 +217,17 @@
   tags:
     - install
 
+- name: Refresh node-topology-optimizer pod name (avoid stale pod references)
+  ansible.builtin.command: >
+    kubectl -n kube-system get pods -l app=node-topology-optimizer
+    -o jsonpath='{.items[0].metadata.name}'
+  register: optimizer_pod_name_refresh
+  changed_when: false
+
+- name: Set refreshed optimizer_pod_name
+  ansible.builtin.set_fact:
+    optimizer_pod_name: "{{ optimizer_pod_name_refresh.stdout | trim }}"
+
 - name: Get detailed CPU information
   kubernetes.core.k8s_exec:
     pod: "{{ optimizer_pod_name }}"
@@ -277,7 +280,7 @@
       for s in $(seq 0 $((total_sockets - 1))); do
         socket_totals[$s]=0;
       done;
-      
+
       for i in $(seq 0 $((total_numa - 1))); do
         numa_cpus=$(lscpu | grep "NUMA node$i CPU(s):" | cut -d: -f2 | xargs);
         if [[ "$numa_cpus" != "" ]]; then
@@ -311,6 +314,43 @@
   register: accurate_cpu_counts
   tags:
     - install
+
+- name: Read CPU reservation script content
+  ansible.builtin.set_fact:
+    cpu_script_content: "{{ lookup('file', role_path + '/files/compute_reserved_cpus.sh') }}"
+  tags:
+    - install
+
+- name: Execute CPU reservation computation directly from script file
+  ansible.builtin.shell:
+    cmd: echo {{ cpu_script_content | quote }} | kubectl exec -n kube-system {{ optimizer_pod_name | quote }} -c ubuntu -i -- bash -s {{ nri_total_reserved_cpus | default(8) | int }}
+  register: computed_reserved_cpu_list
+  changed_when: false
+  tags:
+    - install
+
+- name: Set nri_reserved_cpu_list fact
+  ansible.builtin.set_fact:
+    nri_reserved_cpu_list: >-
+      {{
+        (computed_reserved_cpu_list.stdout | default('') | trim)
+        | regex_replace('^.*NRI_RESERVED_CPU_LIST=', '')
+        | regex_replace('\\s.*$', '')
+        | regex_replace(',+$', '')
+      }}
+
+- name: Assert nri_reserved_cpu_list computed
+  ansible.builtin.assert:
+    that:
+      - nri_reserved_cpu_list | length > 0
+    fail_msg: >-
+      Failed to compute nri_reserved_cpu_list.
+      stdout={{ computed_reserved_cpu_list.stdout | default('') }}
+      stderr={{ computed_reserved_cpu_list.stderr | default('') }}
+
+- name: Debug final nri_reserved_cpu_list
+  ansible.builtin.debug:
+    msg: "nri_reserved_cpu_list={{ nri_reserved_cpu_list }}"
 
 - name: Parse accurate CPU topology results
   ansible.builtin.set_fact:
@@ -526,6 +566,22 @@
   tags:
     - install
 
+- name: Calculate workload CPUs
+  ansible.builtin.set_fact:
+    workload_cpus: >-
+      {%- set total_cpus = (cpus_per_socket | int) * (total_sockets.stdout | int) -%}
+      {%- set reserved_cpu_count = nri_reserved_cpu_list.split(',') | length -%}
+      {%- if reserved_cpu_count >= total_cpus -%}{%- set reserved_cpu_count = total_cpus -%}{%- endif -%}
+      {{ total_cpus - reserved_cpu_count }}
+  tags:
+    - install
+
+- name: Add workload_cpus to balloon configuration
+  ansible.builtin.set_fact:
+    optimal_balloon_config: "{{ optimal_balloon_config | combine({'workload_cpus': workload_cpus | int}) }}"
+  tags:
+    - install
+
 - name: Check for AMX support
   kubernetes.core.k8s_exec:
     pod: "{{ optimizer_pod_name }}"
@@ -573,8 +629,8 @@
       {% endfor %}
 
       === CPU Features ===
-      AMX: {{ 'SUPPORTED' if amx_check.rc == 0 else 'NOT AVAILABLE' }}
-      AVX-512: {{ 'SUPPORTED' if avx512_check.rc == 0 else 'NOT AVAILABLE' }}
+      AMX: {{ 'SUPPORTED' if (amx_check is defined and amx_check.rc is defined and amx_check.rc == 0) else 'NOT AVAILABLE' }}
+      AVX-512: {{ 'SUPPORTED' if (avx512_check is defined and avx512_check.rc is defined and avx512_check.rc == 0) else 'NOT AVAILABLE' }}
 
       === Parallelism Strategy ===
       Strategy: {{ optimal_balloon_config.strategy }}

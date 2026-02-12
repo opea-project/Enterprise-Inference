@@ -1,0 +1,9 @@
+apiVersion: v2
+name: mcp-demo
+version: 0.1.0
+description: Helm chart for MCP Demo server
+appVersion: "1.0.0"
+keywords:
+  - mcp
+  - kubernetes
+type: application
