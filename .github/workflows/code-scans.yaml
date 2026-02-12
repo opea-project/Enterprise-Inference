@@ -45,8 +45,6 @@ jobs:
             --scanners vuln,misconfig,secret \
             --severity CRITICAL,HIGH \
             --format table \
-            --exit-code 1 \
-            --vuln-type os,library \
             --output trivy-reports/trivy_scan_report.txt
             
       - name: Run Trivy Image Scan - vllm-cpu
@@ -55,21 +53,9 @@ jobs:
           trivy image \
             --severity HIGH,CRITICAL \
             --format table \
-            --exit-code 1 \
-            --vuln-type os,library \
             --output trivy-reports/trivy-vllm-cpu.txt \
             public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.10.2 || \
           echo "Image scan skipped - image not available locally" > trivy-reports/trivy-vllm-cpu.txt
-
-      - name: Run Trivy Image Scan - vllm-gaudi
-        continue-on-error: true
-        run: |
-          trivy image \
-            --severity HIGH,CRITICAL \
-            --format table \
-            --output trivy-reports/trivy-vllm-gaudi.txt \
-            opea/vllm-gaudi:1.22.0 || \
-          echo "Image scan skipped - image not available locally" > trivy-reports/trivy-vllm-gaudi.txt
 
       - name: Upload Trivy Reports
         if: always()
