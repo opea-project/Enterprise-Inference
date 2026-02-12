@@ -119,9 +119,10 @@ jobs:
         path: bandit-report.html
         retention-days: 30
 # -----------------------------
-# 2) Clamav Scan
+# 3) ShellCheck Scan
 # -----------------------------
-  clamav-scan:
+  shellcheck_scan:
+    name: ShellCheck script analysis
     runs-on: self-hosted
     permissions:
       contents: read
@@ -129,39 +130,50 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Create report directory
-        run: mkdir -p clamav-reports
+        run: mkdir -p shellcheck-reports
 
-      - name: Run ClamAV Scan using Docker
-        id: clamav
+      - name: Install ShellCheck
+        run: |
+          # Check if shellcheck is already installed
+          if ! command -v shellcheck &> /dev/null; then
+            wget -qO- "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz" | tar -xJv
+            sudo cp shellcheck-stable/shellcheck /usr/local/bin/
+            rm -rf shellcheck-stable
+          fi
+          shellcheck --version
+          
+      - name: Find shell scripts
+        id: find_scripts
+        run: |
+          SCRIPT_COUNT=$(find . -type f -name "*.sh" ! -path "./.git/*" | wc -l)
+          echo "Shell scripts found: $SCRIPT_COUNT"
+          echo "script_count=$SCRIPT_COUNT" >> $GITHUB_OUTPUT
+          
+      - name: Run ShellCheck
+        if: steps.find_scripts.outputs.script_count > 0
         continue-on-error: true
         run: |
-          # Pull ClamAV Docker image
-          docker pull clamav/clamav:latest
+          echo "ShellCheck Analysis Report" > shellcheck-reports/shellcheck-report.txt
+          echo "==========================" >> shellcheck-reports/shellcheck-report.txt
+          echo "" >> shellcheck-reports/shellcheck-report.txt
           
-          # Run ClamAV scan in container
-          docker run --rm \
-            -v ${{ github.workspace }}:/scan:ro \
-            -v ${{ github.workspace }}/clamav-reports:/reports \
-            clamav/clamav:latest \
-            clamscan -r \
-              --exclude-dir=".git" \
-              --exclude-dir="tests" \
-              --exclude-dir=".pytest_cache" \
-              --exclude-dir="__pycache__" \
-              --exclude-dir=".venv" \
-              --exclude-dir="node_modules" \
-              /scan | tee /reports/clamav_scan_report.txt || true
+          find . -type f -name "*.sh" ! -path "./.git/*" | while read -r script; do
+            echo "Checking: $script" >> shellcheck-reports/shellcheck-report.txt
+            shellcheck -f gcc "$script" >> shellcheck-reports/shellcheck-report.txt 2>&1 || true
+            echo "" >> shellcheck-reports/shellcheck-report.txt
+          done
           
-          # Alternatively, if Docker pull fails, skip ClamAV scan
-          if [ $? -ne 0 ]; then
-            echo "ClamAV scan skipped due to installation/network issues" > clamav-reports/clamav_scan_report.txt
-            echo "Status: Skipped" >> clamav-reports/clamav_scan_report.txt
-            echo "Reason: Unable to install or run ClamAV on this runner" >> clamav-reports/clamav_scan_report.txt
-          fi
-
-      - name: Upload Report
+          cat shellcheck-reports/shellcheck-report.txt
+          
+      - name: Create empty report if no scripts
+        if: steps.find_scripts.outputs.script_count == 0
+        run: |
+          echo "ShellCheck Analysis Report" > shellcheck-reports/shellcheck-report.txt
+          echo "No shell scripts found to analyze." >> shellcheck-reports/shellcheck-report.txt
+        
+      - name: Upload ShellCheck Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: clamav-report
-          path: clamav-reports/clamav_scan_report.txt
+          name: shellcheck-report
+          path: shellcheck-reports/shellcheck-report.txt
