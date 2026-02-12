@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy Ingress NGINX using Helm
@@ -25,13 +25,8 @@
       ansible.builtin.shell: helm repo update
       when: helm_repo_list.stdout != ""
 
-    - name: Retrieving the Number of Inference Infrastructure Nodes
-      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra -o jsonpath='{.items[*].metadata.name}' | wc -w
-      register: inference_node_count
-      changed_when: false
-
-    - name: Retrieving the Number of Infrastructure Nodes
-      ansible.builtin.shell: kubectl get nodes --selector=role=infra -o jsonpath='{.items[*].metadata.name}' | wc -w
+    - name: Retrieving the Number of Infrastructure Nodes (ei-infra-eligible)
+      ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true -o jsonpath='{.items[*].metadata.name}' | wc -w
       register: inference_node_count
       changed_when: false
 
@@ -85,9 +80,9 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
-                    - key: role
+                    - key: ei-infra-eligible
                       operator: In
-                      values: ["infra"]
+                      values: ["true"]
                   - matchExpressions:
                     - key: node-role.kubernetes.io/control-plane
                       operator: Exists

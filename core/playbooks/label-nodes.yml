@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Label Kubernetes Nodes
@@ -39,7 +39,7 @@
       register: k8s_nodes
       run_once: true
 
-    - name: Label control plane nodes with role=infra
+    - name: Label control plane nodes with ei-infra-eligible=true
       kubernetes.core.k8s:
         state: patched
         kind: Node
@@ -47,13 +47,13 @@
         definition:
           metadata:
             labels:
-              role: "infra"
+              ei-infra-eligible: "true"
       loop: "{{ k8s_nodes.resources }}"
       when: 
         - item.metadata.name in control_plane_nodes or item.metadata.labels['node-role.kubernetes.io/control-plane'] is defined
       run_once: true
 
-    - name: Label worker nodes with role=inference
+    - name: Label worker/inference nodes with ei-inference-eligible=true
       kubernetes.core.k8s:
         state: patched
         kind: Node
@@ -61,10 +61,10 @@
         definition:
           metadata:
             labels:
-              role: "inference"
+              ei-inference-eligible: "true"
       loop: "{{ k8s_nodes.resources }}"
       when:
-        - item.metadata.name in worker_nodes or (item.metadata.labels['node-role.kubernetes.io/control-plane'] is not defined and item.metadata.name not in control_plane_nodes)
+        - item.metadata.name in worker_nodes
       run_once: true
 
     - name: Verify node labels
@@ -77,6 +77,6 @@
       debug:
         msg: |
           Node: {{ item.metadata.name }}
-          Labels: {{ item.metadata.labels | dict2items | selectattr('key', 'match', '^role') | list | items2dict(key_name='key', value_name='value') }}
+          Labels: {{ item.metadata.labels | dict2items | selectattr('key', 'match', '^ei-') | list | items2dict(key_name='key', value_name='value') }}
       loop: "{{ labeled_nodes.resources }}"
       run_once: true

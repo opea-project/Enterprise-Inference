@@ -8,6 +8,12 @@ Before running the automation, it is recommended to complete all [prerequisites]
 2. [SSL/TLS Certificate Setup for Development Environment](./prerequisites.md#development-environment)
 3. [Hugging Face Token Generation](./prerequisites.md#hugging-face-token-generation)
 
+## System Component Deployment Recommendations
+
+For single-node Xeon clusters, **Keycloak** and **APISIX** are recommended.
+
+For Gaudi or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
+
 ## Deployment
 
 ### Step 1: Configure the Automation config file
