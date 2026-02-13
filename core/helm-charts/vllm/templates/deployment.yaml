@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 {{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) }}
 apiVersion: apps/v1
@@ -23,9 +23,6 @@ spec:
         balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
         {{- end }}
         {{- end }}
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
         {{- include "vllm.selectorLabels" . | nindent 8 }}
         {{- if not .Values.accelDevice }}

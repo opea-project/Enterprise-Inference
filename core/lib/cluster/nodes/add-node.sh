@@ -1,5 +1,5 @@
 
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 add_inference_nodes_playbook() {    

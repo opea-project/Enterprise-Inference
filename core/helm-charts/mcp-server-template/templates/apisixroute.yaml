@@ -1,0 +1,65 @@
+{{- if .Values.apisix.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "mcp-demo.fullname" . }}-route
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mcp-demo.labels" . | nindent 4 }}
+spec:
+  http:
+  # MCP endpoint - protected with OIDC
+  - name: mcp-http-streamable
+    match:
+      hosts:
+      - {{ .Values.ingress.host }}
+      paths:
+      - {{ .Values.ingress.path }}*
+      methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    backends:
+    - serviceName: {{ include "mcp-demo.fullname" . }}
+      servicePort: {{ .Values.service.port }}
+      weight: 100
+    websocket: true
+    timeout:
+      connect: 60s
+      send: 3600s
+      read: 3600s
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            # Disable buffering for streaming responses
+            X-Accel-Buffering: "no"
+            # Maintain connection for streaming
+            Connection: "keep-alive"
+    - name: openid-connect
+      enable: true
+      secretRef: {{ include "mcp-demo.fullname" . }}-secret
+      config:
+        discovery: {{ .Values.oidc.discovery }}
+        introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: openid profile email
+        bearer_only: true
+        realm: master
+  # Health check endpoint - no OIDC protection
+  - name: mcp-health
+    match:
+      hosts:
+      - {{ .Values.ingress.host }}
+      paths:
+      - /health
+      methods:
+      - GET
+    backends:
+    - serviceName: {{ include "mcp-demo.fullname" . }}
+      servicePort: {{ .Values.service.port }}
+      weight: 100
+{{- end }}

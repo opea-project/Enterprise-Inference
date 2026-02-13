@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Default values for tei.
@@ -143,17 +143,9 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: role
+        - key: ei-inference-eligible
           operator: In
-          values: ["inference"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-xeon"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-cpu"]
+          values: ["true"]
 
 global:
   http_proxy: ""

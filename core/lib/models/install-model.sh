@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 deploy_inference_llm_models_playbook() {
@@ -108,7 +108,23 @@ add_model() {
         setup_bastion "$@"
         INVENTORY_PATH=$brownfield_deployment_host_file
         fi        
-        invoke_prereq_workflows "$@"                
+        invoke_prereq_workflows "$@"               
+
+        # Deploy NRI CPU Balloons for CPU deployments (after all infrastructure, before models)
+        if [[ "$deploy_nri_balloon_policy" == "yes" ]]; then
+            # Ensure this is a CPU deployment
+            if [[ "$cpu_or_gpu" != "c" ]]; then
+                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (cpu_or_gpu='c')${NC}"
+                    echo "${RED}Current cpu_or_gpu setting: '$cpu_or_gpu'${NC}"
+                    echo "${RED}Please set cpu_or_gpu to 'c' or disable NRI balloon policy deployment. Exiting!${NC}"
+                    exit 1
+            fi
+            execute_and_check "Deploying CPU Optimization (NRI Balloons & Topology Detection)..." deploy_nri_balloons_playbook "$@" \
+                "CPU optimization deployed successfully." \
+                "Failed to deploy CPU optimization. Exiting!."
+        else
+            echo "Skipping CPU optimization deployment..."
+        fi
         execute_and_check "Deploying Inference LLM Models..." deploy_inference_llm_models_playbook "$@" \
             "Inference LLM Model is deployed successfully." \
             "Failed to deploy Inference LLM Model Exiting!." 
