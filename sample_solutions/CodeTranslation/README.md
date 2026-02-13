@@ -221,6 +221,10 @@ CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
 # If using a local domain like api.example.com mapped to localhost, set to the domain without https://
 # Otherwise, set to: not-needed
 LOCAL_URL_ENDPOINT=not-needed
+
+# SSL Verification Settings
+# Set to false only for dev with self-signed certs
+VERIFY_SSL=true
 EOF
 ```
 
@@ -261,6 +265,10 @@ CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
 # If using a local domain like api.example.com mapped to localhost, set to the domain without https://
 # Otherwise, set to: not-needed
 LOCAL_URL_ENDPOINT=not-needed
+
+# SSL Verification Settings
+# Set to false only for dev with self-signed certs
+VERIFY_SSL=true
 ```
 
 **Important Configuration Notes:**
@@ -269,6 +277,9 @@ LOCAL_URL_ENDPOINT=not-needed
   - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (see [Local Development Configuration](#local-development-configuration))
+- **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
+  - Set to `false` only for development environments with self-signed certificates
+  - Keep as `true` for production environments
 
 **Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for the backend service.
 
