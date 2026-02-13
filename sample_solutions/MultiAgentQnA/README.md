@@ -233,6 +233,10 @@ INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 #   Set this to: api.example.com (domain without https://)
 # If using a public domain, set any placeholder value like: not-needed
 LOCAL_URL_ENDPOINT=not-needed
+
+# SSL Verification Settings
+# Set to false only for dev with self-signed certs
+VERIFY_SSL=true
 EOF
 ```
 
@@ -275,6 +279,10 @@ INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 #   Set this to: api.example.com (domain without https://)
 # If using a public domain, set any placeholder value like: not-needed
 LOCAL_URL_ENDPOINT=not-needed
+
+# SSL Verification Settings
+# Set to false only for dev with self-signed certs
+VERIFY_SSL=true
 ```
 
 **Important Configuration Notes:**
