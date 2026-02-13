@@ -22,6 +22,8 @@ fi
 IDRAC_IP="${IDRAC_IP:-${IDRAC_HOST}}"
 IDRAC_USER="${IDRAC_USER:-${IDRAC_USERNAME}}"
 IDRAC_PASS="${IDRAC_PASS:-${IDRAC_PASSWORD}}"
+DEFAULT_ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
+ISO_URL="${ISO_URL:-$DEFAULT_ISO_URL}"
 
 # Validate required environment variables
 if [ -z "$IDRAC_IP" ]; then
@@ -42,7 +44,8 @@ if [ -z "$IDRAC_PASS" ]; then
     exit 1
 fi
 
-ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
+
+#ISO_URL="https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso"
 SYSTEM_ID="System.Embedded.1"
 VIRTUAL_MEDIA_SLOT="1"
 
