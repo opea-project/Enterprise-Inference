@@ -228,6 +228,10 @@ LOG_LEVEL=INFO
 MAX_FILE_SIZE=524288000
 MAX_PDF_SIZE=52428800
 MAX_PDF_PAGES=100
+
+# SSL Verification Settings
+# Set to false only for dev with self-signed certs
+VERIFY_SSL=true
 EOF
 ```
 
@@ -239,6 +243,9 @@ EOF
 - **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
   - To check available models: `curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"`
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping
+- **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
+  - Set to `false` only for development environments with self-signed certificates
+  - Keep as `true` for production environments
 
 **Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./backend/.env` (backend) files.
 
