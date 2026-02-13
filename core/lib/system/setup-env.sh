@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 setup_initial_env() {
@@ -70,7 +70,7 @@ setup_initial_env() {
     else
         echo "Virtual environment activated successfully. Path: $VIRTUAL_ENV"
     fi                 
-           
+        
     export PIP_BREAK_SYSTEM_PACKAGES=1
     $VENVDIR/bin/python3 -m pip install --upgrade pip
     $VENVDIR/bin/python3 -m pip install -U -r requirements.txt    

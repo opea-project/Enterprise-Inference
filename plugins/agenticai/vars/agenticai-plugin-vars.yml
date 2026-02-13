@@ -1,0 +1,72 @@
+---
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+# Agentic AI Plugin - Internal Variables
+##############################################################################
+# These are internal implementation variables for the Agentic AI plugin.
+# Users should not need to modify these values.
+# Currently implements: Flowise (visual AI agent builder)
+##############################################################################
+
+# Namespace
+agenticai_namespace: flowise
+
+# Image Configuration
+agenticai_image_repository: flowiseai/flowise
+agenticai_image_tag: "3.0.12"
+agenticai_replica_count: 1
+
+# Database Configuration (PostgreSQL)
+agenticai_database_type: postgres
+agenticai_postgres_enabled: true
+agenticai_postgres_version: 15
+agenticai_postgres_port: 5432
+agenticai_postgres_database: flowisedb
+agenticai_postgres_username: flowise
+agenticai_postgres_storage_size: 5Gi
+
+# Redis Configuration
+agenticai_redis_enabled: true
+agenticai_redis_port: 6379
+agenticai_redis_storage_size: 2Gi
+
+# Worker Configuration
+agenticai_worker_enabled: true
+agenticai_worker_replica_count: 1
+agenticai_worker_cpu_request: 500m
+agenticai_worker_memory_request: 1Gi
+agenticai_worker_cpu_limit: 1
+agenticai_worker_memory_limit: 2Gi
+
+# Application Resources
+agenticai_cpu_request: 500m
+agenticai_memory_request: 1Gi
+agenticai_cpu_limit: 1
+agenticai_memory_limit: 2Gi
+
+# Ingress Configuration
+agenticai_ingress_enabled: true
+agenticai_ingress_class: nginx
+agenticai_ingress_path: /
+agenticai_tls_enabled: true
+
+# Storage Configuration
+agenticai_persistence_enabled: true
+agenticai_persistence_storage_class: local-path
+agenticai_persistence_access_mode: ReadWriteOnce
+agenticai_persistence_size: 10Gi
+
+# Helm Chart Configuration
+agenticai_helm_repo_name: cowboysysop
+agenticai_helm_repo_url: https://cowboysysop.github.io/charts/
+agenticai_helm_chart_name: flowise
+agenticai_helm_chart_version: "6.0.0"
+
+# Autoscaling (disabled by default for simplicity)
+agenticai_autoscaling_enabled: false
+agenticai_autoscaling_min_replicas: 1
+agenticai_autoscaling_max_replicas: 3
+agenticai_autoscaling_target_cpu: 80
+agenticai_autoscaling_target_memory: 80
