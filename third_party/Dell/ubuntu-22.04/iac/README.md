@@ -14,29 +14,23 @@ The solution cleanly separates:
 
 **Script:** [custom-iso.sh](./iso/custom-iso.sh)
 
-Before mounting the Ubuntu ISO to iDRAC, you may optionally generate a custom Ubuntu 22.04.5 ISO designed for fully unattended installation.
+> Note: If you already have a prebuilt ISO hosted and accessible via HTTP/HTTPS, you may skip this step and proceed to Step 1: Mount Ubuntu ISO.
 
-This enables a zero-touch, fully automated OS installation, eliminating manual input during setup and ensuring consistent, repeatable provisioning.
+Before mounting the Ubuntu ISO to iDRAC, generate a custom Ubuntu 22.04.5 ISO designed for zero-touch, fully automated OS installation, eliminating manual input during setup and ensuring consistent, repeatable provisioning.
 
-**Host Your Custom ISO (Recommended for Automation)**
+For detailed instructions on building a custom ISO, refer to: [ISO Creation Guide](./iso/README.md)
+
+### Host Your Custom ISO (Recommended for Automation)
 
 After generating the ISO:
-
-1. Upload it to a web-accessible location (e.g., Firebase Hosting, internal web server, object storage, or any HTTP/HTTPS file server).
-
-2. Ensure the ISO is reachable via a public or internally accessible HTTP/HTTPS URL.
-
-3. Save this URL — it will be required in the next step when mounting the ISO using iDRAC Redfish Virtual Media.
+- Upload it to a web-accessible location (e.g., internal or external web server, object storage, or any HTTP/HTTPS file server).
+- Ensure the ISO is reachable via a public or internally accessible HTTP/HTTPS URL.
+- Save this URL, it will be required in the next step when mounting the ISO using iDRAC Redfish Virtual Media.
 
 Example:
 ```bash
 https://your-domain.com/ubuntu-22.04.5-custom.iso
 ```
-
-If you already have a prebuilt ISO hosted and accessible via HTTP/HTTPS, you may skip this step and proceed to Step 1: Mount Ubuntu ISO.
-
-For detailed instructions on building a custom ISO, refer to: [ISO Creation Guide](./iso/README.md)
-
 ---
 
 ## 1. Mount Ubuntu ISO (iDRAC Redfish)
@@ -48,7 +42,7 @@ This script mounts or unmounts the **Ubuntu 22.04.5 live server ISO** using the 
 - Mount ISO
 - Idempotent (skips if already mounted)
 
-**Required Environment Variables**
+### Required Environment Variables
 ```bash
 export IDRAC_IP=100.67.x.x
 export IDRAC_USER=root
@@ -67,37 +61,37 @@ You may also use any internally hosted ISO that is reachable by iDRAC.
 
 > Note: If ISO_URL is not provided, the script will automatically use the default Ubuntu 22.04 Live Server ISO. it will Launch the standard installer and Prompt for manual user input during OS installation.
 
-**Mount ISO**
+### Mount ISO
 ```bash
 chmod +x mount-iso.sh
 ./mount-iso.sh
 ```
 ---
 
-## 2.Boot Ubuntu Installer (Terraform + Redfish)
+## 2. Boot Ubuntu Installer (Terraform + Redfish)
 
 **Script:** [iac/main.tf](./main.tf)
 
 Terraform uses the **Dell Redfish provider** to configure a **one-time boot from Virtual Media (CD)** and **force a reboot**.
 
-**Terraform Installation (Client Machine)**
+### Terraform Installation (Client Machine)
 
 Terraform is executed from a client machine (such as your laptop or a jump host), not from the target server or iDRAC.
 
-Install Terraform on the machine where you will run the Terraform commands.
+Install Terraform on the machine where you will run the Terraform , if terraform is not already installed.
 
-**Download Terraform:**
+- **Download Terraform:**
 https://developer.hashicorp.com/terraform/install
 
 Choose the package for your operating system and follow the installation instructions.
 
-**Verify Installation**
+- **Verify Installation**
 ```bash
 terraform version
 ```
 Terraform should return a version without errors. If Terraform is not found, ensure the installation directory is added to your system PATH.
 
-**Terraform Variables**
+### Terraform Variables
 
 The following variables must be explicitly provided in 'terraform.tfvars' for the Ubuntu installer boot workflow to function correctly.
 
@@ -114,7 +108,7 @@ ubuntu_username    = "user"
 ubuntu_password    = "password"
 ```
 
-**Apply Terraform**
+### Apply Terraform
 ```bash
 terraform init
 terraform apply
@@ -133,12 +127,12 @@ Once OS is installed, Download the deploy-enterprise-inference.sh script to your
 
 This script performs **all post-OS configuration** and deploys the **Enterprise Inference stack** on a **single node**.
 
-**Change permission to your file**
+### Change permission to your file
 
 ```bash
 chmod +x deploy-enterprise-inference.sh
 ```
-**Required Parameters to run the script**
+### Run the script
 
 ```bash
 sudo ./deploy-enterprise-inference.sh \
@@ -149,7 +143,7 @@ sudo ./deploy-enterprise-inference.sh \
 -a cluster-url \
 -m "1" \
 ```
-### Options & Defaults
+**Options & Defaults**
 
 | Option | Required | Default | Description |
 |--------|----------|----------|-------------|
@@ -192,10 +186,7 @@ sudo ./deploy-enterprise-inference.sh -u user uninstall
 
 **State is tracked in:**
 
-Deployment progress is tracked using a local state file:
-```bash
-/tmp/ei-deploy.state
-```
+Deployment progress is tracked using a local state file: `/tmp/ei-deploy.state`
 
 **What the Deployment Script Does**
 
@@ -215,7 +206,7 @@ Deployment progress is tracked using a local state file:
 
 After a successful deployment, verify the system at three levels: OS, Enterprise Inference services, and model inference.
 
-**1. OS & System Validation**
+### 1. OS & System Validation
 Verify the node is healthy and running the expected kernel.
 ```bash
 hostname
@@ -233,7 +224,7 @@ df -h
 free -h
 ```
 
-**2. Enterprise Inference Services**
+### 2. Enterprise Inference Services
 Verify all inference services are running.
 ```bash
 kubectl get pods -A
@@ -247,7 +238,7 @@ Check systemd services manually if needed:
 systemctl list-units --type=service | grep -i inference
 ```
 
-**3. Gaudi3 Verification (Only if -g gaudi3)**
+### 3. Gaudi3 Verification (Only if -g gaudi3)
 Confirm Gaudi devices and firmware are detected.
 ```bash
 hl-smi
@@ -261,7 +252,7 @@ Verify kernel modules:
 lsmod | grep habanalabs
 ```
 
-**4. API & Networking Validation**
+### 4. API & Networking Validation
 Verify hostname resolution:
 ```bash
 cat /etc/hosts | grep api.example.com
@@ -279,7 +270,7 @@ Expected:
 - key.pem
 
 
-**5. API Health Check**
+### 5. API Health Check
 Validate the inference gateway is reachable.
 ```bash
 curl -k https://api.example.com/health
@@ -289,7 +280,7 @@ Expected:
 
 ---
 
-**6. Test Model Inference**
+### 6. Test Model Inference
 
 if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference
 
