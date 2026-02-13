@@ -25,7 +25,7 @@ spec:
         operator: "Exists"
         effect: "NoSchedule"
       # Required for network monitoring
-      hostNetwork: true
+      hostNetwork: false
       containers:
       - name: metric-exporter
         image: vault.habana.ai/gaudi-metric-exporter/metric-exporter:1.20.1-97
@@ -34,7 +34,8 @@ spec:
         - name: LD_LIBRARY_PATH
           value: "/usr/lib/habanalabs"
         securityContext:
-          privileged: true
+          privileged: false
+          readOnlyRootFilesystem: true
         volumeMounts:
           - name: pod-resources
             mountPath: /var/lib/kubelet/pod-resources
