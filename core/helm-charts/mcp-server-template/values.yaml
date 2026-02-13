@@ -1,0 +1,206 @@
+# Replica count: Initial number of pod replicas
+# With stateless_http=True in the MCP server, horizontal scaling is fully supported
+replicaCount: 1
+
+image:
+  repository: <your_repository>/my_mcp_server
+  tag: "1.0.0"          # Use semantic versioning, never 'latest' in production
+  pullPolicy: Always    # Always pull to ensure correct version with registry
+  # pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "false"
+
+# Pod security context - production hardening
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Set true if app doesn't need write access
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  namespace: auth-apisix
+  host: api.example.com  # Replace with your ingress hostname
+  # MCP endpoint path - customize for your deployment
+  path: /demo/mcp
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Streaming-friendly settings for MCP Streamable HTTP (per MCP best practices)
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+  tls:
+    enabled: true
+    secretName: mcp-server-tls  # Replace with your TLS secret name
+
+# APISIX Route
+apisix:
+  enabled: true
+
+# Resource limits and requests for HPA-based horizontal scaling
+# Keep requests and limits close (1.5-2x) for efficient HPA scaling
+# HPA scales based on requests, not limits - right-size your requests!
+# Start conservative, monitor actual usage, then adjust
+resources:
+  limits:
+    cpu: 500m      # Allow 2x burst above request
+    memory: 512Mi  # Allow 2x burst above request
+  requests:
+    cpu: 250m      # Baseline: typical Python web server per pod
+    memory: 256Mi  # Baseline: FastMCP + dependencies
+
+# Horizontal Pod Autoscaler (HPA) configuration
+# Automatically scales pods based on CPU/memory utilization
+# Requires metrics-server to be installed in the cluster
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Liveness: restarts unhealthy pods
+# Readiness: removes pods from load balancer if not ready
+livenessProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+  successThreshold: 1
+
+# Deployment strategy - controls how updates are rolled out
+# maxSurge: maximum number of pods above desired count during updates
+# maxUnavailable: maximum number of pods that can be unavailable during updates
+# Current config ensures zero-downtime deployments
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Pod Disruption Budget - ensures high availability during voluntary disruptions
+# minAvailable: minimum number of pods that must be available during disruptions
+# Protects against downtime during node drains, upgrades, and maintenance
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1  # Alternative: maximum number of pods that can be unavailable
+
+# Pod affinity and anti-affinity rules
+# podAntiAffinity spreads pods across different nodes for better availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/instance
+                operator: In
+                values:
+                  - mcp-server
+          topologyKey: kubernetes.io/hostname
+
+# Tolerations
+tolerations: []
+
+# Node selector
+nodeSelector: {}
+
+# Environment variables
+env: []
+  # - name: LOG_LEVEL
+  #   value: "info"
+
+# Environment from configmap/secret
+envFrom: []
+  # - configMapRef:
+  #     name: app-config
+  # - secretRef:
+  #     name: app-secrets
+
+# Volumes
+volumes: []
+  # - name: tmp
+  #   emptyDir: {}
+
+# Volume mounts
+volumeMounts: []
+  # - name: tmp
+  #   mountPath: /tmp
+
+# OIDC Configuration (OpenID Connect Authentication)
+oidc:
+  realm: master
+  client_id: ""         # Update with value from generate-token.sh
+  client_secret: ""     # Update with value from generate-token.sh
+  discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
+  introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
+
+# Optional extra secrets
+secrets: {}
+  # enabled: true
+  # data:
+  #   key1: value1
+  #   key2: value2
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
+# Priority class
+priorityClassName: ""
+
+# Termination grace period
+terminationGracePeriodSeconds: 30

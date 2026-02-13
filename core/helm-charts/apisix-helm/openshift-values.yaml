@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # APISIX Namespace
@@ -33,9 +33,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: role
+            - key: ei-infra-eligible
               operator: In
-              values: ["infra"]
+              values: ["true"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -76,9 +76,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: role
+            - key: ei-infra-eligible
               operator: In
-              values: ["infra"]
+              values: ["true"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -105,9 +105,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: role
+            - key: ei-infra-eligible
               operator: In
-              values: ["infra"]
+              values: ["true"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists

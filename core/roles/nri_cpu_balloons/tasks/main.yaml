@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 ---
@@ -20,6 +20,25 @@
 # ============================================================================
 # Default Configuration
 # ============================================================================
+
+- name: Auto-compute nri_reserved_cpu_list if not provided
+  ansible.builtin.include_role:
+    name: utils
+    tasks_from: get_optimized_cpu_topology
+  when:
+    - nri_reserved_cpu_list is not defined or (nri_reserved_cpu_list | string | length) == 0
+
+- name: Debug normalized nri_reserved_cpu_list
+  ansible.builtin.debug:
+    msg: "nri_reserved_cpu_list={{ nri_reserved_cpu_list }}"
+
+- name: Validate nri_reserved_cpu_list
+  ansible.builtin.assert:
+    that:
+      - nri_reserved_cpu_list is defined
+      - (nri_reserved_cpu_list | regex_search('^[0-9]+([,-][0-9]+)*$')) is not none
+    fail_msg: "nri_reserved_cpu_list is missing or malformed. Expected cpuset syntax like '0,1,32,33'."
+
 - name: Set default NRI CPU balloons configuration if not defined
   ansible.builtin.set_fact:
     nri_cpu_balloons:
@@ -41,7 +60,6 @@
     generic_balloon:
       name: "vllm-balloon"
       match_expression: "name=vllm"
-      preserve_existing: true
       policy_settings:
         preferIsolCpus: false
         preferNewBalloons: true
@@ -158,93 +176,77 @@
   tags:
     - install
 
-- name: Calculate expected balloon configuration for comparison
+- name: Check if reserved balloon exists
   ansible.builtin.set_fact:
-    expected_balloon_config:
-      name: "{{ generic_balloon.name }}"
-      namespaces:
-        - default
-      matchExpressions:
-        - key: "{{ generic_balloon.match_expression.split('=')[0] }}"
-          operator: In
-          values:
-            - "{{ generic_balloon.match_expression.split('=')[1] }}"
-      allocatorPriority: "high"
-      allocatorTopologyBalancing: true
-      # CPU resource allocation moved to Helm chart values.yaml resources section
-      preferSpreadOnPhysicalCores: false
-      preferIsolCpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
-      preferNewBalloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
-      hideHyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
-      pinCpus: true
-      pinMemory: false
+    reserved_balloon_exists: >-
+      {{
+        existing_config.config.balloonTypes | default([])
+        | selectattr('name', 'equalto', 'reserved')
+        | list | length > 0
+      }}
   when: vllm_balloon_exists
   tags:
     - install
 
-- name: Re-evaluate if existing balloon configuration needs update
+- name: Check if existing config matches simplified balloon structure
   ansible.builtin.set_fact:
     balloon_needs_update: >-
       {{
         vllm_balloon_exists and (
-          existing_balloon_config.get('allocatorPriority') != expected_balloon_config.allocatorPriority or
-          existing_balloon_config.get('allocatorTopologyBalancing') != expected_balloon_config.allocatorTopologyBalancing or
-          existing_balloon_config.get('preferSpreadOnPhysicalCores') != expected_balloon_config.preferSpreadOnPhysicalCores or
-          existing_balloon_config.get('preferIsolCpus') != expected_balloon_config.preferIsolCpus or
-          existing_balloon_config.get('preferNewBalloons') != expected_balloon_config.preferNewBalloons or
-          existing_balloon_config.get('hideHyperthreads') != expected_balloon_config.hideHyperthreads or
-          existing_balloon_config.get('pinCpus') != expected_balloon_config.pinCpus or
-          existing_balloon_config.get('pinMemory') != expected_balloon_config.pinMemory or
-          existing_balloon_config.get('namespaces', []) != expected_balloon_config.namespaces or
-          existing_balloon_config.get('matchExpressions', []) != expected_balloon_config.matchExpressions or
+          not reserved_balloon_exists | default(false) or
+          existing_balloon_config.get('allocatorPriority') != 'high' or
+          existing_config.config.get('agent', {}).get('nodeResourceTopology') != true or
+          existing_config.config.get('agent', {}).get('podResourceAPI') != false or
+          existing_config.config.get('pinCPU') != true or
+          existing_config.config.get('pinMemory') != false or
+          existing_config.config.get('allocatorTopologyBalancing') != true or
           existing_balloon_config.get('preferSpreadOnNuma') is defined or
           existing_balloon_config.get('preserveCpus') is defined or
-          existing_balloon_config.get('allocatorPriority', '') == '0' or
-          existing_balloon_config.get('allocatorPriority', '') | type_debug == 'int'
+          existing_balloon_config.get('preferSpreadOnPhysicalCores') is defined or
+          existing_balloon_config.get('preferIsolCpus') is defined or
+          existing_balloon_config.get('preferNewBalloons') is defined or
+          existing_balloon_config.get('hideHyperthreads') is defined or
+          existing_balloon_config.get('pinCpus') is defined or
+          existing_balloon_config.get('pinMemory') is defined or
+          existing_balloon_config.get('namespaces') is defined
         )
       }}
   when: vllm_balloon_exists
   tags:
     - install
 
-- name: Debug balloon comparison details
+- name: Debug simplified balloon validation
   ansible.builtin.debug:
     msg:
       - "==================================================================="
-      - "Balloon Configuration Comparison Details"
+      - "Simplified Balloon Configuration Validation"
       - "==================================================================="
-      - "Existing balloon configuration:"
-      - "  allocatorPriority: {{ existing_balloon_config.get('allocatorPriority', 'NOT_SET') }}"
-      - "  allocatorTopologyBalancing: {{ existing_balloon_config.get('allocatorTopologyBalancing', 'NOT_SET') }}"
-      - "  preferSpreadOnPhysicalCores: {{ existing_balloon_config.get('preferSpreadOnPhysicalCores', 'NOT_SET') }}"
-      - "  preferIsolCpus: {{ existing_balloon_config.get('preferIsolCpus', 'NOT_SET') }}"
-      - "  preferNewBalloons: {{ existing_balloon_config.get('preferNewBalloons', 'NOT_SET') }}"
-      - "  hideHyperthreads: {{ existing_balloon_config.get('hideHyperthreads', 'NOT_SET') }}"
-      - "  pinCpus: {{ existing_balloon_config.get('pinCpus', 'NOT_SET') }}"
-      - "  pinMemory: {{ existing_balloon_config.get('pinMemory', 'NOT_SET') }}"
-      - "  namespaces: {{ existing_balloon_config.get('namespaces', 'NOT_SET') }}"
-      - "  matchExpressions: {{ existing_balloon_config.get('matchExpressions', 'NOT_SET') }}"
+      - "Required Balloons:"
+      - "  vllm-balloon exists: {{ 'YES' if vllm_balloon_exists else 'NO' }}"
+      - "  reserved balloon exists: {{ 'YES' if reserved_balloon_exists | default(false) else 'NO' }}"
       - ""
-      - "Expected balloon configuration:"
-      - "  allocatorPriority: {{ expected_balloon_config.allocatorPriority }}"
-      - "  allocatorTopologyBalancing: {{ expected_balloon_config.allocatorTopologyBalancing }}"
-      - "  preferSpreadOnPhysicalCores: {{ expected_balloon_config.preferSpreadOnPhysicalCores }}"
-      - "  preferIsolCpus: {{ expected_balloon_config.preferIsolCpus }}"
-      - "  preferNewBalloons: {{ expected_balloon_config.preferNewBalloons }}"
-      - "  hideHyperthreads: {{ expected_balloon_config.hideHyperthreads }}"
-      - "  pinCpus: {{ expected_balloon_config.pinCpus }}"
-      - "  pinMemory: {{ expected_balloon_config.pinMemory }}"
-      - "  namespaces: {{ expected_balloon_config.namespaces }}"
-      - "  matchExpressions: {{ expected_balloon_config.matchExpressions }}"
+      - "Required Global Settings:"
+      - "  agent.nodeResourceTopology: {{ existing_config.config.get('agent', {}).get('nodeResourceTopology', 'NOT_SET') }} (need: true)"
+      - "  agent.podResourceAPI: {{ existing_config.config.get('agent', {}).get('podResourceAPI', 'NOT_SET') }} (need: false)"
+      - "  pinCPU: {{ existing_config.config.get('pinCPU', 'NOT_SET') }} (need: true)"
+      - "  pinMemory: {{ existing_config.config.get('pinMemory', 'NOT_SET') }} (need: false)"
+      - "  allocatorTopologyBalancing: {{ existing_config.config.get('allocatorTopologyBalancing', 'NOT_SET') }} (need: true)"
       - ""
-      - "Note: CPU resource allocation now handled in Helm chart resources section"
-      - "Deprecated fields present in existing config:"
-      - "  preferSpreadOnNuma: {{ 'YES' if existing_balloon_config.get('preferSpreadOnNuma') is defined else 'NO' }}"
-      - "  preserveCpus: {{ 'YES' if existing_balloon_config.get('preserveCpus') is defined else 'NO' }}"
-      - "Global configuration issues:"
-      - "  preserve section missing: {{ 'YES' if existing_config.config.get('preserve') is not defined else 'NO' }}"
-      - "  global pinMemory incorrect: {{ 'YES' if existing_config.config.get('pinMemory', true) != false else 'NO' }}"
-      - "Louie: Need to allocate cpu with sub-NUMA awareness : set node-granularity : 'numa' , allocated-full-node: true and set prefer-nodes: [0,1] "
+      - "vllm-balloon Settings:"
+      - "  allocatorPriority: {{ existing_balloon_config.get('allocatorPriority', 'NOT_SET') }} (need: high)"
+      - ""
+      - "OLD per-balloon fields detected (should NOT exist):"
+      - "  preferSpreadOnNuma: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('preferSpreadOnNuma') is defined else 'NO (OK)' }}"
+      - "  preserveCpus: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('preserveCpus') is defined else 'NO (OK)' }}"
+      - "  preferSpreadOnPhysicalCores: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('preferSpreadOnPhysicalCores') is defined else 'NO (OK)' }}"
+      - "  preferIsolCpus: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('preferIsolCpus') is defined else 'NO (OK)' }}"
+      - "  preferNewBalloons: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('preferNewBalloons') is defined else 'NO (OK)' }}"
+      - "  hideHyperthreads: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('hideHyperthreads') is defined else 'NO (OK)' }}"
+      - "  pinCpus: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('pinCpus') is defined else 'NO (OK)' }}"
+      - "  pinMemory: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('pinMemory') is defined else 'NO (OK)' }}"
+      - "  namespaces: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('namespaces') is defined else 'NO (OK)' }}"
+      - ""
+      - "Update needed: {{ 'YES' if balloon_needs_update | default(false) else 'NO' }}"
       - "==================================================================="
   when: vllm_balloon_exists
   tags:
@@ -269,7 +271,6 @@
   vars:
     balloon_name: "{{ generic_balloon.name }}"
     match_expression: "{{ generic_balloon.match_expression }}"
-    preserve_existing: "{{ generic_balloon.preserve_existing }}"
     prefer_isol_cpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
     prefer_new_balloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
     hide_hyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
@@ -324,72 +325,23 @@
   tags:
     - install
 
-- name: Initialize base configuration if none exists
-  ansible.builtin.set_fact:
-    base_config:
-      config:
-        reservedResources:
-          cpu: 1000m
-        allocatorTopologyBalancing: true
-        reservedPoolNamespaces:
-          - kube-system
-          - ingress-nginx
-          - keycloak
-          - monitoring
-        preserve:
-          matchExpressions:
-            - key: name
-              operator: NotIn
-              values:
-                - vllm
-        balloonTypes: []
-        instrumentation:
-          httpEndpoint: ":8891"
-          prometheusExport: "{{ enable_prometheus | default(false) }}"
-          reportPeriod: 60s
-        log:
-          source: true
-          debug:
-            - policy
-        # Global pin settings
-        pinMemory: false
-  when:
-    - not vllm_balloon_exists or balloon_needs_update | default(false)
-    - existing_config == {}
+- name: Debug decision state before applying template configuration
+  ansible.builtin.debug:
+    msg:
+      - "existing_config_empty={{ existing_config == {} }}"
+      - "existing_config_keys={{ existing_config.keys() | default([]) }}"
+      - "vllm_balloon_exists={{ vllm_balloon_exists }}"
+      - "balloon_needs_update={{ balloon_needs_update | default(false) }}"
+      - "nri_reserved_cpu_list={{ nri_reserved_cpu_list }}"
+      - "enable_prometheus={{ enable_prometheus | default(false) }}"
+      - "Using simplified balloon policy from template"
   tags:
     - install
 
-- name: Use existing configuration as base
-  ansible.builtin.set_fact:
-    base_config: "{{ existing_config }}"
-  when:
-    - not vllm_balloon_exists or balloon_needs_update | default(false)
-    - existing_config != {}
-  tags:
-    - install
 
-- name: Remove existing balloon if updating
+- name: Use complete template configuration directly
   ansible.builtin.set_fact:
-    balloons_without_old: >-
-      {{
-        base_config.config.balloonTypes | default([])
-        | rejectattr('name', 'equalto', generic_balloon.name)
-        | list
-      }}
-  when:
-    - not vllm_balloon_exists or balloon_needs_update | default(false)
-    - balloon_needs_update | default(false)
-  tags:
-    - install
-
-- name: Add generic balloon type to configuration (new or updated)
-  ansible.builtin.set_fact:
-    updated_config: >-
-      {%- if balloon_needs_update | default(false) -%}
-      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': balloons_without_old + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
-      {%- else -%}
-      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': base_config.config.balloonTypes + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
-      {%- endif -%}
+    updated_config: "{{ new_balloon_config }}"
   when: not vllm_balloon_exists or balloon_needs_update | default(false)
   tags:
     - install

@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Xeon CPU-optimized override values for vLLM deployments
@@ -16,7 +16,6 @@ resources:
   requests:
     cpu: "{{ .Values.cpu }}"
     memory: "{{ .Values.memory }}"
-
 
 # CPU-specific configurations
 block_size: 128
@@ -37,17 +36,9 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: role
+        - key: ei-inference-eligible
           operator: In
-          values: ["inference"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-xeon"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-cpu"]
+          values: ["true"]
 
 # vLLM CPU environment variables
 VLLM_CPU_SGL_KERNEL: "1"
