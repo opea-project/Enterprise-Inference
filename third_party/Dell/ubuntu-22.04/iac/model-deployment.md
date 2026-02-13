@@ -13,8 +13,17 @@
 
 ## 1. Overview
 
-This guide outlines the standard procedure for deploying models on an Enterprise Inference cluster using the `inference-stack-deploy.sh` script.
+This guide outlines the procedure for deploying and managing models on an existing Enterprise Inference cluster
 
+The Enterprise Inference cluster must already be provisioned and operational before proceeding with model deployment. If the cluster is not yet deployed, [follow the deployment guide](README.md#3post-os-enterprise-inference-deployment)
+
+**This document covers:**
+
+Deploying models from the Enterprise Inference catalog
+
+Deploying custom models directly from Hugging Face
+
+Undeploying models safely
 ---
 
 ## 2. Environment Prerequisites
@@ -41,6 +50,8 @@ This method deploys pre-integrated and validated models optimized for Enterprise
 **Step 1: Run the Deployment Script**
 
 ```bash
+sudo ./deploy-enterprise-inference.sh -u <username> -p <password> -t <hf-token> -g gaudi3 -a <cluster-url>
+                              or
 bash ~/Enterprise-Inference/core/inference-stack-deploy.sh
 ```
 
@@ -74,6 +85,12 @@ Run the following command to verify that the model pod is in the `Running` state
 ```bash
 kubectl get pods
 ```
+Test the model inference.
+
+if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference
+
+if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-node/user-guide-genai.md#5-test-the-inference) for generating api-key and testing the inference
+
 ---
 
 ### 3.2 Deploy Models Directly from Hugging Face
@@ -82,6 +99,8 @@ This option allows deploying any Hugging Face model, including models not pre-va
 
 **Step 1: To deploy**
 ```bash
+sudo ./deploy-enterprise-inference.sh -u <username> -p <password> -t <hf-token> -g gaudi3 -a <cluster-url>
+                              or
 bash ~/Enterprise-Inference/core/inference-stack-deploy.sh
 ```
 **Step 2: Navigate Through the Menus**
@@ -127,6 +146,12 @@ Run the following command to verify that the model pod is in the `Running` state
 ```bash
 kubectl get pods
 ```
+Test the model inference.
+
+if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference
+
+if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-node/user-guide-genai.md#5-test-the-inference) for generating api-key and testing the inference
+
 ---
 
 ## 4. Undeploy Models
@@ -141,6 +166,8 @@ This method is used for models deployed through pre-integrated and validated mod
 
 **Step 1: Run the Deployment Script**
 ```bash
+sudo ./deploy-enterprise-inference.sh -u <username> -p <password> -t <hf-token> -g gaudi3 -a <cluster-url>
+                              or
 bash ~/Enterprise-Inference/core/inference-stack-deploy.sh
 ```
 **Step 2: Navigate Through the Menus**
@@ -182,6 +209,8 @@ To remove Models deployed via Deploy Model from Hugging Face
 
 **Step 1: Run the Script**
 ```bash
+sudo ./deploy-enterprise-inference.sh -u <username> -p <password> -t <hf-token> -g gaudi3 -a <cluster-url>
+                              or
 bash ~/Enterprise-Inference/core/inference-stack-deploy.sh
 ```
 **Step 2: Navigate Through the Menus**
