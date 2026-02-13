@@ -1,0 +1,222 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy Agentic AI Plugin
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+    - "{{ lookup('env', 'PWD') }}/../../plugins/agenticai/vars/agenticai-plugin-vars.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+
+  roles:
+    - role: inference-tools
+
+  tasks:
+    ###########################################################################
+    # Info
+    ###########################################################################
+    - name: Display Flowise Deployment Configuration
+      debug:
+        msg:
+          - "=============================================="
+          - "Deploying Flowise Agentic Plugin"
+          - "Namespace: {{ agenticai_namespace }}"
+          - "Domain: flowise-{{ cluster_url }}"
+          - "Ingress Class: {{ agenticai_ingress_class }}"
+          - "Worker Enabled: {{ agenticai_worker_enabled }}"
+          - "=============================================="
+      run_once: true
+
+    ###########################################################################
+    # Namespace
+    ###########################################################################
+    - name: Ensure Flowise Namespace Exists
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ agenticai_namespace }}"
+      run_once: true
+
+    ###########################################################################
+    # TLS Secret
+    ###########################################################################
+    - name: Create TLS Secret for Flowise
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          type: kubernetes.io/tls
+          metadata:
+            name: "flowise-{{ cluster_url }}"
+            namespace: "{{ agenticai_namespace }}"
+          data:
+            tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
+            tls.key: "{{ lookup('file', key_file) | b64encode }}"
+      when: agenticai_tls_enabled | bool
+      run_once: true
+
+    ###########################################################################
+    # Helm Repo
+    ###########################################################################
+    - name: Add Flowise Helm Repository
+      command: >
+        helm repo add {{ agenticai_helm_repo_name }} {{ agenticai_helm_repo_url }}
+      register: helm_repo_add
+      changed_when: "'already exists' not in helm_repo_add.stderr"
+      failed_when: helm_repo_add.rc != 0 and 'already exists' not in helm_repo_add.stderr
+      run_once: true
+
+    - name: Update Helm Repositories
+      command: helm repo update
+      run_once: true
+
+    ###########################################################################
+    # Validate Required Secrets
+    ###########################################################################
+    - name: Validate PostgreSQL Password is Set
+      fail:
+        msg: |
+          ERROR: PostgreSQL password is not set!
+          Please ensure 'agenticai_postgres_password' is defined in vault.yml.
+          This is required for production security.
+      when: agenticai_postgres_password is not defined or agenticai_postgres_password | length == 0
+      run_once: true
+
+    - name: Validate Redis Password is Set
+      fail:
+        msg: |
+          ERROR: Redis password is not set!
+          Please ensure 'agenticai_redis_password' is defined in vault.yml.
+          This is required for production security.
+      when: agenticai_redis_password is not defined or agenticai_redis_password | length == 0
+      run_once: true
+
+    ###########################################################################
+    # Deploy Flowise (NO ingress via Helm)
+    ###########################################################################
+    - name: Install or Upgrade Flowise via Helm
+      shell: |
+        helm upgrade --install flowise {{ agenticai_helm_repo_name }}/{{ agenticai_helm_chart_name }} \
+          --namespace {{ agenticai_namespace }} \
+          --create-namespace \
+          --set image.repository={{ agenticai_image_repository }} \
+          --set image.tag={{ agenticai_image_tag }} \
+          --set replicaCount={{ agenticai_replica_count }} \
+          --set env.DATABASE_TYPE={{ agenticai_database_type }} \
+          --set env.DATABASE_HOST=flowise-postgresql.{{ agenticai_namespace }}.svc.cluster.local \
+          --set env.DATABASE_PORT={{ agenticai_postgres_port }} \
+          --set env.DATABASE_NAME={{ agenticai_postgres_database }} \
+          --set env.DATABASE_USER={{ agenticai_postgres_username }} \
+          --set env.DATABASE_PASSWORD={{ agenticai_postgres_password }} \
+          --set env.REDIS_URL=redis://:{{ agenticai_redis_password }}@flowise-redis-master.{{ agenticai_namespace }}.svc.cluster.local:{{ agenticai_redis_port }} \
+          --set postgresql.enabled={{ agenticai_postgres_enabled }} \
+          --set postgresql.auth.username={{ agenticai_postgres_username }} \
+          --set postgresql.auth.password={{ agenticai_postgres_password }} \
+          --set postgresql.auth.database={{ agenticai_postgres_database }} \
+          --set postgresql.primary.persistence.size={{ agenticai_postgres_storage_size }} \
+          --set redis.enabled={{ agenticai_redis_enabled }} \
+          --set redis.auth.password={{ agenticai_redis_password }} \
+          --set redis.master.persistence.size={{ agenticai_redis_storage_size }} \
+          --set worker.enabled={{ agenticai_worker_enabled }} \
+          --set worker.replicaCount={{ agenticai_worker_replica_count }} \
+          --set worker.resources.requests.cpu={{ agenticai_worker_cpu_request }} \
+          --set worker.resources.requests.memory={{ agenticai_worker_memory_request }} \
+          --set worker.resources.limits.cpu={{ agenticai_worker_cpu_limit }} \
+          --set worker.resources.limits.memory={{ agenticai_worker_memory_limit }} \
+          --set resources.requests.cpu={{ agenticai_cpu_request }} \
+          --set resources.requests.memory={{ agenticai_memory_request }} \
+          --set resources.limits.cpu={{ agenticai_cpu_limit }} \
+          --set resources.limits.memory={{ agenticai_memory_limit }} \
+          --set persistence.enabled={{ agenticai_persistence_enabled }} \
+          --set persistence.storageClass={{ agenticai_persistence_storage_class }} \
+          --set persistence.size={{ agenticai_persistence_size }} \
+          --set ingress.enabled=false \
+          --wait \
+          --timeout 10m
+      run_once: true
+
+    ###########################################################################
+    # Root Ingress (SUBDOMAIN MODE)
+    ###########################################################################
+    - name: Create Flowise Root Ingress (Subdomain)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: flowise-root
+            namespace: "{{ agenticai_namespace }}"
+          spec:
+            ingressClassName: "{{ agenticai_ingress_class }}"
+            tls:
+              - secretName: "flowise-{{ cluster_url }}"
+                hosts:
+                  - "flowise-{{ cluster_url }}"
+            rules:
+              - host: "flowise-{{ cluster_url }}"
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: flowise
+                          port:
+                            number: 3000
+      when: kubernetes_platform != 'openshift' and agenticai_ingress_enabled | bool
+      run_once: true
+
+    ###########################################################################
+    # Wait for Pods
+    ###########################################################################
+    - name: Display Wait Message
+      debug:
+        msg:
+          - "=============================================="
+          - "Waiting for Flowise pods to be ready..."
+          - "This may take several minutes as PostgreSQL"
+          - "and Redis initialize for the first time."
+          - "=============================================="
+      run_once: true
+
+    - name: Wait for Flowise Pods to be Ready
+      shell: |
+        kubectl get pods -n {{ agenticai_namespace }} \
+          -l app.kubernetes.io/name=flowise \
+          -o json | jq -r '
+            .items[] |
+            select(.status.phase != "Running"
+              or (.status.containerStatuses[]? | select(.ready != true))) |
+            .metadata.name' | wc -l
+      register: pod_status
+      until: pod_status.stdout == "0"
+      retries: 60
+      delay: 10
+      run_once: true
+
+    ###########################################################################
+    # Summary
+    ###########################################################################
+    - name: Display Deployment Summary
+      debug:
+        msg:
+          - "=============================================="
+          - "Flowise Agentic Plugin Deployed Successfully!"
+          - "=============================================="
+          - "Namespace: {{ agenticai_namespace }}"
+          - "Access URL: https://flowise-{{ cluster_url }}"
+          - "Database: PostgreSQL"
+          - "Cache: Redis"
+          - "Worker Mode: {{ agenticai_worker_enabled }}"
+          - "=============================================="
+      run_once: true

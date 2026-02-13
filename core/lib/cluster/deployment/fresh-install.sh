@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 
@@ -19,7 +19,7 @@ fresh_installation() {
 
     echo "Deployment configuration: $deploy_kubernetes_fresh"
 
-    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" ]]; then
+    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" && "$deploy_agenticai_plugin" == "no" ]]; then
 
     # Check if all deployment steps are set to "no" after getting user input
         echo "No installation or deployment steps selected. Skipping setup_initial_env..."
@@ -127,6 +127,28 @@ fresh_installation() {
             else
                 echo "Skipping Observability deployment..."
             fi
+            # Deploy Plugins
+            # --------------
+            # Plugins are deployed after core infrastructure is ready
+            
+            if [[ "$deploy_agenticai_plugin" == "yes" ]]; then
+                echo "Deploying Agentic AI Plugin..."
+                ansible-playbook -i "${INVENTORY_PATH}" ../../plugins/agenticai/playbooks/deploy-agenticai-plugin.yml \
+                    --extra-vars "cluster_url=${cluster_url} \
+                                  cert_file=${cert_file} \
+                                  key_file=${key_file} \
+                                  kubernetes_platform=${kubernetes_platform}" \
+                    --vault-password-file "$vault_pass_file"
+                if [ $? -eq 0 ]; then
+                    echo "Agentic AI Plugin deployed successfully."
+                else
+                    echo "Failed to deploy Agentic AI Plugin. Exiting!."
+                    exit 1
+                fi
+            else
+                echo "Skipping Agentic AI Plugin deployment..."
+            fi
+            
             if [[ "$deploy_istio" == "yes" ]]; then
                 echo "Deploying Istio..."
                 execute_and_check "Deploying Istio..." deploy_istio_playbook "$@" \

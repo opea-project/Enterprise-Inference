@@ -1,6 +1,6 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-ansible_python_interpreter: /usr/bin/python3
+ansible_python_interpreter: "{{ lookup('env', 'ANSIBLE_PYTHON_INTERPRETER') or '/usr/bin/python3' }}"
 helm_charts_base: "{{ lookup('env', 'PWD') }}/helm-charts"
 remote_home_dir: "{{ lookup('env', 'PWD') }}/scripts"
 remote_helm_charts_base: "/tmp/helm-charts"
@@ -25,3 +25,6 @@ balloon_policy_cpu: 'None'
 gaudi_values_file: "{{ remote_helm_charts_base }}/vllm/gaudi-values.yaml"
 huggingface_tensor_parellel_size: 'false'
 vllm_metrics_enabled: 'false'
+# Total CPUs reserved across all NUMA nodes for system components (keycloak, apisix, observability)
+# This fixed total is distributed evenly across NUMA nodes
+nri_total_reserved_cpus: 8

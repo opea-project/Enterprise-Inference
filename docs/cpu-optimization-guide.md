@@ -7,15 +7,19 @@ The system automatically optimizes CPU allocation for AI models using balloon po
 ## Automatic Features
  
 ### CPU Allocation
-- System automatically detects available CPU cores
-- Reserves 18% of CPUs for system processes
-- Allocates remaining CPUs to AI models
-- Assigns dedicated CPU cores to each model
 
-### Memory Allocation
-- System automatically detects available memory
-- Reserves 18% of memory for system processes
-- Allocates remaining memory to AI models
+**System CPU Reservation**: A total of **8 vCPUs** is reserved for infrastructure components (Keycloak, APISIX, observability, kube-system), distributed evenly across NUMA nodes.
+
+**Intelligent CPU Selection**:
+- Automatically detects NUMA topology and hyperthreading configuration
+- For hyperthreaded systems: Balances reservations between physical cores and HT siblings
+  - Example (48 cores with HT): Reserves from both physical cores (0-23) and HT cores (24-47)
+- For non-segmented CPUs (e.g., "0-47"): Creates virtual segments at the midpoint
+- For segmented CPUs (e.g., "0-23,48-71"): Uses existing segment boundaries
+
+**Model CPU Allocation**:
+- Remaining CPUs (after reservation) are allocated to LLM models
+- Assigns dedicated CPU cores to each model for optimal performance
  
 ### Hardware Detection
 - Automatically detects NUMA topology
@@ -37,17 +41,16 @@ labels:
 resources:
   requests:
     cpu: 40        # Automatically calculated
-    memory: 4G
+    # for tp1, tp2 system should have minimum 128Gi and for tp>=4 minimum 256Gi memory available for the model's pod
+    memory: 128Gi  
 ```
  
-## Recommendations for Single Node Clusters with Limited CPUs
+## System Component Deployment Recommendations
 
-For single node clusters (e.g., systems with 48 CPU cores), only Keycloak and APISIX are supported. GenAI Gateway is not supported on these configurations. To deploy GenAI Gateway, a minimum of 96 CPU cores is required.
+For single-node Xeon clusters, **Keycloak** and **APISIX** are recommended.
 
-**Summary:**
-- For clusters with limited CPU resources, deploy only Keycloak and APISIX.
-- GenAI Gateway deployment requires at least 96 CPU cores.
- 
+For Gaudi or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
+
 ## Status Verification
  
 ### Check System Status

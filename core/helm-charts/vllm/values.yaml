@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025 Intel Corporation
+# Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Default values for vllm.
@@ -152,17 +152,9 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: role
+        - key: ei-inference-eligible
           operator: In
-          values: ["inference"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-xeon"]
-      - matchExpressions:
-        - key: role
-          operator: In
-          values: ["inference-cpu"]
+          values: ["true"]
 
 LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
 SERVED_MODEL_NAME: ""
