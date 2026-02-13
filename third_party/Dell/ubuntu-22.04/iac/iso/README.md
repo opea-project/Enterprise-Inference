@@ -37,15 +37,15 @@ brew install xorriso rsync
 
 ## Usage
 
-Set `--hostname`, `--username`, and `--password-hash` variables, these are need to run script. All other values have defaults.
+The script requires `--hostname`, `--username`, and `--password-hash`. All other values have defaults.
 
 Basic example using a local ISO:
 
 ```bash
 ./custom-iso.sh \
-  --hostname=<hostname> \
-  --username=<user> \
-  --password-hash=<password in SHA-516 hah format> \
+  --hostname=ubuntu-server-001 \
+  --username=user \
+  --iso=./ubuntu-22.04.5-live-server-amd64.iso
 ```
 
 Full example with all options:
@@ -82,7 +82,7 @@ Notes:
 |---|---|---|---|
 | `--hostname` | Yes | (none) | Hostname for the installed system. |
 | `--username` | Yes | (none) | Primary user name. |
-| `--password-hash` | Yes | (none) | password should be in SHA-512 hash format. |
+| `--password-hash` | Yes | (none) | SHA-512 password hash for the user. |
 | `--ssh-key` | No | `""` | SSH public key (optional). |
 | `--timezone` | No | `America/Chicago` | System timezone. |
 | `--locale` | No | `en_US.UTF-8` | Locale. |
