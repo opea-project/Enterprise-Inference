@@ -43,9 +43,9 @@ Basic example using a local ISO:
 
 ```bash
 ./custom-iso.sh \
-  --hostname=ubuntu-server-001 \
-  --username=user \
-  --password-hash='$6$Sl0xydNgA3rBk1Uo$Pj7oVVI7smkdBh20V8EyLivWpKDHFueUhvrfwxundGp/DQrAuTHjIxnrCZIMVJ1zcTIJ7VgIWKu0mUZmiRsqv0' \
+  --hostname=<hostname> \
+  --username=<user> \
+  --password-hash=<password in SHA-516 hah format> \
 ```
 
 Full example with all options:
