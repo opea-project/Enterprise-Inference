@@ -41,6 +41,7 @@ brew install xorriso rsync
 ```bash
 chmod +x custom-iso.sh
 ```
+> Note: make sure to run the custom-iso.sh script with sudo privileges.
 
 **Use this if you do not already have the Ubuntu ISO downloaded**
 
