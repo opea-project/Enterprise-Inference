@@ -37,21 +37,38 @@ brew install xorriso rsync
 
 ## Usage
 
-The script requires `--hostname`, `--username`, and `--password-hash`. All other values have defaults.
-
-Basic example using a local ISO:
-
+### Change permission to your file
 ```bash
-./custom-iso.sh \
+chmod +x custom-iso.sh
+```
+
+**Use this if you do not already have the Ubuntu ISO downloaded**
+
+set `--hostname`, `--username`, `--password-hash`. All other values have defaults.
+
+The script will automatically download ubuntu iso.
+```bash
+sudo ./custom-iso.sh \
   --hostname=ubuntu-server-001 \
   --username=user \
-  --iso=./ubuntu-22.04.5-live-server-amd64.iso
+  --password-hash=Replace-with-your-password-hash
+```
+
+
+**Use this if you already have downloaded ubuntu ISO locally:**
+
+```bash
+sudo ./custom-iso.sh \
+  --hostname=ubuntu-server-001 \
+  --username=user \
+  --password-hash=Replace-with-your-password-hash \
+  --iso=Replace-with-path-to-your-local-iso
 ```
 
 Full example with all options:
 
 ```bash
-./custom-iso.sh \
+sudo ./custom-iso.sh \
   --hostname=ubuntu-server-001 \
   --username=user \
   --password-hash='$6$Sl0xydNgA3rBk1Uo$Pj7oVVI7smkdBh20V8EyLivWpKDHFueUhvrfwxundGp/DQrAuTHjIxnrCZIMVJ1zcTIJ7VgIWKu0mUZmiRsqv0' \
@@ -63,7 +80,6 @@ Full example with all options:
   --storage-layout=direct \
   --instance-id=ubuntu-server-001 \
   --packages='' \
-  --iso=./ubuntu-22.04.5-live-server-amd64.iso \
   --iso-url=https://releases.ubuntu.com/jammy/ubuntu-22.04.5-live-server-amd64.iso \
   --iso-name=ubuntu-22.04.5-live-server-amd64.iso \
   --out-iso=ubuntu-22.04.5-autoinstall.iso \
@@ -72,6 +88,7 @@ Full example with all options:
 
 Notes:
 - If `--iso` is provided, `--iso-url` and `--iso-name` are ignored.
+- If `--iso` is not provided, the script downloads the ISO using --iso-url.
 - If `--ssh-key` is empty, no SSH key is embedded.
 - `--packages` is a comma-separated list (e.g., `--packages=openssh-server,curl`).
 - `--volid` must be 32 characters or fewer.

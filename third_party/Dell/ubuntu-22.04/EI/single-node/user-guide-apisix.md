@@ -181,11 +181,11 @@ deploy_istio=off
 uninstall_ceph=off
 ```
 
-To support non-interactive execution of inference-stack-deploy.sh, create a file named "core/inentory/.become-passfile" with your user's sudo password:
+To support non-interactive execution of inference-stack-deploy.sh, create a file named "core/inventory/.become-passfile" with your user's sudo password:
 
 ```bash
-vi core/inentory/.become-passfile
-chmod 600 core/inentory/.become-passfile
+vi core/inventory/.become-passfile
+chmod 600 core/inventory/.become-passfile
 ```
 **Update hosts.yaml File**
 
@@ -266,7 +266,7 @@ If a valid token is returned (long JWT string), the environment is ready for inf
 > Note: Replace ${BASE_URL} with your DNS
 
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
 -X POST \
 -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' \
 -H 'Content-Type: application/json' \

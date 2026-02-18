@@ -225,7 +225,7 @@ Reference the litellm_master_key file under core/inventory/metadata/vault.yml fo
 
 **Run a test query for Gaudi:**
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
+curl -k https://${BASE_URL}/v1/completions \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <<master-key>>" \
@@ -239,8 +239,8 @@ curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
 
 **Run a test query for CPU:**
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
--X POST \
+curl -k https://${BASE_URL}/v1/completions \
+  -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <<master-key>>" \
   -d '{
