@@ -234,6 +234,36 @@ modelConfigs:
     tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
     pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
+  "Qwen/Qwen2.5-VL-7B-Instruct":
+    configMapValues:
+      VLLM_SKIP_WARMUP: true
+      VLLM_CPU_KVCACHE_SPACE: "40"
+      VLLM_RPC_TIMEOUT: "100000"
+      VLLM_ALLOW_LONG_MAX_MODEL_LEN: "1"
+      VLLM_ENGINE_ITERATION_TIMEOUT_S: "120"
+      VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
+      VLLM_CPU_SGL_KERNEL: "1"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--block-size",
+      "128",
+      "--dtype",
+      "bfloat16",
+      "--distributed_executor_backend",
+      "mp",
+      "--enable_chunked_prefill",
+      "--enforce-eager",
+      "--max-model-len",
+      "33024",
+      "--max-num-batched-tokens",
+      "2048",
+      "--max-num-seqs",
+      "256",
+      ]
+    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
+
 defaultModelConfigs:
   configMapValues:
     VLLM_CPU_KVCACHE_SPACE: "40"
