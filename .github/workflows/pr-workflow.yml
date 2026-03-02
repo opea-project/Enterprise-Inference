@@ -1,0 +1,44 @@
+name: pr-workflow
+
+on:
+  pull_request:
+    branches:
+      - cd-integration
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number to dry run'
+        required: true
+
+jobs:
+  dry-run:
+    name: Dry Run
+    runs-on: pr-workflow
+    steps:
+      - name: Determine target ref
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "${{ github.event.inputs.pr_number }}" ]; then
+              echo "pr_number input is required" >&2
+              exit 1
+            fi
+            echo "ref=refs/pull/${{ github.event.inputs.pr_number }}/merge" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=refs/pull/${{ github.event.pull_request.number }}/merge" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Dry run summary
+        run: |
+          echo "=== Dry Run Context ==="
+          echo "Event        : ${{ github.event_name }}"
+          echo "Repository   : ${{ github.repository }}"
+          echo "Target ref   : ${{ steps.target.outputs.ref }}"
+          echo "Runner label : pr-workflow"
+          echo "Dry run complete"
