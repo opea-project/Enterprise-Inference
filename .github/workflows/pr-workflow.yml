@@ -1,6 +1,9 @@
 name: pr-workflow
 
 on:
+  push:
+    branches:
+      - cd-integration
   pull_request:
     branches:
       - cd-integration
