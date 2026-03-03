@@ -3,10 +3,10 @@ name: PR Workflow
 on:
   push:
     branches:
-      - cd-integration
+      - cd-integeration
   pull_request:
     branches:
-      - cd-integration
+      - cd-integeration
   workflow_dispatch:
     inputs:
       pr_number:
@@ -27,8 +27,10 @@ jobs:
               exit 1
             fi
             echo "ref=refs/pull/${{ github.event.inputs.pr_number }}/merge" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "ref=refs/pull/${{ github.event.pull_request.number }}/merge" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout target
