@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 run_infrastructure_readiness_check() {
@@ -14,19 +10,11 @@ run_infrastructure_readiness_check() {
         echo -e "${YELLOW}Please ensure the inventory file exists and contains the correct host information.${NC}"
         return 1
     fi    
-<<<<<<< HEAD
-    if ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --extra-vars "brownfield_deployment=true" playbooks/inference-precheck.yml; then
-=======
     if ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" --extra-vars "brownfield_deployment=true" playbooks/inference-precheck.yml; then
->>>>>>> dell-deploy-1.4-nv
         echo -e "${GREEN}Infrastructure readiness check completed successfully.${NC}"
         return 0
     else
         echo -e "${RED}Infrastructure readiness check failed. Please resolve the issues before proceeding.${NC}"
         return 1
     fi
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> dell-deploy-1.4-nv

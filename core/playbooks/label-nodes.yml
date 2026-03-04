@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Label Kubernetes Nodes
@@ -43,11 +39,7 @@
       register: k8s_nodes
       run_once: true
 
-<<<<<<< HEAD
-    - name: Label control plane nodes with ei-infra-eligible=true
-=======
     - name: Label control plane nodes with role=infra
->>>>>>> dell-deploy-1.4-nv
       kubernetes.core.k8s:
         state: patched
         kind: Node
@@ -55,21 +47,13 @@
         definition:
           metadata:
             labels:
-<<<<<<< HEAD
-              ei-infra-eligible: "true"
-=======
               role: "infra"
->>>>>>> dell-deploy-1.4-nv
       loop: "{{ k8s_nodes.resources }}"
       when: 
         - item.metadata.name in control_plane_nodes or item.metadata.labels['node-role.kubernetes.io/control-plane'] is defined
       run_once: true
 
-<<<<<<< HEAD
-    - name: Label worker/inference nodes with ei-inference-eligible=true
-=======
     - name: Label worker nodes with role=inference
->>>>>>> dell-deploy-1.4-nv
       kubernetes.core.k8s:
         state: patched
         kind: Node
@@ -77,17 +61,10 @@
         definition:
           metadata:
             labels:
-<<<<<<< HEAD
-              ei-inference-eligible: "true"
-      loop: "{{ k8s_nodes.resources }}"
-      when:
-        - item.metadata.name in worker_nodes
-=======
               role: "inference"
       loop: "{{ k8s_nodes.resources }}"
       when:
         - item.metadata.name in worker_nodes or (item.metadata.labels['node-role.kubernetes.io/control-plane'] is not defined and item.metadata.name not in control_plane_nodes)
->>>>>>> dell-deploy-1.4-nv
       run_once: true
 
     - name: Verify node labels
@@ -100,10 +77,6 @@
       debug:
         msg: |
           Node: {{ item.metadata.name }}
-<<<<<<< HEAD
-          Labels: {{ item.metadata.labels | dict2items | selectattr('key', 'match', '^ei-') | list | items2dict(key_name='key', value_name='value') }}
-=======
           Labels: {{ item.metadata.labels | dict2items | selectattr('key', 'match', '^role') | list | items2dict(key_name='key', value_name='value') }}
->>>>>>> dell-deploy-1.4-nv
       loop: "{{ labeled_nodes.resources }}"
       run_once: true

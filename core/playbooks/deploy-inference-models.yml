@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy/Remove Inference LLM Models
@@ -40,11 +36,8 @@
     - name: Set default model parallelism configuration for CPU deployments
       ansible.builtin.set_fact:
         model_parallelism_config:
-<<<<<<< HEAD
-=======
           tensor_parallel_size: "{{ model_parallelism_config.tensor_parallel_size | default(1) }}"
           pipeline_parallel_size: "{{ model_parallelism_config.pipeline_parallel_size | default(1) }}"
->>>>>>> dell-deploy-1.4-nv
           strategy: "{{ model_parallelism_config.strategy | default('tensor_parallel') }}"
       when:
         - cpu_playbook == 'true'
@@ -283,16 +276,6 @@
               is_single_node: "{{ cpu_topology_config.total_sockets == 1 and cpu_topology_config.numa_nodes_per_socket == 1 }}"
               reserved_cpus_percentage: "{{ reserved_cpus_percentage | default(18) | int }}"
               reserved_cpus: >-
-<<<<<<< HEAD
-                {%- set reserved_cpu_count = nri_reserved_cpu_list.split(',') | length -%}
-                {{ reserved_cpu_count }}
-              balloon_cpus: >-
-                {%- set total_cpus = (cpu_topology_config.cpus_per_socket | int) * (cpu_topology_config.total_sockets | int) -%}
-                {%- set reserved_cpu_count = nri_reserved_cpu_list.split(',') | length -%}
-                {%- if reserved_cpu_count >= total_cpus -%}{%- set reserved_cpu_count = total_cpus -%}{%- endif -%}
-                {{ total_cpus - reserved_cpu_count }}
-              workload_cpus: "{{ cpu_topology_config.workload_cpus | int }}"
-=======
                 {%- set total_cpus = cpu_topology_config.cpus_per_socket | int -%}
                 {%- set percentage = reserved_cpus_percentage | default(18) | int -%}
                 {%- set calculated_reserved = ((total_cpus * percentage) / 100) | round(0, 'ceil') | int -%}
@@ -337,36 +320,23 @@
                 {%- set final_reserved = calculated_reserved -%}
                 {%- endif -%}
                 {{ total_cpus - final_reserved }}
->>>>>>> dell-deploy-1.4-nv
 
         - name: Calculate parallelism configuration
           ansible.builtin.set_fact:
             parallelism_config:
               tensor_parallel_size: >-
-<<<<<<< HEAD
-                {%- set total_numa = (cpu_topology_config.total_sockets | int) * (cpu_topology_config.numa_nodes_per_socket | int) -%}
-                {%- if total_numa in [1, 2, 4] -%}
-                {{ total_numa }}
-                {%- elif total_numa in [3] -%}
-                2
-                {%- elif total_numa in [6] -%}
-=======
                 {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
                 {%- if numa_per_socket in [2, 4] -%}
                 {{ numa_per_socket }}
                 {%- elif numa_per_socket in [3] -%}
                 2
                 {%- elif numa_per_socket in [6] -%}
->>>>>>> dell-deploy-1.4-nv
                 4
                 {%- else -%}
                 1
                 {%- endif -%}
               strategy: >-
-<<<<<<< HEAD
-=======
                 {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
->>>>>>> dell-deploy-1.4-nv
                 tensor_parallel
 
         - name: Combine topology and parallelism configs
@@ -384,10 +354,7 @@
               - "NUMA Nodes per Socket: {{ optimal_balloon_config.numa_nodes_per_socket }}"
               - "CPUs per Socket: {{ optimal_balloon_config.cpus_per_socket }}"
               - "Is Single Node: {{ optimal_balloon_config.is_single_node }}"
-<<<<<<< HEAD
-=======
               - "Reserved CPUs Percentage: {{ optimal_balloon_config.reserved_cpus_percentage }}%"
->>>>>>> dell-deploy-1.4-nv
               - "Reserved CPUs Count: {{ optimal_balloon_config.reserved_cpus }} ({{ ((optimal_balloon_config.reserved_cpus | int / optimal_balloon_config.cpus_per_socket | int) * 100) | round(1) }}% actual)"
               - "Workload CPUs (for xeon-values.yaml): {{ optimal_balloon_config.workload_cpus }}"
               - "Balloon CPUs: {{ optimal_balloon_config.balloon_cpus }}"
@@ -436,62 +403,17 @@
           when: usable_mem_var is string and socket0_memory_gb | int == 0
           ignore_errors: true
 
-<<<<<<< HEAD
-        - name: Calculate minimum memory based on tensor parallel size
-          ansible.builtin.set_fact:
-            min_memory_for_tp: >-
-              {%- set tp = optimal_balloon_config.tensor_parallel_size | default(1) | int -%}
-              {%- if tp >= 4 -%}
-              256
-              {%- elif tp >= 2 -%}
-              128
-              {%- else -%}
-              128
-              {%- endif -%}
-
-        - name: Set optimal memory based on TP requirements and available memory
-          ansible.builtin.set_fact:
-            optimal_memory_gb: >-
-              {%- set available = socket0_memory_gb | int -%}
-              {%- set min_required = min_memory_for_tp | int -%}
-              {%- set max_limit = 256 -%}
-              {%- if available < min_required -%}
-              {{ min_required }}
-              {%- elif available > max_limit -%}
-              {{ max_limit }}
-              {%- else -%}
-              {{ available }}
-              {%- endif -%}
-=======
         - name: Set optimal memory with minimum 8GB and maximum 256GB
           ansible.builtin.set_fact:
             optimal_memory_gb: "{% if socket0_memory_gb | int < 8 %}8{% elif socket0_memory_gb | int > 256 %}256{% else %}{{ socket0_memory_gb | int }}{% endif %}"
->>>>>>> dell-deploy-1.4-nv
 
         - name: Final memory calculation
           ansible.builtin.debug:
             msg: |
               === Memory Calculation Summary ===
-<<<<<<< HEAD
-              Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size | default(1) }}
-              Minimum memory required for TP: {{ min_memory_for_tp }} GB
-              Socket 0 memory available: {{ socket0_memory_gb }} GB
-              Final memory for deployment: {{ optimal_memory_gb }} GB
-              Memory allocation: {{ 'Using minimum required' if (socket0_memory_gb | int) < (min_memory_for_tp | int) else 'Using available memory' if (socket0_memory_gb | int) <= 256 else 'Capped at 256GB max' }}
-
-        - name: Apply optimized TP/PP defaults (unless user overrides)
-          ansible.builtin.set_fact:
-            tensor_parallel_size: "{{ tensor_parallel_size |  default(optimal_balloon_config.get('tensor_parallel_size', 1)) | int }}"
-            pipeline_parallel_size: "{{ pipeline_parallel_size | default(optimal_balloon_config.get('pipeline_parallel_size', 1)) | int }}"
-          when:
-            - cpu_playbook == 'true'
-          tags: always
-          run_once: true
-=======
               Socket 0 memory available: {{ socket0_memory_gb }} GB
               Final memory for deployment: {{ optimal_memory_gb }} GB
               Min threshold: 8 GB, Max threshold: 256 GB
->>>>>>> dell-deploy-1.4-nv
 
         - name: Display CPU optimization helm charts update completion
           debug:
@@ -726,9 +648,6 @@
               --set apisix.enabled={{ apisix_enabled }}
               --set platform={{ kubernetes_platform }}
             {% endif %}
-<<<<<<< HEAD
-            {% if gaudi_deployment %}
-=======
             {% if nvidia_deployment|lower == "true" %}
               --set accelDevice=nvidia
               --set gpuCount={{ tensor_parallel_size_vllm }}
@@ -737,7 +656,6 @@
               --values {{ nvidia_values_file }}
               {% endif %}
             {% elif gaudi_deployment and gaudi_values_file is defined and gaudi_values_file|length > 0 %}
->>>>>>> dell-deploy-1.4-nv
               --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
               --values {{ gaudi_values_file }}
             {% endif %}
@@ -827,13 +745,6 @@
             {% if cpu_playbook == 'true' %}
               --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
               --set cpu_balloon_annotation="vllm-balloon"
-<<<<<<< HEAD
-              --set podLabels.name="vllm"
-              --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
-              --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-              --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
-              --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
-=======
               --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
             {% elif nvidia_deployment|lower == "true" %}
@@ -843,7 +754,6 @@
               {% if nvidia_values_file is defined and nvidia_values_file|length > 0 %}
               --values {{ nvidia_values_file }}
               {% endif %}
->>>>>>> dell-deploy-1.4-nv
             {% elif gaudi_deployment|lower == "true" %}
               --set tensor_parallel_size={{ huggingface_tensor_parellel_size }}
               --values {{ gaudi_values_file }}
@@ -1273,8 +1183,6 @@
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
-<<<<<<< HEAD
-=======
     - name: Deploy Llama-3.2-3B LLM Model
       block:
         - name: Delete Ingress resource Llama-3.2-3B from default namespace
@@ -1369,7 +1277,6 @@
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
->>>>>>> dell-deploy-1.4-nv
     - name: Deploy Mixtral7b LLM Model
       block:
         - name: Delete Ingress resource Mixtral7b from default namespace
@@ -2169,10 +2076,6 @@
             namespace: default
             name: vllm-llama-8b-cpu-ingress
             state: absent
-<<<<<<< HEAD
-          ignore_errors: yes
-=======
->>>>>>> dell-deploy-1.4-nv
         - name: Delete Ingress resource Llama8b from auth-apisix namespace
           tags: install-cpu-llama-8b
           ignore_errors: yes
@@ -2181,10 +2084,6 @@
             namespace: auth-apisix
             name: vllm-llama-8b-cpu-ingress
             state: absent
-<<<<<<< HEAD
-          ignore_errors: yes
-=======
->>>>>>> dell-deploy-1.4-nv
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2198,13 +2097,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2306,13 +2200,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ model_paralletensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2413,13 +2302,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2523,13 +2407,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2638,13 +2517,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2748,13 +2622,8 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
-<<<<<<< HEAD
-            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
-            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
-=======
             --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
->>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2829,8 +2698,4 @@
       tags: always
       ansible.builtin.file:
         path: "{{ remote_helm_charts_base }}"
-<<<<<<< HEAD
         state: absent
-=======
-        state: absent
->>>>>>> dell-deploy-1.4-nv
