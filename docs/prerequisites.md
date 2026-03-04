@@ -15,11 +15,7 @@ The first step is to get access to the hardware platforms. This guide assumes th
 
 | Category            | Details                                                                                                           |
 |---------------------|-------------------------------------------------------------------------------------------------------------------|
-<<<<<<< HEAD
-| Operating System    | Ubuntu 22.04, Ubuntu 24.04                                                                                                |
-=======
 | Operating System    | Ubuntu 22.04                                                                                                |
->>>>>>> dell-deploy-1.4-nv
 | Hardware Platforms  | 4th Gen Intel® Xeon® Scalable processors<br>5th Gen Intel® Xeon® Scalable processors<br>6th Gen Intel® Xeon® Scalable processors<br>3rd Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator<br>4th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 2 AI Accelerator <br>6th Gen Intel® Xeon® Scalable processors and Intel® Gaudi® 3 AI Accelerator|
 | Gaudi Firmware Version | 1.20.0 or newer
 

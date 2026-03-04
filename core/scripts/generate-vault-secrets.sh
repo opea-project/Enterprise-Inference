@@ -33,11 +33,6 @@ MINIO_SECRET=$(generate_password 20)
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD=$(generate_password 20)
 GRAFANA_ADMIN_PASSWORD=$(generate_password 20)
-<<<<<<< HEAD
-AGENTICAI_POSTGRES_PASSWORD=$(generate_password 20)
-AGENTICAI_REDIS_PASSWORD=$(generate_password 20)
-=======
->>>>>>> dell-deploy-1.4-nv
 
 # Generate connection strings
 DATABASE_URL="postgresql://admin:${POSTGRESQL_PASSWORD}@genai-gateway-postgresql:5432/litellm"
@@ -72,11 +67,6 @@ minio_user: "$MINIO_USER"
 postgres_user: "$POSTGRES_USER"
 postgres_password: "$POSTGRES_PASSWORD"
 grafana_admin_password: "$GRAFANA_ADMIN_PASSWORD"
-<<<<<<< HEAD
-agenticai_postgres_password: "$AGENTICAI_POSTGRES_PASSWORD"
-agenticai_redis_password: "$AGENTICAI_REDIS_PASSWORD"
-=======
->>>>>>> dell-deploy-1.4-nv
 EOF
 
 # Set appropriate permissions
