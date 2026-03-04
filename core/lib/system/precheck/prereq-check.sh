@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 run_system_prerequisites_check() {
@@ -124,22 +120,14 @@ run_system_prerequisites_check() {
     echo "Updating system package lists..."
     if command -v apt &> /dev/null; then
         echo "Updating package lists using apt Ubuntu..."
-<<<<<<< HEAD
-        if sudo apt update; then
-=======
         if sudo -S apt update < "${BECOME_PASSWORD_FILE}"; then
->>>>>>> dell-deploy-1.4-nv
             echo -e "${GREEN}Package lists updated successfully${NC}"
         else
             echo -e "${YELLOW}Package list update failed, continuing anyway${NC}"
         fi
     elif command -v dnf &> /dev/null; then
         echo "Updating package lists using dnf (RHEL/CentOS)..."
-<<<<<<< HEAD
-        if sudo dnf check-update || [ $? -eq 100 ]; then
-=======
         if sudo -S dnf check-update < "${BECOME_PASSWORD_FILE}" || [ $? -eq 100 ]; then
->>>>>>> dell-deploy-1.4-nv
             echo -e "${GREEN} Package lists updated successfully${NC}"
         else
             echo -e "${YELLOW} Package list update failed, continuing anyway${NC}"
@@ -229,17 +217,10 @@ run_system_prerequisites_check() {
                 if [ ${#other_deps[@]} -gt 0 ]; then
                     if command -v dnf &> /dev/null; then
                         echo "Installing dependencies using dnf RHEL..."
-<<<<<<< HEAD
-                        sudo dnf install -y "${other_deps[@]}"
-                    elif command -v apt &> /dev/null; then
-                        echo "Installing dependencies using apt Ubuntu..."
-                        sudo apt update && sudo apt install -y "${other_deps[@]}"
-=======
                         sudo -S dnf install -y "${other_deps[@]}" < "${BECOME_PASSWORD_FILE}"
                     elif command -v apt &> /dev/null; then
                         echo "Installing dependencies using apt Ubuntu..."
                         sudo -S apt update < "${BECOME_PASSWORD_FILE}" && sudo -S apt install -y "${other_deps[@]}" < "${BECOME_PASSWORD_FILE}"
->>>>>>> dell-deploy-1.4-nv
                     else
                         echo -e "${RED}Unsupported package manager. This script supports RHEL (dnf) and Ubuntu (apt) only.${NC}"
                         echo -e "${YELLOW}Please install manually:${NC}"
@@ -256,42 +237,26 @@ run_system_prerequisites_check() {
                         python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
                         if [[ "$python_version" == "3.11" ]]; then
                             echo "Installing python3.11-pip using dnf (RHEL 9)..."
-<<<<<<< HEAD
-                            if ! sudo dnf install -y python3.11-pip; then
-=======
                             if ! sudo -S dnf install -y python3.11-pip < "${BECOME_PASSWORD_FILE}"; then
->>>>>>> dell-deploy-1.4-nv
                                 echo -e "${RED}Failed to install python3.11-pip using dnf${NC}"
                                 exit 1
                             fi
                         elif [[ "$python_version" == "3.12" ]]; then
                             echo "Installing python3.12-pip using dnf (RHEL 9)..."
-<<<<<<< HEAD
-                            if ! sudo dnf install -y python3.12-pip; then
-=======
                             if ! sudo -S dnf install -y python3.12-pip < "${BECOME_PASSWORD_FILE}"; then
->>>>>>> dell-deploy-1.4-nv
                                 echo -e "${RED}Failed to install python3.12-pip using dnf${NC}"
                                 exit 1
                             fi
                         else
                             echo "Installing python3-pip using dnf (RHEL 9)..."
-<<<<<<< HEAD
-                            if ! sudo dnf install -y python3-pip; then
-=======
                             if ! sudo -S dnf install -y python3-pip < "${BECOME_PASSWORD_FILE}"; then
->>>>>>> dell-deploy-1.4-nv
                                 echo -e "${RED}Failed to install python3-pip using dnf${NC}"
                                 exit 1
                             fi
                         fi
                     elif command -v apt &> /dev/null; then
                         echo "Installing python3-pip using apt (Ubuntu 22/24)..."
-<<<<<<< HEAD
-                        if ! sudo apt install -y python3-pip; then
-=======
                         if ! sudo -S apt install -y python3-pip < "${BECOME_PASSWORD_FILE}"; then
->>>>>>> dell-deploy-1.4-nv
                             echo -e "${RED}Failed to install python3-pip using apt${NC}"
                             exit 1
                         fi
@@ -333,8 +298,4 @@ run_system_prerequisites_check() {
     
     echo -e "${GREEN}System prerequisites check completed successfully.${NC}"    
     return 0
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> dell-deploy-1.4-nv

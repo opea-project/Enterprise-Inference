@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 run_deploy_habana_ai_operator_playbook() {
@@ -15,19 +11,11 @@ run_deploy_habana_ai_operator_playbook() {
     else
         gaudi_operator=""
     fi    
-<<<<<<< HEAD
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root playbooks/deploy-habana-ai-operator.yml --extra-vars "gaudi_operator=${gaudi_operator}"
-=======
     ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" playbooks/deploy-habana-ai-operator.yml --extra-vars "gaudi_operator=${gaudi_operator}"
->>>>>>> dell-deploy-1.4-nv
     if [ $? -eq 0 ]; then
         echo "The deploy-habana-ai-operator.yml playbook ran successfully."
     else
         echo "The deploy-habana-ai-operator.yml playbook encountered an error."
         exit 1
     fi
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> dell-deploy-1.4-nv

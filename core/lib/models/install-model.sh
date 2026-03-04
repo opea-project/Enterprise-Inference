@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 deploy_inference_llm_models_playbook() {
@@ -14,10 +10,7 @@ deploy_inference_llm_models_playbook() {
         cpu_playbook="true"
         gpu_playbook="false"
         gaudi_deployment="false"
-<<<<<<< HEAD
-=======
         nvidia_deployment="false"
->>>>>>> dell-deploy-1.4-nv
         enable_cpu_balloons="true"  # Enable NRI balloons for CPU deployments
         huggingface_model_deployment_name="${huggingface_model_deployment_name}-cpu"
         if [ "$balloon_policy_cpu" == "enabled" ]; then
@@ -27,9 +20,6 @@ deploy_inference_llm_models_playbook() {
     if [ "$cpu_or_gpu" == "g" ]; then
         cpu_playbook="false"
         gpu_playbook="true"
-<<<<<<< HEAD
-        gaudi_deployment="true"
-=======
         if [ "$gpu_vendor" == "nvidia" ]; then
             gaudi_deployment="false"
             nvidia_deployment="true"
@@ -37,7 +27,6 @@ deploy_inference_llm_models_playbook() {
             gaudi_deployment="true"
             nvidia_deployment="false"
         fi
->>>>>>> dell-deploy-1.4-nv
         enable_cpu_balloons="false"
     fi
     if [ "$deploy_apisix" == "no" ]; then        
@@ -61,19 +50,13 @@ deploy_inference_llm_models_playbook() {
     elif [[ "$gaudi_platform" == "gaudi3" ]]; then
         gaudi_values_file=$gaudi3_values_file_path
     fi    
-<<<<<<< HEAD
-=======
     nvidia_values_file=$nvidia_values_file_path
->>>>>>> dell-deploy-1.4-nv
 
     echo "Ingress based Deployment: $ingress_enabled"
     echo "APISIX Enabled: $apisix_enabled"
     echo "Keycloak Enabled: $deploy_keycloak"    
     echo "Gaudi based: $gaudi_deployment"
-<<<<<<< HEAD
-=======
     echo "NVIDIA based: $nvidia_deployment"
->>>>>>> dell-deploy-1.4-nv
     echo "Model Metrics Enabled: $vllm_metrics_enabled"
     echo "CPU NRI Balloons: $enable_cpu_balloons"
     
@@ -103,11 +86,7 @@ deploy_inference_llm_models_playbook() {
     fi
         
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-inference-models.yml \
-<<<<<<< HEAD
-        --extra-vars "kubernetes_platform=${kubernetes_platform} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} install_true=${install_true} model_name_list='${model_name_list//\ /,}' cpu_playbook=${cpu_playbook} gpu_playbook=${gpu_playbook} hugging_face_token_falcon3=${hugging_face_token_falcon3} deploy_keycloak=${deploy_keycloak} apisix_enabled=${apisix_enabled} ingress_enabled=${ingress_enabled} gaudi_deployment=${gaudi_deployment} huggingface_model_id=${huggingface_model_id} hugging_face_model_deployment=${hugging_face_model_deployment} huggingface_model_deployment_name=${huggingface_model_deployment_name} deploy_inference_llm_models_playbook=${deploy_inference_llm_models_playbook} huggingface_tensor_parellel_size=${huggingface_tensor_parellel_size} deploy_genai_gateway=${deploy_genai_gateway} vllm_metrics_enabled=${vllm_metrics_enabled} gaudi_values_file=${gaudi_values_file} xeon_values_file=${xeon_values_file_path} deploy_ceph=${deploy_ceph} enable_cpu_balloons=${enable_cpu_balloons} balloon_policy_cpu=${balloon_policy_cpu} aws_certificate_arn=${aws_certificate_arn}" --tags "$tags" --vault-password-file "$vault_pass_file"
-=======
         --extra-vars "kubernetes_platform=${kubernetes_platform} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} install_true=${install_true} model_name_list='${model_name_list//\ /,}' cpu_playbook=${cpu_playbook} gpu_playbook=${gpu_playbook} hugging_face_token_falcon3=${hugging_face_token_falcon3} deploy_keycloak=${deploy_keycloak} apisix_enabled=${apisix_enabled} ingress_enabled=${ingress_enabled} gaudi_deployment=${gaudi_deployment} nvidia_deployment=${nvidia_deployment} huggingface_model_id=${huggingface_model_id} hugging_face_model_deployment=${hugging_face_model_deployment} huggingface_model_deployment_name=${huggingface_model_deployment_name} deploy_inference_llm_models_playbook=${deploy_inference_llm_models_playbook} huggingface_tensor_parellel_size=${huggingface_tensor_parellel_size} deploy_genai_gateway=${deploy_genai_gateway} vllm_metrics_enabled=${vllm_metrics_enabled} gaudi_values_file=${gaudi_values_file} nvidia_values_file=${nvidia_values_file} xeon_values_file=${xeon_values_file_path} deploy_ceph=${deploy_ceph} enable_cpu_balloons=${enable_cpu_balloons} balloon_policy_cpu=${balloon_policy_cpu} aws_certificate_arn=${aws_certificate_arn}" --tags "$tags" --vault-password-file "$vault_pass_file"
->>>>>>> dell-deploy-1.4-nv
 
 }
 
@@ -138,27 +117,7 @@ add_model() {
         setup_bastion "$@"
         INVENTORY_PATH=$brownfield_deployment_host_file
         fi        
-<<<<<<< HEAD
-        invoke_prereq_workflows "$@"               
-
-        # Deploy NRI CPU Balloons for CPU deployments (after all infrastructure, before models)
-        if [[ "$deploy_nri_balloon_policy" == "yes" ]]; then
-            # Ensure this is a CPU deployment
-            if [[ "$cpu_or_gpu" != "c" ]]; then
-                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (cpu_or_gpu='c')${NC}"
-                    echo "${RED}Current cpu_or_gpu setting: '$cpu_or_gpu'${NC}"
-                    echo "${RED}Please set cpu_or_gpu to 'c' or disable NRI balloon policy deployment. Exiting!${NC}"
-                    exit 1
-            fi
-            execute_and_check "Deploying CPU Optimization (NRI Balloons & Topology Detection)..." deploy_nri_balloons_playbook "$@" \
-                "CPU optimization deployed successfully." \
-                "Failed to deploy CPU optimization. Exiting!."
-        else
-            echo "Skipping CPU optimization deployment..."
-        fi
-=======
         invoke_prereq_workflows "$@"                
->>>>>>> dell-deploy-1.4-nv
         execute_and_check "Deploying Inference LLM Models..." deploy_inference_llm_models_playbook "$@" \
             "Inference LLM Model is deployed successfully." \
             "Failed to deploy Inference LLM Model Exiting!." 
@@ -175,8 +134,4 @@ add_model() {
         echo "Please refer to this comprehensive guide for detailed instructions."          
         echo ""
     fi
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> dell-deploy-1.4-nv

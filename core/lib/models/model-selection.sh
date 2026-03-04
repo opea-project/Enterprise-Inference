@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 model_selection(){
@@ -44,19 +40,12 @@ model_selection(){
                             echo "12. BAAI/bge-reranker-base"
                             echo "13. codellama/CodeLlama-34b-Instruct-hf"
                             echo "14. tiiuae/Falcon3-7B-Instruct"
-<<<<<<< HEAD
-=======
                             echo "15. meta-llama/Llama-3.2-3B-Instruct"
->>>>>>> dell-deploy-1.4-nv
                             read -p "Enter the numbers of the GPU models you want to deploy/remove (comma-separated, e.g., 1,3,5): " models
                             # Validate input
                             IFS=',' read -ra selected <<< "$models"
                             for m in "${selected[@]}"; do
-<<<<<<< HEAD
-                                if ! [[ "$m" =~ ^(1|2|3|4|5|6|7|8|9|10|11|12|13|14)$ ]]; then
-=======
                                 if ! [[ "$m" =~ ^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15)$ ]]; then
->>>>>>> dell-deploy-1.4-nv
                                     echo "Error: Invalid model selected ($m). Exiting." >&2
                                     exit 1
                                 fi
@@ -212,8 +201,6 @@ get_model_names() {
                 fi
                 model_names+=("falcon3-7b")
                 ;;
-<<<<<<< HEAD
-=======
             15)
                 if [ "$cpu_or_gpu" = "c" ]; then
                     echo "Error: GPU model identifier provided for CPU deployment/removal." >&2
@@ -221,7 +208,6 @@ get_model_names() {
                 fi
                 model_names+=("llama-3-2-3b")
                 ;;
->>>>>>> dell-deploy-1.4-nv
             21)
                 if [ "$cpu_or_gpu" = "g" ]; then
                     echo "Error: CPU model identifier provided for GPU deployment/removal." >&2
@@ -264,11 +250,7 @@ get_model_names() {
                 fi
                 model_names+=("cpu-qwen3-4b")
                 ;;
-<<<<<<< HEAD
-            "llama-8b"|"llama-70b"|"codellama-34b"|"mixtral-8x-7b"|"mistral-7b"|"tei"|"tei-rerank"|"falcon3-7b"|"deepseek-r1-distill-qwen-32b"|"deepseek-r1-distill-llama8b"|"llama3-405b"|"llama-3-3-70b"|"llama-4-scout-17b"|"qwen-2-5-32b")
-=======
             "llama-8b"|"llama-70b"|"codellama-34b"|"mixtral-8x-7b"|"mistral-7b"|"tei"|"tei-rerank"|"falcon3-7b"|"deepseek-r1-distill-qwen-32b"|"deepseek-r1-distill-llama8b"|"llama3-405b"|"llama-3-3-70b"|"llama-4-scout-17b"|"qwen-2-5-32b"|"llama-3-2-3b")
->>>>>>> dell-deploy-1.4-nv
                 if [ "$cpu_or_gpu" = "c" ]; then
                     echo "Error: GPU model identifier provided for CPU deployment/removal." >&2
                     exit 1
