@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 run_reset_playbook() {
@@ -15,11 +11,7 @@ run_reset_playbook() {
     fi
         
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-keycloak-controller.yml --extra-vars "delete_pv_on_purge=${delete_pv_on_purge}"
-<<<<<<< HEAD
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root reset.yml -e "confirm_reset=yes reset_nodes=false"
-=======
     ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" reset.yml -e "confirm_reset=yes reset_nodes=false"
->>>>>>> dell-deploy-1.4-nv
     # Check the exit status of the Ansible playbook command
     if [ $? -eq 0 ]; then
         echo "Cluster reset playbook execution completed successfully."
