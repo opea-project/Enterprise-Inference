@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 # Langfuse Helm Chart Configuration
 
@@ -152,15 +148,9 @@ langfuse:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-<<<<<<< HEAD
-          - key: ei-infra-eligible
-            operator: In
-            values: ["true"]
-=======
           - key: role
             operator: In
             values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -519,15 +509,9 @@ postgresql:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-<<<<<<< HEAD
-          - key: ei-infra-eligible
-            operator: In
-            values: ["true"]
-=======
           - key: role
             operator: In
             values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -552,15 +536,9 @@ postgresql:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-<<<<<<< HEAD
-            - key: ei-infra-eligible
-              operator: In
-              values: ["true"]
-=======
             - key: role
               operator: In
               values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -618,15 +596,9 @@ redis:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-<<<<<<< HEAD
-          - key: ei-infra-eligible
-            operator: In
-            values: ["true"]
-=======
           - key: role
             operator: In
             values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -653,15 +625,9 @@ redis:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-<<<<<<< HEAD
-            - key: ei-infra-eligible
-              operator: In
-              values: ["true"]
-=======
             - key: role
               operator: In
               values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -694,15 +660,9 @@ clickhouse:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-<<<<<<< HEAD
-          - key: ei-infra-eligible
-            operator: In
-            values: ["true"]
-=======
           - key: role
             operator: In
             values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -730,15 +690,9 @@ clickhouse:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-<<<<<<< HEAD
-            - key: ei-infra-eligible
-              operator: In
-              values: ["true"]
-=======
             - key: role
               operator: In
               values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -933,15 +887,9 @@ s3:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-<<<<<<< HEAD
-          - key: ei-infra-eligible
-            operator: In
-            values: ["true"]
-=======
           - key: role
             operator: In
             values: ["infra"]
->>>>>>> dell-deploy-1.4-nv
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists

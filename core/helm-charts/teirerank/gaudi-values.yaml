@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
-=======
-# Copyright (C) 2024-2025 Intel Corporation
->>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 # Default values for teirerank.
@@ -29,11 +25,6 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-<<<<<<< HEAD
-        - key: ei-inference-eligible
-          operator: In
-          values: ["true"]
-=======
         - key: role
           operator: In
           values: ["inference"]
@@ -41,7 +32,6 @@ affinity:
         - key: role
           operator: In
           values: ["inference-gaudi"]
->>>>>>> dell-deploy-1.4-nv
 
 livenessProbe:
   timeoutSeconds: 1
