@@ -143,9 +143,17 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: ei-inference-eligible
+        - key: role
           operator: In
-          values: ["true"]
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-xeon"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-cpu"]
 
 global:
   http_proxy: ""

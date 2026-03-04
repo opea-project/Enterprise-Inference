@@ -63,7 +63,9 @@ read_config_file() {
         case "$cpu_or_gpu" in
             "c" | "cpu")
             cpu_or_gpu="c"
+            gpu_vendor=""
             deploy_habana_ai_operator="no"
+            deploy_nvidia_operator="no"
             ;;
             "g" | "gpu" | "gaudi2" | "gaudi3")
             if [[ "$cpu_or_gpu" == "gaudi2" || "$cpu_or_gpu" == "gpu" || "$cpu_or_gpu" == "g" ]]; then
@@ -73,10 +75,18 @@ read_config_file() {
                 gaudi_platform="gaudi3"
             fi
             cpu_or_gpu="g"
+            gpu_vendor="gaudi"
             deploy_habana_ai_operator="yes"            
+            deploy_nvidia_operator="no"
+            ;;
+            "nv-gpu" | "nvidia")
+            cpu_or_gpu="g"
+            gpu_vendor="nvidia"
+            deploy_habana_ai_operator="no"
+            deploy_nvidia_operator="yes"
             ;;
             *)
-            echo "Invalid value for cpu_or_gpu. It should be 'c' or 'cpu' for CPU, or 'g', 'gpu', 'gaudi2', or 'gaudi3' for GPU."
+            echo "Invalid value for cpu_or_gpu. It should be 'c' or 'cpu' for CPU, or 'g', 'gpu', 'gaudi2', 'gaudi3', or 'nv-gpu' for GPU."
             exit 1
             ;;
         esac

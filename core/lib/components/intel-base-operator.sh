@@ -11,7 +11,7 @@ run_deploy_habana_ai_operator_playbook() {
     else
         gaudi_operator=""
     fi    
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root playbooks/deploy-habana-ai-operator.yml --extra-vars "gaudi_operator=${gaudi_operator}"
+    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" playbooks/deploy-habana-ai-operator.yml --extra-vars "gaudi_operator=${gaudi_operator}"
     if [ $? -eq 0 ]; then
         echo "The deploy-habana-ai-operator.yml playbook ran successfully."
     else

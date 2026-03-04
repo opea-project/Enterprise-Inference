@@ -118,6 +118,7 @@ source "$SCRIPT_DIR/lib/cluster/drv-fw-update.sh"
 # Components deployment
 source "$SCRIPT_DIR/lib/components/kubernetes-setup.sh"
 source "$SCRIPT_DIR/lib/components/intel-base-operator.sh"
+source "$SCRIPT_DIR/lib/components/nvidia-operator.sh"
 source "$SCRIPT_DIR/lib/components/ingress-controller.sh"
 source "$SCRIPT_DIR/lib/components/keycloak-controller.sh"
 source "$SCRIPT_DIR/lib/components/genai-gateway-controller.sh"

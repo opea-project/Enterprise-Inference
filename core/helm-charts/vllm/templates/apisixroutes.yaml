@@ -33,7 +33,7 @@ spec:
       secretRef: {{ include "vllm.fullname" . }}-secret
       config:
         discovery: {{ .Values.oidc.discovery }}
-        {{- if or (eq .Values.platform "openshift") (eq .Values.platform "eks") }}
+        {{- if eq .Values.platform "openshift" }}
         use_jwks: {{ .Values.oidc.use_jwks }}
         {{- else }}
         introspection_endpoint: {{ .Values.oidc.introspection_endpoint }}

@@ -1,0 +1,145 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-llama-3b
+  labels:
+    app: vllm-llama-3b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-llama-3b
+  template:
+    metadata:
+      labels:
+        app: vllm-llama-3b
+    spec:
+      nodeSelector:
+        role: inference
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: HF_TOKEN
+            - name: VLLM_NO_USAGE_STATS
+              value: "1"
+            - name: DO_NOT_TRACK
+              value: "1"
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          args:
+            - --model
+            - meta-llama/Llama-3.2-3B-Instruct
+            - --dtype
+            - float16
+            - --max-model-len
+            - "2048"
+            - --gpu-memory-utilization
+            - "0.8"
+            - --trust-remote-code
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-llama-3b
+  labels:
+    app: vllm-llama-3b
+spec:
+  type: ClusterIP
+  selector:
+    app: vllm-llama-3b
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: vllm-llama-3b
+  namespace: default
+spec:
+  http:
+    - name: vllm-llama-3b-route
+      match:
+        paths:
+          - /vllm-llama-3b/*
+      backends:
+        - serviceName: vllm-llama-3b
+          servicePort: 8000
+      plugins:
+        - name: openid-connect
+          enable: true
+          secretRef: vllm-llama-3b-oidc
+          config:
+            discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
+            introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
+            introspection_endpoint_auth_method: client_secret_basic
+            scope: openid profile email
+            bearer_only: true
+            realm: master
+        - name: proxy-rewrite
+          enable: true
+          config:
+            regex_uri:
+              - ^/vllm-llama-3b/(.*)
+              - /$1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vllm-llama-3b-oidc
+  namespace: default
+type: Opaque
+stringData:
+  client_id: "<SET_KEYCLOAK_CLIENT_ID>"
+  client_secret: "<SET_KEYCLOAK_CLIENT_SECRET>"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vllm-llama-3b
+  namespace: auth-apisix
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /vllm-llama-3b/$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /vllm-llama-3b/(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: auth-apisix-gateway
+                port:
+                  number: 80

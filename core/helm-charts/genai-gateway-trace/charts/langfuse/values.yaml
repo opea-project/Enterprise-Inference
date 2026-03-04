@@ -148,9 +148,9 @@ langfuse:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: ei-infra-eligible
+          - key: role
             operator: In
-            values: ["true"]
+            values: ["infra"]
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -509,9 +509,9 @@ postgresql:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: ei-infra-eligible
+          - key: role
             operator: In
-            values: ["true"]
+            values: ["infra"]
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -536,9 +536,9 @@ postgresql:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -596,9 +596,9 @@ redis:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: ei-infra-eligible
+          - key: role
             operator: In
-            values: ["true"]
+            values: ["infra"]
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -625,9 +625,9 @@ redis:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -660,9 +660,9 @@ clickhouse:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: ei-infra-eligible
+          - key: role
             operator: In
-            values: ["true"]
+            values: ["infra"]
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
@@ -690,9 +690,9 @@ clickhouse:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -887,9 +887,9 @@ s3:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: ei-infra-eligible
+          - key: role
             operator: In
-            values: ["true"]
+            values: ["infra"]
         - matchExpressions:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists

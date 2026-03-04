@@ -38,7 +38,7 @@
       set_fact:
         os_supported: >-
           {{
-            (ansible_distribution == "Ubuntu" and (ansible_distribution_version == "22.04" or ansible_distribution_version == "24.04")) or
+            (ansible_distribution == "Ubuntu" and ansible_distribution_version == "22.04") or
             (ansible_distribution == "RedHat" and ansible_distribution_major_version == "9")
           }}
     
@@ -52,7 +52,6 @@
           
           Officially supported operating systems:
           - Ubuntu 22.04
-          - Ubuntu 24.04
           - RHEL 9
           
           Current system: {{ ansible_distribution }} {{ ansible_distribution_version }}
@@ -74,7 +73,6 @@
           
           Officially supported platforms:
           - Ubuntu 22.04
-          - Ubuntu 24.04
           - RHEL 9
           
           Do you want to proceed anyway at your own risk? (yes/no)

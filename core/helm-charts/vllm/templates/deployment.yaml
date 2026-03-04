@@ -23,6 +23,9 @@ spec:
         balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
         {{- end }}
         {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "vllm.selectorLabels" . | nindent 8 }}
         {{- if not .Values.accelDevice }}
@@ -55,11 +58,12 @@ spec:
           {{- if .Values.image.pullPolicy }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- end }}
-          # command:
-          #   - /bin/bash
-          #   - -c
-          #   - |
-          #     python3 -m vllm.entrypoints.openai.api_server --dtype {{ .Values.d_type }}  --model {{ .Values.LLM_MODEL_ID }} --port {{ .Values.port }} --tensor-parallel-size {{ .Values.tensor_parallel_size }} --block-size {{ .Values.block_size }} --max-model-len {{ .Values.max_model_len }} --disable-log-requests
+          {{- if eq .Values.accelDevice "nvidia" }}
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          {{- end }}
           args:
             {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
             {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
@@ -117,9 +121,14 @@ spec:
               memory: {{ .Values.memory | quote }}
               {{- end }}
             {{- end }}
-            {{- else }}
+            {{- else if eq .Values.accelDevice "gaudi" }}
             limits:
               habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            {{- else if eq .Values.accelDevice "nvidia" }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpuCount | default 1 | quote }}
+            {{- else }}
+            {{- toYaml .Values.resources | nindent 12 }}
             {{- end }}
           {{- end }}
             
