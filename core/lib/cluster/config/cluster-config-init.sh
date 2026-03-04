@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 deploy_cluster_config_playbook() {       
@@ -8,5 +12,10 @@ deploy_cluster_config_playbook() {
         tags=""        
     fi
     
+<<<<<<< HEAD
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cluster-config.yml --become --become-user=root --extra-vars "brownfield_deployment=${brownfield_deployment} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file}" --tags "$tags" 
 }
+=======
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cluster-config.yml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" --extra-vars "brownfield_deployment=${brownfield_deployment} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file}" --tags "$tags" 
+}
+>>>>>>> dell-deploy-1.4-nv

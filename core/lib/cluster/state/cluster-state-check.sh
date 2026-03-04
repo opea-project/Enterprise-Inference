@@ -1,9 +1,17 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 check_cluster_state() {
     echo "Checking the state of the Kubernetes cluster..."
+<<<<<<< HEAD
     ansible-playbook -i inventory/mycluster/hosts.yaml --become --become-user=root upgrade-cluster.yml --check
+=======
+    ansible-playbook -i inventory/mycluster/hosts.yaml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" upgrade-cluster.yml --check
+>>>>>>> dell-deploy-1.4-nv
     # Check the exit status of the Ansible playbook command
     if [ $? -eq 0 ]; then
         echo "Kubernetes cluster state check completed successfully."
@@ -15,6 +23,10 @@ check_cluster_state() {
 
 run_k8s_cluster_wait() {
     echo "Waiting for Kubernetes control plane to become ready..."
+<<<<<<< HEAD
     ansible -i "${INVENTORY_PATH}" kube_control_plane -m wait_for -a "port=6443 timeout=600" --become --become-user=root   
+=======
+    ansible -i "${INVENTORY_PATH}" kube_control_plane -m wait_for -a "port=6443 timeout=600" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}"
+>>>>>>> dell-deploy-1.4-nv
     return $?
 }

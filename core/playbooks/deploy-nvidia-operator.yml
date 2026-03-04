@@ -1,0 +1,63 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy NVIDIA GPU Operator
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+  roles:
+    - role: inference-tools
+  tasks:
+    - name: Create Kubernetes Namespace for NVIDIA GPU Operator
+      community.kubernetes.k8s:
+        state: present
+        kind: Namespace
+        name: gpu-operator
+
+    - name: Add NVIDIA GPU Operator Helm repository
+      community.kubernetes.helm_repository:
+        name: nvidia
+        repo_url: https://nvidia.github.io/gpu-operator
+        state: present
+
+    - name: Update NVIDIA Helm repository
+      ansible.builtin.command:
+        cmd: helm repo update nvidia
+      run_once: true
+
+    - name: Deploy NVIDIA GPU Operator
+      community.kubernetes.helm:
+        name: gpu-operator
+        chart_ref: nvidia/gpu-operator
+        release_namespace: gpu-operator
+        state: present
+      run_once: true
+
+    - name: Output waiting status
+      debug:
+        msg: "Waiting for NVIDIA GPU Operator pods to be running."
+      run_once: true
+
+    - name: Ensure NVIDIA GPU Operator Pods Are Running and Ready
+      shell: |
+        kubectl get pods -n gpu-operator -o json | jq -r '
+          .items[] |
+          select(
+            (.status.phase == "Running" and ((.status.containerStatuses // []) | any(.ready != true))) or
+            (.status.phase != "Running" and .status.phase != "Succeeded")
+          ) |
+          .metadata.name' | wc -l
+      register: pod_status
+      until: pod_status.stdout == "0" and pod_status.rc == 0
+      retries: 260
+      delay: 10
+      failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
+
+    - name: Display User Message
+      debug:
+        msg: "All NVIDIA GPU Operator pods are running and ready."
+      run_once: true

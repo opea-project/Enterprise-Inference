@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 # Default values for tei.
@@ -20,6 +24,7 @@ resources:
   limits:
     habana.ai/gaudi: 1
 
+<<<<<<< HEAD
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -29,6 +34,8 @@ affinity:
           operator: In
           values: ["true"]
 
+=======
+>>>>>>> dell-deploy-1.4-nv
 livenessProbe:
   timeoutSeconds: 1
 readinessProbe:

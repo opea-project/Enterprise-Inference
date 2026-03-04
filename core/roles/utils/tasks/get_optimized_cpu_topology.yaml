@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 ---
@@ -28,9 +32,23 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
+<<<<<<< HEAD
                     - key: ei-inference-eligible
                       operator: In
                       values: ["true"]
+=======
+                    - key: role
+                      operator: In
+                      values: ["inference"]
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["inference-xeon"]
+                  - matchExpressions:
+                    - key: role
+                      operator: In
+                      values: ["inference-cpu"]
+>>>>>>> dell-deploy-1.4-nv
             tolerations:
               - operator: Exists # Allow scheduling on any node including master
             securityContext:
@@ -217,6 +235,7 @@
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Refresh node-topology-optimizer pod name (avoid stale pod references)
   ansible.builtin.command: >
     kubectl -n kube-system get pods -l app=node-topology-optimizer
@@ -228,6 +247,8 @@
   ansible.builtin.set_fact:
     optimizer_pod_name: "{{ optimizer_pod_name_refresh.stdout | trim }}"
 
+=======
+>>>>>>> dell-deploy-1.4-nv
 - name: Get detailed CPU information
   kubernetes.core.k8s_exec:
     pod: "{{ optimizer_pod_name }}"
@@ -280,7 +301,11 @@
       for s in $(seq 0 $((total_sockets - 1))); do
         socket_totals[$s]=0;
       done;
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> dell-deploy-1.4-nv
       for i in $(seq 0 $((total_numa - 1))); do
         numa_cpus=$(lscpu | grep "NUMA node$i CPU(s):" | cut -d: -f2 | xargs);
         if [[ "$numa_cpus" != "" ]]; then
@@ -315,6 +340,7 @@
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Read CPU reservation script content
   ansible.builtin.set_fact:
     cpu_script_content: "{{ lookup('file', role_path + '/files/compute_reserved_cpus.sh') }}"
@@ -352,6 +378,8 @@
   ansible.builtin.debug:
     msg: "nri_reserved_cpu_list={{ nri_reserved_cpu_list }}"
 
+=======
+>>>>>>> dell-deploy-1.4-nv
 - name: Parse accurate CPU topology results
   ansible.builtin.set_fact:
     numa_cpu_counts: >-
@@ -566,6 +594,7 @@
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Calculate workload CPUs
   ansible.builtin.set_fact:
     workload_cpus: >-
@@ -582,6 +611,8 @@
   tags:
     - install
 
+=======
+>>>>>>> dell-deploy-1.4-nv
 - name: Check for AMX support
   kubernetes.core.k8s_exec:
     pod: "{{ optimizer_pod_name }}"
@@ -629,8 +660,13 @@
       {% endfor %}
 
       === CPU Features ===
+<<<<<<< HEAD
       AMX: {{ 'SUPPORTED' if (amx_check is defined and amx_check.rc is defined and amx_check.rc == 0) else 'NOT AVAILABLE' }}
       AVX-512: {{ 'SUPPORTED' if (avx512_check is defined and avx512_check.rc is defined and avx512_check.rc == 0) else 'NOT AVAILABLE' }}
+=======
+      AMX: {{ 'SUPPORTED' if amx_check.rc == 0 else 'NOT AVAILABLE' }}
+      AVX-512: {{ 'SUPPORTED' if avx512_check.rc == 0 else 'NOT AVAILABLE' }}
+>>>>>>> dell-deploy-1.4-nv
 
       === Parallelism Strategy ===
       Strategy: {{ optimal_balloon_config.strategy }}

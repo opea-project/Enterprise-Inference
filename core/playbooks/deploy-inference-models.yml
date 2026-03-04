@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy/Remove Inference LLM Models
@@ -36,6 +40,11 @@
     - name: Set default model parallelism configuration for CPU deployments
       ansible.builtin.set_fact:
         model_parallelism_config:
+<<<<<<< HEAD
+=======
+          tensor_parallel_size: "{{ model_parallelism_config.tensor_parallel_size | default(1) }}"
+          pipeline_parallel_size: "{{ model_parallelism_config.pipeline_parallel_size | default(1) }}"
+>>>>>>> dell-deploy-1.4-nv
           strategy: "{{ model_parallelism_config.strategy | default('tensor_parallel') }}"
       when:
         - cpu_playbook == 'true'
@@ -274,6 +283,7 @@
               is_single_node: "{{ cpu_topology_config.total_sockets == 1 and cpu_topology_config.numa_nodes_per_socket == 1 }}"
               reserved_cpus_percentage: "{{ reserved_cpus_percentage | default(18) | int }}"
               reserved_cpus: >-
+<<<<<<< HEAD
                 {%- set reserved_cpu_count = nri_reserved_cpu_list.split(',') | length -%}
                 {{ reserved_cpu_count }}
               balloon_cpus: >-
@@ -282,22 +292,81 @@
                 {%- if reserved_cpu_count >= total_cpus -%}{%- set reserved_cpu_count = total_cpus -%}{%- endif -%}
                 {{ total_cpus - reserved_cpu_count }}
               workload_cpus: "{{ cpu_topology_config.workload_cpus | int }}"
+=======
+                {%- set total_cpus = cpu_topology_config.cpus_per_socket | int -%}
+                {%- set percentage = reserved_cpus_percentage | default(18) | int -%}
+                {%- set calculated_reserved = ((total_cpus * percentage) / 100) | round(0, 'ceil') | int -%}
+                {%- set min_reserved = 2 -%}
+                {%- set max_reserved = total_cpus // 2 -%}
+                {%- if calculated_reserved < min_reserved -%}
+                {{ min_reserved }}
+                {%- elif calculated_reserved > max_reserved -%}
+                {{ max_reserved }}
+                {%- else -%}
+                {{ calculated_reserved }}
+                {%- endif -%}
+              balloon_cpus: >-
+                {%- set total_cpus = cpu_topology_config.cpus_per_socket | int -%}
+                {%- set percentage = reserved_cpus_percentage | default(18) | int -%}
+                {%- set calculated_reserved = ((total_cpus * percentage) / 100) | round(0, 'ceil') | int -%}
+                {%- set min_reserved = 2 -%}
+                {%- set max_reserved = total_cpus // 2 -%}
+                {%- if calculated_reserved < min_reserved -%}
+                {%- set final_reserved = min_reserved -%}
+                {%- elif calculated_reserved > max_reserved -%}
+                {%- set final_reserved = max_reserved -%}
+                {%- else -%}
+                {%- set final_reserved = calculated_reserved -%}
+                {%- endif -%}
+                {%- if cpu_topology_config.total_sockets == 1 and cpu_topology_config.numa_nodes_per_socket == 1 -%}
+                {{ ((total_cpus - final_reserved) / 2) | int }}
+                {%- else -%}
+                {{ total_cpus - final_reserved }}
+                {%- endif -%}
+              workload_cpus: >-
+                {%- set total_cpus = cpu_topology_config.cpus_per_socket | int -%}
+                {%- set percentage = reserved_cpus_percentage | default(18) | int -%}
+                {%- set calculated_reserved = ((total_cpus * percentage) / 100) | round(0, 'ceil') | int -%}
+                {%- set min_reserved = 2 -%}
+                {%- set max_reserved = total_cpus // 2 -%}
+                {%- if calculated_reserved < min_reserved -%}
+                {%- set final_reserved = min_reserved -%}
+                {%- elif calculated_reserved > max_reserved -%}
+                {%- set final_reserved = max_reserved -%}
+                {%- else -%}
+                {%- set final_reserved = calculated_reserved -%}
+                {%- endif -%}
+                {{ total_cpus - final_reserved }}
+>>>>>>> dell-deploy-1.4-nv
 
         - name: Calculate parallelism configuration
           ansible.builtin.set_fact:
             parallelism_config:
               tensor_parallel_size: >-
+<<<<<<< HEAD
                 {%- set total_numa = (cpu_topology_config.total_sockets | int) * (cpu_topology_config.numa_nodes_per_socket | int) -%}
                 {%- if total_numa in [1, 2, 4] -%}
                 {{ total_numa }}
                 {%- elif total_numa in [3] -%}
                 2
                 {%- elif total_numa in [6] -%}
+=======
+                {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
+                {%- if numa_per_socket in [2, 4] -%}
+                {{ numa_per_socket }}
+                {%- elif numa_per_socket in [3] -%}
+                2
+                {%- elif numa_per_socket in [6] -%}
+>>>>>>> dell-deploy-1.4-nv
                 4
                 {%- else -%}
                 1
                 {%- endif -%}
               strategy: >-
+<<<<<<< HEAD
+=======
+                {%- set numa_per_socket = cpu_topology_config.numa_nodes_per_socket | int -%}
+>>>>>>> dell-deploy-1.4-nv
                 tensor_parallel
 
         - name: Combine topology and parallelism configs
@@ -315,6 +384,10 @@
               - "NUMA Nodes per Socket: {{ optimal_balloon_config.numa_nodes_per_socket }}"
               - "CPUs per Socket: {{ optimal_balloon_config.cpus_per_socket }}"
               - "Is Single Node: {{ optimal_balloon_config.is_single_node }}"
+<<<<<<< HEAD
+=======
+              - "Reserved CPUs Percentage: {{ optimal_balloon_config.reserved_cpus_percentage }}%"
+>>>>>>> dell-deploy-1.4-nv
               - "Reserved CPUs Count: {{ optimal_balloon_config.reserved_cpus }} ({{ ((optimal_balloon_config.reserved_cpus | int / optimal_balloon_config.cpus_per_socket | int) * 100) | round(1) }}% actual)"
               - "Workload CPUs (for xeon-values.yaml): {{ optimal_balloon_config.workload_cpus }}"
               - "Balloon CPUs: {{ optimal_balloon_config.balloon_cpus }}"
@@ -363,6 +436,7 @@
           when: usable_mem_var is string and socket0_memory_gb | int == 0
           ignore_errors: true
 
+<<<<<<< HEAD
         - name: Calculate minimum memory based on tensor parallel size
           ansible.builtin.set_fact:
             min_memory_for_tp: >-
@@ -388,11 +462,17 @@
               {%- else -%}
               {{ available }}
               {%- endif -%}
+=======
+        - name: Set optimal memory with minimum 8GB and maximum 256GB
+          ansible.builtin.set_fact:
+            optimal_memory_gb: "{% if socket0_memory_gb | int < 8 %}8{% elif socket0_memory_gb | int > 256 %}256{% else %}{{ socket0_memory_gb | int }}{% endif %}"
+>>>>>>> dell-deploy-1.4-nv
 
         - name: Final memory calculation
           ansible.builtin.debug:
             msg: |
               === Memory Calculation Summary ===
+<<<<<<< HEAD
               Tensor Parallel Size: {{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               Minimum memory required for TP: {{ min_memory_for_tp }} GB
               Socket 0 memory available: {{ socket0_memory_gb }} GB
@@ -407,6 +487,11 @@
             - cpu_playbook == 'true'
           tags: always
           run_once: true
+=======
+              Socket 0 memory available: {{ socket0_memory_gb }} GB
+              Final memory for deployment: {{ optimal_memory_gb }} GB
+              Min threshold: 8 GB, Max threshold: 256 GB
+>>>>>>> dell-deploy-1.4-nv
 
         - name: Display CPU optimization helm charts update completion
           debug:
@@ -641,7 +726,18 @@
               --set apisix.enabled={{ apisix_enabled }}
               --set platform={{ kubernetes_platform }}
             {% endif %}
+<<<<<<< HEAD
             {% if gaudi_deployment %}
+=======
+            {% if nvidia_deployment|lower == "true" %}
+              --set accelDevice=nvidia
+              --set gpuCount={{ tensor_parallel_size_vllm }}
+              --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
+              {% if nvidia_values_file is defined and nvidia_values_file|length > 0 %}
+              --values {{ nvidia_values_file }}
+              {% endif %}
+            {% elif gaudi_deployment and gaudi_values_file is defined and gaudi_values_file|length > 0 %}
+>>>>>>> dell-deploy-1.4-nv
               --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
               --values {{ gaudi_values_file }}
             {% endif %}
@@ -731,11 +827,23 @@
             {% if cpu_playbook == 'true' %}
               --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
               --set cpu_balloon_annotation="vllm-balloon"
+<<<<<<< HEAD
               --set podLabels.name="vllm"
               --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
               --set memory="{{ optimal_memory_gb | default(8) }}Gi"
               --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
+=======
+              --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
+              --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
+            {% elif nvidia_deployment|lower == "true" %}
+              --set accelDevice=nvidia
+              --set gpuCount={{ huggingface_tensor_parellel_size }}
+              --set tensor_parallel_size={{ huggingface_tensor_parellel_size }}
+              {% if nvidia_values_file is defined and nvidia_values_file|length > 0 %}
+              --values {{ nvidia_values_file }}
+              {% endif %}
+>>>>>>> dell-deploy-1.4-nv
             {% elif gaudi_deployment|lower == "true" %}
               --set tensor_parallel_size={{ huggingface_tensor_parellel_size }}
               --values {{ gaudi_values_file }}
@@ -1165,6 +1273,103 @@
         - uninstall_true == 'true'
         - helm_release_installed.stdout != ""
 
+<<<<<<< HEAD
+=======
+    - name: Deploy Llama-3.2-3B LLM Model
+      block:
+        - name: Delete Ingress resource Llama-3.2-3B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-llama-3-2-3b-ingress
+            state: absent
+          tags: install-llama-3-2-3b
+        - name: Delete Ingress resource Llama-3.2-3B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-llama-3-2-3b-ingress
+            state: absent
+          tags: install-llama-3-2-3b
+        - name: Deploy LLM model Llama-3.2-3B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-llama-3-2-3b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.2-3B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if nvidia_deployment|lower == "true" %}
+              --set accelDevice=nvidia
+              --set gpuCount={{ tensor_parallel_size_vllm }}
+              --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
+              {% if nvidia_values_file is defined and nvidia_values_file|length > 0 %}
+              --values {{ nvidia_values_file }}
+              {% endif %}
+            {% elif gaudi_deployment and gaudi_values_file is defined and gaudi_values_file|length > 0 %}
+              --set tensor_parallel_size={{ tensor_parallel_size_vllm }}
+              --values {{ gaudi_values_file }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+            {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment
+          failed_when: helm_upgrade_install_model_deployment.rc != 0
+          tags: install-llama-3-2-3b
+        - name: Register LLM model Llama-3.2-3B
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "meta-llama/Llama-3.2-3B-Instruct"
+            reg_litellm_model: "openai/meta-llama/Llama-3.2-3B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-llama-3-2-3b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-llama-3-2-3b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-llama-3-2-3b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - "'llama-3-2-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - install_true == 'true'
+
+    - name: Check if vllm-llama-3-2-3b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-llama-3-2-3b --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-llama-3-2-3b
+    - name: Uninstall vllm-llama-3-2-3b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-llama-3-2-3b"
+      run_once: true
+      tags: uninstall-llama-3-2-3b
+      when:
+        - "'llama-3-2-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+>>>>>>> dell-deploy-1.4-nv
     - name: Deploy Mixtral7b LLM Model
       block:
         - name: Delete Ingress resource Mixtral7b from default namespace
@@ -1964,7 +2169,10 @@
             namespace: default
             name: vllm-llama-8b-cpu-ingress
             state: absent
+<<<<<<< HEAD
           ignore_errors: yes
+=======
+>>>>>>> dell-deploy-1.4-nv
         - name: Delete Ingress resource Llama8b from auth-apisix namespace
           tags: install-cpu-llama-8b
           ignore_errors: yes
@@ -1973,7 +2181,10 @@
             namespace: auth-apisix
             name: vllm-llama-8b-cpu-ingress
             state: absent
+<<<<<<< HEAD
           ignore_errors: yes
+=======
+>>>>>>> dell-deploy-1.4-nv
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -1987,8 +2198,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2090,8 +2306,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ model_paralletensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2192,8 +2413,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2297,8 +2523,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2407,8 +2638,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2512,8 +2748,13 @@
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+<<<<<<< HEAD
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+=======
+            --set tensor_parallel_size={{ model_parallelism_config.tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ model_parallelism_config.pipeline_parallel_size | default(1) }}
+>>>>>>> dell-deploy-1.4-nv
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2588,4 +2829,8 @@
       tags: always
       ansible.builtin.file:
         path: "{{ remote_helm_charts_base }}"
+<<<<<<< HEAD
         state: absent
+=======
+        state: absent
+>>>>>>> dell-deploy-1.4-nv

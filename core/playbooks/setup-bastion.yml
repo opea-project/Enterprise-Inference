@@ -464,6 +464,7 @@
       when: not kubeconfig_check.stat.exists
       tags: kubeconfig
 
+<<<<<<< HEAD
     #############################################################
     # BROWNFIELD DEPLOYMENT PRECHECKS
     #############################################################
@@ -1668,6 +1669,8 @@
       when: kubeconfig_check.stat.exists
       tags: precheck
 
+=======
+>>>>>>> dell-deploy-1.4-nv
     - name: Add Kubernetes tools to PATH in bashrc
       lineinfile:
         path: /home/{{ setup_user }}/.bashrc

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 # User-configurable parameters (can be set via --set during helm install)
@@ -20,9 +24,19 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
+<<<<<<< HEAD
         - key: ei-inference-eligible
           operator: In
           values: ["true"]
+=======
+        - key: role
+          operator: In
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-gaudi"]
+>>>>>>> dell-deploy-1.4-nv
 
 runtime: "habana"
 HABANA_VISIBLE_DEVICES: "all"

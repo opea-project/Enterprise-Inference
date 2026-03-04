@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 ---
@@ -20,6 +24,7 @@
 # ============================================================================
 # Default Configuration
 # ============================================================================
+<<<<<<< HEAD
 
 - name: Auto-compute nri_reserved_cpu_list if not provided
   ansible.builtin.include_role:
@@ -39,6 +44,8 @@
       - (nri_reserved_cpu_list | regex_search('^[0-9]+([,-][0-9]+)*$')) is not none
     fail_msg: "nri_reserved_cpu_list is missing or malformed. Expected cpuset syntax like '0,1,32,33'."
 
+=======
+>>>>>>> dell-deploy-1.4-nv
 - name: Set default NRI CPU balloons configuration if not defined
   ansible.builtin.set_fact:
     nri_cpu_balloons:
@@ -60,6 +67,10 @@
     generic_balloon:
       name: "vllm-balloon"
       match_expression: "name=vllm"
+<<<<<<< HEAD
+=======
+      preserve_existing: true
+>>>>>>> dell-deploy-1.4-nv
       policy_settings:
         preferIsolCpus: false
         preferNewBalloons: true
@@ -176,6 +187,7 @@
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Check if reserved balloon exists
   ansible.builtin.set_fact:
     reserved_balloon_exists: >-
@@ -184,15 +196,42 @@
         | selectattr('name', 'equalto', 'reserved')
         | list | length > 0
       }}
+=======
+- name: Calculate expected balloon configuration for comparison
+  ansible.builtin.set_fact:
+    expected_balloon_config:
+      name: "{{ generic_balloon.name }}"
+      namespaces:
+        - default
+      matchExpressions:
+        - key: "{{ generic_balloon.match_expression.split('=')[0] }}"
+          operator: In
+          values:
+            - "{{ generic_balloon.match_expression.split('=')[1] }}"
+      allocatorPriority: "high"
+      allocatorTopologyBalancing: true
+      # CPU resource allocation moved to Helm chart values.yaml resources section
+      preferSpreadOnPhysicalCores: false
+      preferIsolCpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
+      preferNewBalloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
+      hideHyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
+      pinCpus: true
+      pinMemory: false
+>>>>>>> dell-deploy-1.4-nv
   when: vllm_balloon_exists
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Check if existing config matches simplified balloon structure
+=======
+- name: Re-evaluate if existing balloon configuration needs update
+>>>>>>> dell-deploy-1.4-nv
   ansible.builtin.set_fact:
     balloon_needs_update: >-
       {{
         vllm_balloon_exists and (
+<<<<<<< HEAD
           not reserved_balloon_exists | default(false) or
           existing_balloon_config.get('allocatorPriority') != 'high' or
           existing_config.config.get('agent', {}).get('nodeResourceTopology') != true or
@@ -209,12 +248,29 @@
           existing_balloon_config.get('pinCpus') is defined or
           existing_balloon_config.get('pinMemory') is defined or
           existing_balloon_config.get('namespaces') is defined
+=======
+          existing_balloon_config.get('allocatorPriority') != expected_balloon_config.allocatorPriority or
+          existing_balloon_config.get('allocatorTopologyBalancing') != expected_balloon_config.allocatorTopologyBalancing or
+          existing_balloon_config.get('preferSpreadOnPhysicalCores') != expected_balloon_config.preferSpreadOnPhysicalCores or
+          existing_balloon_config.get('preferIsolCpus') != expected_balloon_config.preferIsolCpus or
+          existing_balloon_config.get('preferNewBalloons') != expected_balloon_config.preferNewBalloons or
+          existing_balloon_config.get('hideHyperthreads') != expected_balloon_config.hideHyperthreads or
+          existing_balloon_config.get('pinCpus') != expected_balloon_config.pinCpus or
+          existing_balloon_config.get('pinMemory') != expected_balloon_config.pinMemory or
+          existing_balloon_config.get('namespaces', []) != expected_balloon_config.namespaces or
+          existing_balloon_config.get('matchExpressions', []) != expected_balloon_config.matchExpressions or
+          existing_balloon_config.get('preferSpreadOnNuma') is defined or
+          existing_balloon_config.get('preserveCpus') is defined or
+          existing_balloon_config.get('allocatorPriority', '') == '0' or
+          existing_balloon_config.get('allocatorPriority', '') | type_debug == 'int'
+>>>>>>> dell-deploy-1.4-nv
         )
       }}
   when: vllm_balloon_exists
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Debug simplified balloon validation
   ansible.builtin.debug:
     msg:
@@ -247,6 +303,46 @@
       - "  namespaces: {{ 'YES (NEEDS UPDATE)' if existing_balloon_config.get('namespaces') is defined else 'NO (OK)' }}"
       - ""
       - "Update needed: {{ 'YES' if balloon_needs_update | default(false) else 'NO' }}"
+=======
+- name: Debug balloon comparison details
+  ansible.builtin.debug:
+    msg:
+      - "==================================================================="
+      - "Balloon Configuration Comparison Details"
+      - "==================================================================="
+      - "Existing balloon configuration:"
+      - "  allocatorPriority: {{ existing_balloon_config.get('allocatorPriority', 'NOT_SET') }}"
+      - "  allocatorTopologyBalancing: {{ existing_balloon_config.get('allocatorTopologyBalancing', 'NOT_SET') }}"
+      - "  preferSpreadOnPhysicalCores: {{ existing_balloon_config.get('preferSpreadOnPhysicalCores', 'NOT_SET') }}"
+      - "  preferIsolCpus: {{ existing_balloon_config.get('preferIsolCpus', 'NOT_SET') }}"
+      - "  preferNewBalloons: {{ existing_balloon_config.get('preferNewBalloons', 'NOT_SET') }}"
+      - "  hideHyperthreads: {{ existing_balloon_config.get('hideHyperthreads', 'NOT_SET') }}"
+      - "  pinCpus: {{ existing_balloon_config.get('pinCpus', 'NOT_SET') }}"
+      - "  pinMemory: {{ existing_balloon_config.get('pinMemory', 'NOT_SET') }}"
+      - "  namespaces: {{ existing_balloon_config.get('namespaces', 'NOT_SET') }}"
+      - "  matchExpressions: {{ existing_balloon_config.get('matchExpressions', 'NOT_SET') }}"
+      - ""
+      - "Expected balloon configuration:"
+      - "  allocatorPriority: {{ expected_balloon_config.allocatorPriority }}"
+      - "  allocatorTopologyBalancing: {{ expected_balloon_config.allocatorTopologyBalancing }}"
+      - "  preferSpreadOnPhysicalCores: {{ expected_balloon_config.preferSpreadOnPhysicalCores }}"
+      - "  preferIsolCpus: {{ expected_balloon_config.preferIsolCpus }}"
+      - "  preferNewBalloons: {{ expected_balloon_config.preferNewBalloons }}"
+      - "  hideHyperthreads: {{ expected_balloon_config.hideHyperthreads }}"
+      - "  pinCpus: {{ expected_balloon_config.pinCpus }}"
+      - "  pinMemory: {{ expected_balloon_config.pinMemory }}"
+      - "  namespaces: {{ expected_balloon_config.namespaces }}"
+      - "  matchExpressions: {{ expected_balloon_config.matchExpressions }}"
+      - ""
+      - "Note: CPU resource allocation now handled in Helm chart resources section"
+      - "Deprecated fields present in existing config:"
+      - "  preferSpreadOnNuma: {{ 'YES' if existing_balloon_config.get('preferSpreadOnNuma') is defined else 'NO' }}"
+      - "  preserveCpus: {{ 'YES' if existing_balloon_config.get('preserveCpus') is defined else 'NO' }}"
+      - "Global configuration issues:"
+      - "  preserve section missing: {{ 'YES' if existing_config.config.get('preserve') is not defined else 'NO' }}"
+      - "  global pinMemory incorrect: {{ 'YES' if existing_config.config.get('pinMemory', true) != false else 'NO' }}"
+      - "Louie: Need to allocate cpu with sub-NUMA awareness : set node-granularity : 'numa' , allocated-full-node: true and set prefer-nodes: [0,1] "
+>>>>>>> dell-deploy-1.4-nv
       - "==================================================================="
   when: vllm_balloon_exists
   tags:
@@ -271,6 +367,10 @@
   vars:
     balloon_name: "{{ generic_balloon.name }}"
     match_expression: "{{ generic_balloon.match_expression }}"
+<<<<<<< HEAD
+=======
+    preserve_existing: "{{ generic_balloon.preserve_existing }}"
+>>>>>>> dell-deploy-1.4-nv
     prefer_isol_cpus: "{{ generic_balloon.policy_settings.preferIsolCpus }}"
     prefer_new_balloons: "{{ generic_balloon.policy_settings.preferNewBalloons }}"
     hide_hyperthreads: "{{ generic_balloon.policy_settings.hideHyperthreads }}"
@@ -325,6 +425,7 @@
   tags:
     - install
 
+<<<<<<< HEAD
 - name: Debug decision state before applying template configuration
   ansible.builtin.debug:
     msg:
@@ -342,6 +443,74 @@
 - name: Use complete template configuration directly
   ansible.builtin.set_fact:
     updated_config: "{{ new_balloon_config }}"
+=======
+- name: Initialize base configuration if none exists
+  ansible.builtin.set_fact:
+    base_config:
+      config:
+        reservedResources:
+          cpu: 1000m
+        allocatorTopologyBalancing: true
+        reservedPoolNamespaces:
+          - kube-system
+          - ingress-nginx
+          - keycloak
+          - monitoring
+        preserve:
+          matchExpressions:
+            - key: name
+              operator: NotIn
+              values:
+                - vllm
+        balloonTypes: []
+        instrumentation:
+          httpEndpoint: ":8891"
+          prometheusExport: "{{ enable_prometheus | default(false) }}"
+          reportPeriod: 60s
+        log:
+          source: true
+          debug:
+            - policy
+        # Global pin settings
+        pinMemory: false
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - existing_config == {}
+  tags:
+    - install
+
+- name: Use existing configuration as base
+  ansible.builtin.set_fact:
+    base_config: "{{ existing_config }}"
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - existing_config != {}
+  tags:
+    - install
+
+- name: Remove existing balloon if updating
+  ansible.builtin.set_fact:
+    balloons_without_old: >-
+      {{
+        base_config.config.balloonTypes | default([])
+        | rejectattr('name', 'equalto', generic_balloon.name)
+        | list
+      }}
+  when:
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+    - balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Add generic balloon type to configuration (new or updated)
+  ansible.builtin.set_fact:
+    updated_config: >-
+      {%- if balloon_needs_update | default(false) -%}
+      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': balloons_without_old + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
+      {%- else -%}
+      {{ base_config | combine({'config': base_config.config | combine({'balloonTypes': base_config.config.balloonTypes + [new_balloon_config.config.balloonTypes[0]]})}, recursive=True) }}
+      {%- endif -%}
+>>>>>>> dell-deploy-1.4-nv
   when: not vllm_balloon_exists or balloon_needs_update | default(false)
   tags:
     - install

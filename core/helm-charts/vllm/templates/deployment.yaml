@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 {{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) }}
 apiVersion: apps/v1
@@ -23,6 +27,12 @@ spec:
         balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
         {{- end }}
         {{- end }}
+<<<<<<< HEAD
+=======
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+>>>>>>> dell-deploy-1.4-nv
       labels:
         {{- include "vllm.selectorLabels" . | nindent 8 }}
         {{- if not .Values.accelDevice }}
@@ -55,11 +65,20 @@ spec:
           {{- if .Values.image.pullPolicy }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- end }}
+<<<<<<< HEAD
           # command:
           #   - /bin/bash
           #   - -c
           #   - |
           #     python3 -m vllm.entrypoints.openai.api_server --dtype {{ .Values.d_type }}  --model {{ .Values.LLM_MODEL_ID }} --port {{ .Values.port }} --tensor-parallel-size {{ .Values.tensor_parallel_size }} --block-size {{ .Values.block_size }} --max-model-len {{ .Values.max_model_len }} --disable-log-requests
+=======
+          {{- if eq .Values.accelDevice "nvidia" }}
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          {{- end }}
+>>>>>>> dell-deploy-1.4-nv
           args:
             {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
             {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
@@ -117,9 +136,20 @@ spec:
               memory: {{ .Values.memory | quote }}
               {{- end }}
             {{- end }}
+<<<<<<< HEAD
             {{- else }}
             limits:
               habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+=======
+            {{- else if eq .Values.accelDevice "gaudi" }}
+            limits:
+              habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            {{- else if eq .Values.accelDevice "nvidia" }}
+            limits:
+              nvidia.com/gpu: {{ .Values.gpuCount | default 1 | quote }}
+            {{- else }}
+            {{- toYaml .Values.resources | nindent 12 }}
+>>>>>>> dell-deploy-1.4-nv
             {{- end }}
           {{- end }}
             
@@ -165,4 +195,8 @@ spec:
       {{- if not .Values.accelDevice }}
       # extra time to finish processing buffered requests on CPU before pod is forcibly terminated
       terminationGracePeriodSeconds: 120
+<<<<<<< HEAD
       {{- end }}
+=======
+      {{- end }}
+>>>>>>> dell-deploy-1.4-nv

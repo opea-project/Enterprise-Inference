@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 parse_arguments() {
@@ -30,10 +34,32 @@ prompt_for_input() {
         echo "Proceeding with the setup of Fresh Kubernetes cluster: $deploy_kubernetes_fresh"
     fi
     if [ -z "$deploy_habana_ai_operator" ]; then
+<<<<<<< HEAD
         read -p "Do you want to proceed with deploying Habana AI Operator? (yes/no): " deploy_habana_ai_operator
     else
         echo "Proceeding with the setup of Habana AI Operator: $deploy_habana_ai_operator"
     fi
+=======
+        if [ "$gpu_vendor" == "nvidia" ]; then
+            deploy_habana_ai_operator="no"
+            echo "Skipping Habana AI Operator for NVIDIA GPU deployment"
+        else
+            read -p "Do you want to proceed with deploying Habana AI Operator? (yes/no): " deploy_habana_ai_operator
+        fi
+    else
+        echo "Proceeding with the setup of Habana AI Operator: $deploy_habana_ai_operator"
+    fi
+    if [ -z "$deploy_nvidia_operator" ]; then
+        if [ "$gpu_vendor" == "nvidia" ]; then
+            deploy_nvidia_operator="yes"
+            echo "Proceeding with NVIDIA GPU Operator deployment: $deploy_nvidia_operator"
+        else
+            deploy_nvidia_operator="no"
+        fi
+    else
+        echo "Proceeding with the setup of NVIDIA GPU Operator: $deploy_nvidia_operator"
+    fi
+>>>>>>> dell-deploy-1.4-nv
     if [ -z "$deploy_ingress_controller" ]; then
         read -p "Do you want to proceed with deploying Ingress NGINX Controller? (yes/no): " deploy_ingress_controller
     else

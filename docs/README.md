@@ -12,7 +12,10 @@ Complete all [prerequisites](./prerequisites.md).
 
 | Deployment Type                         | Description                                                  |
 |-----------------------------------------|--------------------------------------------------------------|
+<<<<<<< HEAD
 | **Single Node (vLLM, non‑production)**  | For Quick Testing on Intel® Xeon® processors using vLLM Docker ([Guide](../core/scripts/vllm-quickstart/README.md))               |
+=======
+>>>>>>> dell-deploy-1.4-nv
 | **Single Node**                         | Quick start for testing or lightweight workloads ([Guide](./single-node-deployment.md)) |
 | **Single Master, Multiple Workers**     | For higher throughput workloads ([Guide](./inventory-design-guide.md#single-master-multiple-workload-node-deployment)) |
 | **Multi-Master, Multiple Workers**      | Recommended for HA enterprise clusters ([Guide](./inventory-design-guide.md#multi-master-multi-workload-node-deployment)) |

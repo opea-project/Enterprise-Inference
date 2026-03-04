@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 ---
 - name: Deploy Ingress NGINX using Helm
@@ -25,8 +29,18 @@
       ansible.builtin.shell: helm repo update
       when: helm_repo_list.stdout != ""
 
+<<<<<<< HEAD
     - name: Retrieving the Number of Infrastructure Nodes (ei-infra-eligible)
       ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true -o jsonpath='{.items[*].metadata.name}' | wc -w
+=======
+    - name: Retrieving the Number of Inference Infrastructure Nodes
+      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra -o jsonpath='{.items[*].metadata.name}' | wc -w
+      register: inference_node_count
+      changed_when: false
+
+    - name: Retrieving the Number of Infrastructure Nodes
+      ansible.builtin.shell: kubectl get nodes --selector=role=infra -o jsonpath='{.items[*].metadata.name}' | wc -w
+>>>>>>> dell-deploy-1.4-nv
       register: inference_node_count
       changed_when: false
 
@@ -80,9 +94,15 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
+<<<<<<< HEAD
                     - key: ei-infra-eligible
                       operator: In
                       values: ["true"]
+=======
+                    - key: role
+                      operator: In
+                      values: ["infra"]
+>>>>>>> dell-deploy-1.4-nv
                   - matchExpressions:
                     - key: node-role.kubernetes.io/control-plane
                       operator: Exists

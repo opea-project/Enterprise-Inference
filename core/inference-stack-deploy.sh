@@ -8,7 +8,11 @@ CYAN=$(tput setaf 6)
 NC=$(tput sgr0)
 
 
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 # Permission is granted for recipient to internally use and modify this software for purposes of benchmarking and testing on Intel architectures. 
@@ -118,6 +122,10 @@ source "$SCRIPT_DIR/lib/cluster/drv-fw-update.sh"
 # Components deployment
 source "$SCRIPT_DIR/lib/components/kubernetes-setup.sh"
 source "$SCRIPT_DIR/lib/components/intel-base-operator.sh"
+<<<<<<< HEAD
+=======
+source "$SCRIPT_DIR/lib/components/nvidia-operator.sh"
+>>>>>>> dell-deploy-1.4-nv
 source "$SCRIPT_DIR/lib/components/ingress-controller.sh"
 source "$SCRIPT_DIR/lib/components/keycloak-controller.sh"
 source "$SCRIPT_DIR/lib/components/genai-gateway-controller.sh"

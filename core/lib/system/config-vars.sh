@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 HOMEDIR="$(pwd)"
 KUBESPRAYDIR="$(dirname "$(realpath "$0")")/kubespray"
 VENVDIR="$(dirname "$(realpath "$0")")/kubespray225-venv"
 INVENTORY_PATH="${KUBESPRAYDIR}/inventory/mycluster/hosts.yaml"
+<<<<<<< HEAD
+=======
+BECOME_PASSWORD_FILE="$(dirname "$(realpath "$0")")/inventory/.become-passfile"
+>>>>>>> dell-deploy-1.4-nv
 # Set the default values for the parameters
 cluster_url=""
 cert_file=""
@@ -16,8 +24,15 @@ hugging_face_token=""
 models=""
 model_name_list=""
 cpu_or_gpu=""
+<<<<<<< HEAD
 deploy_kubernetes_fresh=""
 deploy_habana_ai_operator=""
+=======
+gpu_vendor=""
+deploy_kubernetes_fresh=""
+deploy_habana_ai_operator=""
+deploy_nvidia_operator=""
+>>>>>>> dell-deploy-1.4-nv
 deploy_ingress_controller=""
 deploy_genai_gateway=""
 deploy_llm_models=""
@@ -43,6 +58,10 @@ gaudi_platform=""
 gaudi_operator=""
 gaudi2_values_file_path=""
 gaudi3_values_file_path=""
+<<<<<<< HEAD
+=======
+nvidia_values_file_path=""
+>>>>>>> dell-deploy-1.4-nv
 python3_interpreter=""
 skip_check=""
 purge_inference_cluster=""

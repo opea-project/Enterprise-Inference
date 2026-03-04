@@ -1,5 +1,9 @@
 
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 add_inference_nodes_playbook() {    
@@ -16,7 +20,11 @@ add_inference_nodes_playbook() {
 
     invoke_prereq_workflows "$@"     
 
+<<<<<<< HEAD
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root 
+=======
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}"
+>>>>>>> dell-deploy-1.4-nv
     
 }
 
