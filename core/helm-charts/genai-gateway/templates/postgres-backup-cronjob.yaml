@@ -23,6 +23,20 @@ spec:
               value: "{{ .Values.backup.s3.secretAccessKey }}"
             - name: AWS_DEFAULT_REGION
               value: "{{ .Values.backup.s3.region }}"
+            {{- if .Values.proxy.http_proxy }}
+            - name: http_proxy
+              value: {{ .Values.proxy.http_proxy | quote }}
+            - name: https_proxy
+              value: {{ .Values.proxy.https_proxy | quote }}
+            - name: HTTP_PROXY
+              value: {{ .Values.proxy.http_proxy | quote }}
+            - name: HTTPS_PROXY
+              value: {{ .Values.proxy.https_proxy | quote }}
+            - name: no_proxy
+              value: {{ .Values.proxy.no_proxy | quote }}
+            - name: NO_PROXY
+              value: {{ .Values.proxy.no_proxy | quote }}
+            {{- end }}
             command:
               - "/bin/bash"
               - "-c"

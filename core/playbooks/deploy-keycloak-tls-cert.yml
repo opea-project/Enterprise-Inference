@@ -512,6 +512,17 @@
                 containers:
                 - name: keycloak-setup
                   image: ubuntu:22.04
+                  env: >-
+                    {{
+                      [
+                        {'name': 'http_proxy',  'value': env_proxy.http_proxy  | default('')},
+                        {'name': 'https_proxy', 'value': env_proxy.https_proxy | default('')},
+                        {'name': 'HTTP_PROXY',  'value': env_proxy.http_proxy  | default('')},
+                        {'name': 'HTTPS_PROXY', 'value': env_proxy.https_proxy | default('')},
+                        {'name': 'no_proxy',    'value': env_proxy.no_proxy    | default('')},
+                        {'name': 'NO_PROXY',    'value': env_proxy.no_proxy    | default('')}
+                      ] if (env_proxy is defined and env_proxy.http_proxy | default('') != '') else []
+                    }}
                   command: ["/bin/bash", "-c"]
                   args:
                     - |
