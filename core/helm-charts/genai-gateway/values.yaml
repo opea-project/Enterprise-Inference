@@ -157,6 +157,10 @@ redis:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
+proxy:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""
 backup:
   enabled: false
   postgresBackupSchedule: "0 2 * * *" # Every day at 2am
