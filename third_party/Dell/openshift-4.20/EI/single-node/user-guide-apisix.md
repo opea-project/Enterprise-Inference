@@ -173,7 +173,7 @@ chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu"
 ```
 
-When prompted, choose option **4) Brownfield Deployment** provide **Kubeconfig path**(e.g. ~/.kube/config **) and then select option **1) Initial deployment**
+When prompted, choose option **4) Brownfield Deployment** provide **Kubeconfig path**(e.g. ~/.kube/config ) then select option **1) Initial deployment**
 
 ### 3. Verify the Deployment
 
