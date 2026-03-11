@@ -122,6 +122,15 @@
         --set postgresql.auth.password={{ postgresql_password }}
         --set postgresql.auth.postgresPassword={{ postgresql_password }}
         --set redis.auth.password={{ redis_password }}
+        {% if env_proxy is defined and env_proxy.http_proxy | default('') != '' %}
+        --set proxy.http_proxy="{{ env_proxy.http_proxy }}"
+        {% if env_proxy.https_proxy | default('') != '' %}
+        --set proxy.https_proxy="{{ env_proxy.https_proxy }}"
+        {% endif %}
+        {% if env_proxy.no_proxy | default('') != '' %}
+        --set proxy.no_proxy="{{ env_proxy.no_proxy | replace(',', '\\,') }}"
+        {% endif %}
+        {% endif %}
         {% if kubernetes_platform == 'openshift' %}
         --set route.enabled=true
         --set route.host={{ secret_name }}
