@@ -1,0 +1,30 @@
+# Embedding Service Requirements
+# API Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# OpenAI API
+openai>=1.35.0
+httpx>=0.25.0  # Required for OpenAI client
+requests>=2.32.0  # Security updates
+
+# Numpy for array operations
+numpy==1.24.3
+
+# Logging
+python-json-logger==2.0.7
+
+# Retry Logic
+tenacity==8.2.3
+
+# Environment
+python-dotenv==1.0.0
+
+# Production Phase Dependencies (will be used later)
+# sentence-transformers==2.2.2
+# torch==2.1.0
+# transformers==4.35.0
+# intel-extension-for-pytorch==2.1.0
+

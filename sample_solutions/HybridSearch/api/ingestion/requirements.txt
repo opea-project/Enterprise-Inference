@@ -1,0 +1,50 @@
+# Document Ingestion Service Requirements
+# API Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Document Processing
+pypdf==6.6.0
+pdfplumber==0.10.3
+python-docx==1.1.0
+openpyxl==3.1.5
+python-pptx==1.0.2
+
+# Advanced document processing (optional)
+# unstructured==0.10.30
+# pdf2image==1.16.3
+
+# Text processing
+nltk>=3.9
+spacy==3.7.2
+
+# Vector search and indexing
+faiss-cpu==1.7.4
+rank-bm25==0.2.2
+numpy>=1.24.0
+
+# Database
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+
+# HTTP Client (for calling embedding service)
+httpx==0.25.1
+
+# Logging
+python-json-logger==2.0.7
+
+# Environment
+python-dotenv==1.0.0
+
+# File handling
+python-multipart>=0.0.22
+aiofiles==23.2.1
+
+# Product catalog support
+pandas>=2.0.0
+
+# Utilities
+python-magic==0.4.27
+
