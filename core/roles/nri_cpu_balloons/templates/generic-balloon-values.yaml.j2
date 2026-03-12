@@ -1,8 +1,13 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 # Generic NRI Balloon Policy Template for vLLM Models (Simplified)
 config:
+<<<<<<< HEAD
   agent:
     nodeResourceTopology: true
     podResourceAPI: false
@@ -13,11 +18,32 @@ config:
     cpu: "cpuset:{{ nri_reserved_cpu_list }}"
   balloonTypes:
     - name: "{{ balloon_name }}"
+=======
+  reservedResources:
+    cpu: 1000m
+  allocatorTopologyBalancing: true
+  reservedPoolNamespaces:
+    - kube-system
+    - ingress-nginx
+    - keycloak
+    - monitoring
+  preserve:
+    matchExpressions:
+    - key: name
+      operator: NotIn
+      values:
+      - vllm
+  balloonTypes:
+    - name: "{{ balloon_name }}"
+      namespaces:
+        - default
+>>>>>>> dell-deploy-1.4-nv
       matchExpressions:
         - key: "{{ match_expression.split('=')[0] }}"
           operator: In
           values:
             - "{{ match_expression.split('=')[1] }}"
+<<<<<<< HEAD
       minCPUs: {{ workload_cpus }}
       maxCPUs: 1024
       allocatorPriority: "high"
@@ -25,6 +51,21 @@ config:
       allocatorPriority: "high"
       namespaces:
         - "*"
+=======
+      allocatorPriority: "high"
+      allocatorTopologyBalancing: true
+      # CPU resource allocation handled in Helm chart values.yaml resources section
+      preferSpreadOnPhysicalCores: false
+      preferIsolCpus: {{ prefer_isol_cpus | lower }}
+      preferNewBalloons: {{ prefer_new_balloons | lower }}
+      hideHyperthreads: false
+      pinCpus: true
+      pinMemory: false
+  instrumentation:
+    httpEndpoint: ":8891"
+    prometheusExport: {{ prometheus_enabled | lower }}
+    reportPeriod: 60s
+>>>>>>> dell-deploy-1.4-nv
   log:
     source: true
     debug:

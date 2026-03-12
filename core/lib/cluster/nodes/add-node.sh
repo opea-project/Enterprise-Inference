@@ -16,7 +16,7 @@ add_inference_nodes_playbook() {
 
     invoke_prereq_workflows "$@"     
 
-    ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root 
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}"
     
 }
 

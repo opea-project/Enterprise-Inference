@@ -25,8 +25,13 @@
       ansible.builtin.shell: helm repo update
       when: helm_repo_list.stdout != ""
 
-    - name: Retrieving the Number of Infrastructure Nodes (ei-infra-eligible)
-      ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true -o jsonpath='{.items[*].metadata.name}' | wc -w
+    - name: Retrieving the Number of Inference Infrastructure Nodes
+      ansible.builtin.shell: kubectl get nodes --selector=role=inference-infra -o jsonpath='{.items[*].metadata.name}' | wc -w
+      register: inference_node_count
+      changed_when: false
+
+    - name: Retrieving the Number of Infrastructure Nodes
+      ansible.builtin.shell: kubectl get nodes --selector=role=infra -o jsonpath='{.items[*].metadata.name}' | wc -w
       register: inference_node_count
       changed_when: false
 
@@ -80,9 +85,9 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
-                    - key: ei-infra-eligible
+                    - key: role
                       operator: In
-                      values: ["true"]
+                      values: ["infra"]
                   - matchExpressions:
                     - key: node-role.kubernetes.io/control-plane
                       operator: Exists

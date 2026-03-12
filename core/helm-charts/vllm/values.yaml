@@ -152,9 +152,17 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: ei-inference-eligible
+        - key: role
           operator: In
-          values: ["true"]
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-xeon"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-cpu"]
 
 LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
 SERVED_MODEL_NAME: ""

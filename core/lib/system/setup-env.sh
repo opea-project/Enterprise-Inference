@@ -41,7 +41,7 @@ setup_initial_env() {
     fi
     
     VENVDIR="$KUBESPRAYDIR/venv"
-    REMOTEDIR="/tmp/helm-charts"    
+    REMOTEDIR="$KUBESPRAYDIR/helm-charts"    
     if [ ! -d "$VENVDIR" ]; then                
         echo "Installing python3-venv package..."
         if command -v apt &> /dev/null; then            
@@ -70,7 +70,7 @@ setup_initial_env() {
     else
         echo "Virtual environment activated successfully. Path: $VIRTUAL_ENV"
     fi                 
-        
+           
     export PIP_BREAK_SYSTEM_PACKAGES=1
     $VENVDIR/bin/python3 -m pip install --upgrade pip
     $VENVDIR/bin/python3 -m pip install -U -r requirements.txt    
@@ -95,6 +95,7 @@ setup_initial_env() {
     cp "$HOMEDIR"/playbooks/* "$KUBESPRAYDIR"/playbooks/    
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
+    nvidia_values_file_path="$REMOTEDIR/vllm/nvidia-values.yaml"
     xeon_values_file_path="$REMOTEDIR/vllm/xeon-values.yaml"
     cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml
     cp "$HOMEDIR"/inventory/metadata/all.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/all/all.yml
@@ -158,6 +159,7 @@ setup_initial_env() {
     echo "Infrastructure readiness check completed successfully."    
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
+    nvidia_values_file_path="$REMOTEDIR/vllm/nvidia-values.yaml"
     ansible-galaxy collection install community.kubernetes        
 }
 

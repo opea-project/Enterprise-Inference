@@ -36,9 +36,17 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: ei-inference-eligible
+        - key: role
           operator: In
-          values: ["true"]
+          values: ["inference"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-xeon"]
+      - matchExpressions:
+        - key: role
+          operator: In
+          values: ["inference-cpu"]
 
 # vLLM CPU environment variables
 VLLM_CPU_SGL_KERNEL: "1"

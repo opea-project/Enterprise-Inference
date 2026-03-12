@@ -19,7 +19,7 @@ fresh_installation() {
 
     echo "Deployment configuration: $deploy_kubernetes_fresh"
 
-    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" && "$deploy_agenticai_plugin" == "no" ]]; then
+    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_nvidia_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" ]]; then
 
     # Check if all deployment steps are set to "no" after getting user input
         echo "No installation or deployment steps selected. Skipping setup_initial_env..."
@@ -76,6 +76,13 @@ fresh_installation() {
                 echo "Skipping Habana AI Operator installation..."
             fi
 
+            if [[ "$deploy_nvidia_operator" == "yes" ]]; then
+                execute_and_check "Deploying NVIDIA GPU Operator..." run_deploy_nvidia_operator_playbook "NVIDIA GPU Operator is deployed." \
+                    "Failed to deploy NVIDIA GPU Operator. Exiting."
+            else
+                echo "Skipping NVIDIA GPU Operator installation..."
+            fi
+
             if [[ "$uninstall_ceph" == "yes" ]]; then
                 execute_and_check "Uninstalling CEPH storage..." uninstall_ceph_cluster "$@" \
                     "CEPH is uninstalled successfully." \
@@ -127,28 +134,6 @@ fresh_installation() {
             else
                 echo "Skipping Observability deployment..."
             fi
-            # Deploy Plugins
-            # --------------
-            # Plugins are deployed after core infrastructure is ready
-            
-            if [[ "$deploy_agenticai_plugin" == "yes" ]]; then
-                echo "Deploying Agentic AI Plugin..."
-                ansible-playbook -i "${INVENTORY_PATH}" ../../plugins/agenticai/playbooks/deploy-agenticai-plugin.yml \
-                    --extra-vars "cluster_url=${cluster_url} \
-                                  cert_file=${cert_file} \
-                                  key_file=${key_file} \
-                                  kubernetes_platform=${kubernetes_platform}" \
-                    --vault-password-file "$vault_pass_file"
-                if [ $? -eq 0 ]; then
-                    echo "Agentic AI Plugin deployed successfully."
-                else
-                    echo "Failed to deploy Agentic AI Plugin. Exiting!."
-                    exit 1
-                fi
-            else
-                echo "Skipping Agentic AI Plugin deployment..."
-            fi
-            
             if [[ "$deploy_istio" == "yes" ]]; then
                 echo "Deploying Istio..."
                 execute_and_check "Deploying Istio..." deploy_istio_playbook "$@" \
@@ -212,5 +197,5 @@ fresh_installation() {
 
 run_fresh_install_playbook() {
     echo "Running the cluster.yml playbook to set up the Kubernetes cluster..."
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root cluster.yml
+    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" cluster.yml
 }
