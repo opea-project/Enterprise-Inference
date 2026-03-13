@@ -153,6 +153,10 @@ SNO does not support dynamic storage provisioning. Local storage must be explici
 
 **Step 1: Install Local Storage Operator**
 ```bash
+oc create namespace openshift-local-storage
+```
+
+```bash
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -196,6 +200,9 @@ Example disk:
 /dev/nvme5n1
 ```
 **Step 4: Bind Disk to Local Storage (Create LocalVolume)**
+
+Replace "SNO_HOSTNAME"with your cluster ip
+
 ```bash
 cat <<EOF | oc apply -f -
 apiVersion: local.storage.openshift.io/v1
