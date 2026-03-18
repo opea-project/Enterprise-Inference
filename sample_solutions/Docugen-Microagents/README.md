@@ -1,6 +1,6 @@
 ## Documentation Generator
 
-AI-powered documentation generator that automatically creates comprehensive README files from code repositories. This application uses a micro-agent system with nine specialized agents orchestrated by LangGraph to analyze code, extract API endpoints, map call graphs, identify error patterns, parse configurations, and generate documentation with architecture diagrams.
+Documentation Generator (DocuGen) is an enterprise-grade, AI-powered documentation pipeline that autonomously transforms any GitHub repository into a comprehensive, production-ready README, running entirely on-premises on Intel® Xeon® processors. Built on a nine-agent micro-agent architecture orchestrated by LangGraph, the application deploys specialized AI agents that analyze code structure, extract API endpoints, map call graphs, detect error patterns, parse configurations, and generate Mermaid architecture diagrams. All nine agents are powered by Qwen3-4B-Instruct, a small language model optimized for Intel Xeon's instruction set and memory architecture. By delivering multi-agent AI inference at scale without GPU dependency, Documentation Generator demonstrates how Intel Xeon can run sophisticated, parallel agentic workloads, making it a compelling reference solution for enterprises seeking to automate developer workflows through cost-effective, CPU-native generative AI infrastructure.
 
 ## Table of Contents
 
