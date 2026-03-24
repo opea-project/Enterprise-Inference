@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Copyright (C) 2025-2026 Intel Corporation
+=======
+# Copyright (C) 2024-2025 Intel Corporation
+>>>>>>> dell-deploy-1.4-nv
 # SPDX-License-Identifier: Apache-2.0
 
 remove_inference_nodes_playbook() {
@@ -15,7 +19,11 @@ remove_inference_nodes_playbook() {
         return 1
     fi
     invoke_prereq_workflows "$@"
+<<<<<<< HEAD
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/remove_node.yml --become --become-user=root -e node="$worker_nodes_to_remove" -e allow_ungraceful_removal=true
+=======
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/remove_node.yml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" -e node="$worker_nodes_to_remove" -e allow_ungraceful_removal=true
+>>>>>>> dell-deploy-1.4-nv
 }
 
 remove_worker_node() {
@@ -35,4 +43,8 @@ remove_worker_node() {
     echo "|     Node is being removed from Intel AI for Enterprise Inference!    |"
     echo "------------------------------------------------------------------------"
     
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dell-deploy-1.4-nv

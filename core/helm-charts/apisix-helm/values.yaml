@@ -28,9 +28,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -64,9 +64,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
@@ -93,9 +93,9 @@ apisix:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: ei-infra-eligible
+            - key: role
               operator: In
-              values: ["true"]
+              values: ["infra"]
           - matchExpressions:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists

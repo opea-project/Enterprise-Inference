@@ -1,0 +1,79 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# NVIDIA GPU configuration
+accelDevice: "nvidia"
+gpuCount: 1
+tensor_parallel_size: "1"
+
+# Base model settings (aligned to manifest)
+block_size: 16
+max_num_seqs: 256
+max_seq_len_to_capture: 2048
+d_type: "float16"
+max_model_len: 1024
+port: 8000
+
+image:
+  repository: vllm/vllm-openai
+  tag: "v0.6.3"
+  pullPolicy: IfNotPresent
+
+runtime: "nvidia"
+VLLM_NO_USAGE_STATS: 1
+DO_NOT_TRACK: 1
+
+# Optional scheduling overrides for NVIDIA nodes
+nodeSelector:
+  role: inference
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+affinity: {}
+
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  fsGroup: 0
+
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  allowPrivilegeEscalation: false
+
+# Model-specific overrides
+modelConfigs:
+  "meta-llama/Llama-3.2-3B-Instruct":
+    extraCmdArgs:
+      [
+        "--dtype",
+        "float16",
+        "--max-model-len",
+        "2048",
+        "--gpu-memory-utilization",
+        "0.8",
+        "--trust-remote-code",
+      ]
+    tensor_parallel_size: "1"
+
+defaultModelConfigs:
+  configMapValues:
+    VLLM_CACHE_ROOT: "/tmp/.cache/vllm"
+    XDG_CACHE_HOME: "/tmp/.cache"
+    PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+  extraCmdArgs:
+    [
+      "--dtype",
+      "float16",
+      "--max-model-len",
+      "1024",
+      "--gpu-memory-utilization",
+      "0.9",
+      "--trust-remote-code",
+      "--max-num-seqs",
+      "16",
+      "--max-num-batched-tokens",
+      "1024",
+    ]
+  tensor_parallel_size: "1"
