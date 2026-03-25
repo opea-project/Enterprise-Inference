@@ -12,7 +12,7 @@ Documentation Generator (DocuGen) is an enterprise-grade, AI-powered documentati
 - [Quick Start](#quick-start)
 - [User Interface](#user-interface)
 - [Troubleshooting](#troubleshooting)
-- [Additional Info](#additional-info)
+- [Performance Metrics](#performance-metrics)
 
 ---
 
@@ -236,8 +236,19 @@ The system includes 11 specialized repository analysis tools implemented in `api
 
 Before you begin, ensure you have the following installed:
 
-- **Docker and Docker Compose**
+- **Docker and Docker Compose** (required for running the application containers)
+- **Docker daemon running** (required for PR Agent's GitHub MCP server container)
 - **Enterprise inference endpoint access** (token-based authentication)
+
+### Required Model
+
+This application requires the following model to be deployed on your inference endpoint:
+
+- **Qwen/Qwen3-4B-Instruct-2507** - Small language model optimized for Intel Xeon processors with 8K context window
+
+All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Environment Config, Dependency Analyzer, Planner, Mermaid Generator, and QA Validator) use this model for efficient documentation generation.
+
+**Note:** This model must be available through your GenAI Gateway or APISIX Gateway deployment before running the application.
 
 ### Required API Configuration
 
@@ -260,7 +271,6 @@ This application supports multiple inference deployment patterns:
 - **INFERENCE_API_ENDPOINT**: URL to your inference service (example: `https://api.example.com`)
 - **INFERENCE_API_TOKEN**: Authentication token/API key for your chosen service
 
-**Note:** All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Env Config, Dependency Analyzer, Planner, Mermaid Generator, QA Validator) plus PR Agent use Qwen/Qwen3-4B-Instruct-2507 optimized for Intel Xeon processors
 
 ### Local Development Configuration
 
@@ -307,8 +317,8 @@ docker ps
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/cld2labs/GenAISamples.git
-cd GenAISamples/Docugen-Microagents
+git clone https://github.com/opea-project/Enterprise-Inference.git
+cd Enterprise-Inference/sample_solutions/Docugen-Microagents
 ```
 
 ### Set up the Environment
@@ -324,8 +334,24 @@ This application requires **two `.env` files** for proper configuration:
 # From the Docugen-Microagents directory
 cat > .env << EOF
 # Docker Compose Configuration
+
+# Local URL Endpoint (only needed for non-public domains)
+# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
+# Otherwise, set to: not-needed
 LOCAL_URL_ENDPOINT=not-needed
+
+BACKEND_PORT=8000
+FRONTEND_PORT=3000
+
 EOF
+```
+
+OR
+
+Copy from the example file and edit with your credentials as required.
+
+```bash
+cp .env.example .env
 ```
 
 **Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
@@ -362,10 +388,6 @@ Or manually create `api/.env` with:
 # INFERENCE_API_TOKEN: Authentication token/API key for the inference service
 INFERENCE_API_ENDPOINT=https://api.example.com
 INFERENCE_API_TOKEN=your-pre-generated-token-here
-
-# APISIX Gateway Example (uncomment and configure when using APISIX):
-# INFERENCE_API_ENDPOINT=https://api.example.com/Qwen3-4B-Instruct
-# INFERENCE_API_TOKEN=your-keycloak-generated-token-here
 
 # ==========================================
 # Docker Network Configuration
@@ -435,6 +457,8 @@ CORS_ORIGINS=["http://localhost:3000", "http://localhost:3001", "http://localhos
 VERIFY_SSL=true
 ```
 
+**Note:** All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Env Config, Dependency Analyzer, Planner, Mermaid Generator, QA Validator) plus PR Agent use Qwen/Qwen3-4B-Instruct-2507 optimized for Intel Xeon processors
+
 **Important Configuration Notes:**
 
 - **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
@@ -491,10 +515,10 @@ docker compose logs -f
 docker compose logs -f
 
 # Backend only
-docker compose logs -f Docugen-Microagents-backend
+docker logs -f Docugen-Microagents-backend
 
 # Frontend only
-docker compose logs -f Docugen-Microagents-frontend
+docker logs -f Docugen-Microagents-frontend
 ```
 
 **Verify the services are running:**
@@ -562,15 +586,7 @@ For detailed troubleshooting guidance and solutions to common issues, refer to:
 
 ---
 
-## Additional Info
-
-### Model Compatibility
-
-| Model Name | Deployment Platform | Notes |
-|------------|---------------------|-------|
-| Qwen/Qwen3-4B-Instruct-2507 | Xeon | Optimized SLM with 8K context window for efficient documentation generation across all nine micro-agents. |
-
-### Performance Metrics
+## Performance Metrics
 
 The system tracks comprehensive performance metrics for each agent execution, providing visibility into token usage, processing speed, and resource consumption. Metrics are calculated and displayed in real-time during workflow execution:
 
