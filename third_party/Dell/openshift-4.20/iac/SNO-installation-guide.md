@@ -64,47 +64,66 @@ In a Single Node OpenShift deployment:
 ---
 
 ## Installation Procedure
-### Step 1: Create the Cluster
 
-1. Open the OpenShift Assisted Installer UI:
+Open the OpenShift Assisted Installer UI and click on **Create Cluster**
+
 ```bash
 https://console.redhat.com/openshift/assisted-installer/clusters
 ```
-2. Click Create new cluster
-3. Select:
-   - **Deployment type:** Single Node OpenShift (SNO)
-   - **Platform:** Bare metal / Other
-4. Provide cluster details:
-    - Cluster name
-    - Base domain (example: example.com)
-    - OpenShift version
-5. Click Create cluster
+### Step 1: Configure cluster details
 
-### Step 2: Add Host and Generate Discovery ISO
+Provide the cluster details
 
-1. Navigate to the Hosts tab
-2. Click Add host
-3. Select:
-   - Full Discovery ISO (strongly recommended)
-4. Click Generate Discovery ISO
-5. Download the ISO
-The Full Discovery ISO reduces network dependencies and significantly improves installation reliability.
+- **Cluster Name** : Provide a name to the cluster (example: api)
+- **Base Domain** : Enter your domain (example: example.com)
+> Note: The system will automatically form the full cluster URL: api.api.example.com, This value is permanent and cannot be changed later
+- **Openshift Version** : Select OpenShift version as 4.20.x (example: 4.20.17)
+- **CPU architecture** : Select _x86_64_ as CPU architecture
+- **Number of control plane nodes** : Select _1 (Single Node OpenShift)_ as control plane node
 
-### Step 3: Boot the Target Machine
+Next, under _operators_ leave everything default and move to next Page
 
-1. Boot the bare-metal server using the Discovery ISO
-2. Wait for the host to appear in the Assisted Installer UI
-3. Confirm:
-    - Host discovery is successful
-    - CPU, memory, and disk validations pass
-    - Network connectivity checks pass
-    - All operator validations are successful
+### Step 2: Host Discovery (Generate and Boot Discovery ISO
+
+- Click “Add host” and generate Discovery ISO
+- Choose **Provisioning type** as _Full Discovery ISO_
+- Paste your SSH public key (required for accessing the node later)
+- Click Generate Discovery ISO
+- Once the ISO is generated, save the URL or download the ISO, use this to boot your machine that will acts as openshift cluster
+
+> Note: The Full Discovery ISO reduces network dependencies and significantly improves installation reliability.
+
+### Step 3: Boot your server using the ISO
+
+**Boot the server using the Discovery ISO**
+- Mount the ISO (via iDRAC / USB)
+- Reboot the server and ensure it boots from the ISO
+- The system will start a lightweight discovery agent
+
+**Wait for host detection in OpenShift UI**
+- In Openshift UI, check host inventory status
+- Confirm the host is listed with:
+  Role: Control plane + Worker (SNO)
+  Status: Ready
 
 ### Step 4: Install the Cluster
 
-1. Click Install Cluster
-2. Monitor progress in the Assisted Installer UI
-3. Installation typically completes in 30–60 minutes
+**Validate Storage configuration**
+
+- Ensure correct installation disk is selected
+- Verify additional disks are visible and not selected (to use later)
+
+**Validate Networking configuration**
+- Confirm correct IP address is assigned (DHCP or Static)
+- Verify active NIC is detected
+
+> Note: Ensure connectivity to required endpoints (DNS / API if applicable)
+
+**Install Cluster**
+
+- Click Install Cluster, installation typically completes in 30–60 minutes
+- Once cluster is installed, download and save the kubeconfig file.
+- Also, save the kubeadmin password.
 
 > Note: Do not reboot or shut down the node during installation.
 
@@ -114,14 +133,18 @@ The Full Discovery ISO reduces network dependencies and significantly improves i
 
 ### Copy kubeconfig to the Node
 
+- Replace PATH_TO_YOUR_KUBECONFIG_FILE below with the actual path of your downloaded kubeconfig file, Run this on your local machine.
+- Replace NODE_IP with your actual IP
 ```bash
-scp ~/.kube/config user@<NODE_IP>:/home/user/admin.kubeconfig
+scp PATH_TO_YOUR_KUBECONFIG_FILE core@<NODE_IP>:/home/core/admin.kubeconfig
 ```
 > **Note:** RHCOS restricts root access and /home/user is writable
 
 ### SSH into the Node
+
+SSH into the node
 ```bash
-ssh user@<NODE_IP>
+ssh core@<NODE_IP>
 ```
 ### Switch to Root
 ```bash
@@ -131,7 +154,7 @@ sudo -i
 
 Configure kubeconfig for Root
 ```bash
-mv /home/user/admin.kubeconfig /root/admin.kubeconfig
+mv /home/core/admin.kubeconfig /root/admin.kubeconfig
 export KUBECONFIG=/root/admin.kubeconfig
 echo 'export KUBECONFIG=/root/admin.kubeconfig' >> ~/.bashrc
 source ~/.bashrc
@@ -149,13 +172,22 @@ oc get nodes
 
 ## Post-Installation Storage Setup
 
-SNO does not support dynamic storage provisioning. Local storage must be explicitly configured.
+SNO does not support dynamic storage provisioning by default. Local storage must be explicitly configured.
 
 **Step 1: Install Local Storage Operator**
 ```bash
 oc create namespace openshift-local-storage
 ```
 
+**verify**
+```bash
+oc get csv -n openshift-local-storage
+```
+**expected**
+```bash
+local-storage-operator.vX.X.X   Succeeded
+```
+**Create Operator Group**
 ```bash
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
@@ -166,7 +198,11 @@ metadata:
 spec:
   targetNamespaces:
   - openshift-local-storage
----
+EOF
+```
+**Create Subscription**
+```bash
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -179,19 +215,20 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 ```
-**Step 2: Verify Operator Is Running**
+**verify**
 ```bash
 oc get pods -n openshift-local-storage
 ```
-Expected:
-  - local-storage-operator → Running
-  - diskmaker-manager → Running
+**Expected:**
+```bash
+local-storage-operator-xxxxxxx 1/1 Running
+```
 
-**Step 3: Identify a Free Disk**
+**Step 2: Identify a Free Disk**
 ```bash
 lsblk
 ```
-Ensure the disk is:
+Ensure the selected disk meets the following criteria:
   - Not mounted
   - Not already used
   - Large enough for workloads
@@ -199,9 +236,10 @@ Example disk:
 ```bash
 /dev/nvme5n1
 ```
-**Step 4: Bind Disk to Local Storage (Create LocalVolume)**
+**Step 3: Create LocalVolume**
 
-Replace "SNO_HOSTNAME"with your cluster ip
+- Replace SNO_HOSTNAME with your cluster hostname (example: f4-4d-ad-04-86-37)
+- Replace device paths with the available disks on your machine.
 
 ```bash
 cat <<EOF | oc apply -f -
@@ -223,10 +261,18 @@ spec:
     volumeMode: Filesystem
     fsType: xfs
     devicePaths:
-    - /dev/nvme5n1
+     - /dev/nvme0n1
+     - /dev/nvme5n1
+     - /dev/nvme7n1
 EOF
 ```
 > **Note:** The Local Storage Operator creates only **one PV per disk**. Additional PVCs require additional disks or partitions.
+
+**Make local-sc as default storageclass**
+```bash
+oc patch storageclass local-sc \
+  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+```
 
 ---
 
@@ -235,9 +281,14 @@ EOF
 ### Validate cluster health:
 ```bash
 oc get nodes
+``
+```bash
 oc get clusteroperators
 ```
-All cluster operators should be Available=True.
+**Ensure:**
+- Available = True
+- Progressing = False
+- Degraded = False
 
 ### Verify StorageClass
 ```bash
@@ -247,10 +298,15 @@ oc get storageclass
 
   - local-sc
 
-### Check for pending PVCs:
+### Verify PV
+
 ```bash
-oc get pvc -A
+oc get pv
 ```
-If PVC is Pending:
-  - No free disk is assigned
-  - A new disk must be added and bound via LocalVolume
+**Expected:**
+ ```bash
+NAME                CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   AGE
+local-pv-xxxx       3576Gi     RWO            Delete           Available           local-sc       5m
+local-pv-yyyy       3576Gi     RWO            Delete           Available           local-sc       5m
+local-pv-zzzz       3576Gi     RWO            Delete           Available           local-sc       5m
+```

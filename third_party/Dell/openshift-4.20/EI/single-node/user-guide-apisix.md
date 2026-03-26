@@ -1,4 +1,4 @@
-# Intel® AI for Enterprise Inference - Openshift (APISIX)
+# Intel® AI for Enterprise Inference - OpenShift (APISIX)
 ## Red Hat OpenShift Brownfield Deployment (Single Node OpenShift – SNO)
 
 ## Table of Contents
@@ -38,14 +38,14 @@ The solution leverages **OpenShift Routes, router-managed TLS, local storage, an
 
 | Component | Requirement |
 |---------|------------|
-| OpenShift Container Platform | v4.20.0 
+| OpenShift Container Platform | v4.20.0 |
 | Kubernetes Version | v1.33.6 |
 | Node Type | Single Node OpenShift (SNO) |
 | Operating System | Red Hat CoreOS (RHCOS) |
 | Access | cluster-admin kubeconfig |
 | OpenShift Router | Default (Routes used instead of Ingress) |
 | StorageClass | local-sc |
-|local storage operator | installed and bound |
+| Local Storage Operator | installed and bound |
 | TLS | Edge termination (Router-managed) |
 |Networking	| Default OpenShift Router |
 
@@ -64,21 +64,29 @@ The inference stack must be deployed from a separate machine, not the SNO node.
 
 ### Pre-Deployment Validation
 
-**1. kubeconfig Access Verification**
+**1. copy kubeconfig file**
+
+- Replace `PATH_TO_YOUR_KUBECONFIG_FILE` with the actual path of your downloaded kubeconfig file. Run this on your local machine.
+- Replace VM2_IP with your actual machine IP, where inference will be deployed
+```bash
+scp PATH_TO_YOUR_KUBECONFIG_FILE username@<VM2_IP>:/home/user/admin.kubeconfig
+```
+
+**2. kubeconfig Access Verification**
 
 Copy kubeconfig to the deployment machine:
 ```bash
 mkdir -p ~/.kube
-cp <kubeconfig> ~/.kube/config
+cp /home/user/admin.kubeconfig ~/.kube/config
 chmod 600 ~/.kube/config
 ```
 
 > **Note:** The kubeconfig provides cluster-admin access and should be protected like a root credential.
 
 
-**2. DNS Resolution (If No Corporate DNS)**
+**3. DNS Resolution (If No Corporate DNS)**
 
-If API Does Not Resolve at DNS to **etc/hosts**
+If the API does not resolve via DNS, add entries to `/etc/hosts`
 ```bash
 sudo vi /etc/hosts
 ```
@@ -88,6 +96,14 @@ Add these lines and save file:
 <SNO_IP> keycloak-okd.apps.<cluster>.<domain>
 <SNO_IP> okd.apps.<cluster>.<domain>
 ```
+
+example:
+```
+100.67.152.208 api.api.example.com
+100.67.152.208 keycloak-okd.apps.api.example.com
+100.67.152.208 okd.apps.api.example.com
+```
+
 > If enterprise DNS is configured correctly, this step is not required.
 
 ---
@@ -96,18 +112,34 @@ Add these lines and save file:
 
 ### 1. Configure the Setup Files and Environment
 
-Clone the repository, If repo is not downloaded on target machine.
+Clone the repository if it is not already downloaded on the target machine.
 
+**Activate Virtual Environment**
+```bash
+cd ~/Enterprise-Inference/core/kubespray
+source venv/bin/activate
+pip install kubernetes
+```
+
+**Create dummy certificate files**
+```bash
+mkdir -p ~/certs && \
+openssl req -x509 -nodes -days 365 \
+-newkey rsa:2048 \
+-keyout ~/certs/ei.key \
+-out ~/certs/ei.crt \
+-subj "/CN=okd.apps.api.example.com"
+```
 **Update the config file**
 
 ```bash
 vi Enterprise-Inference/core/inventory/inference-config.cfg
 ```
 
-> **Note:** Update configuration files for single node apisix deployment, Below are the changes needed.
+> **Note:** Update the configuration file for single-node APISIX deployment. Below are the required changes:
 > * Replace cluster_url with your **okd.apps.CLUSTER.DOMAIN**
 > * Set `deploy_kubernetes_fresh` to "off" and `deploy_ingress_controller` to "off", as we are doing a brownfield deployment.
-> * Set keycloak `keycloak_client_id` `keycloak_admin_user` `keycloak_admin_password` values
+> * Set Keycloak values: `keycloak_client_id`, `keycloak_admin_user`, and `keycloak_admin_password`
 > * Add your Hugging Face token
 > * Set the `cpu_or_gpu value` to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
 > * Set `deploy_keycloak_apisix` to "on" and Set `deploy_genai_gateway` to "off"
@@ -136,13 +168,6 @@ deploy_istio=off
 uninstall_ceph=off
 ```
 
-To support non-interactive execution of inference-stack-deploy.sh, create a file named "core/inventory/.become-passfile" with your user's sudo password
-
-```bash
-vi core/inventory/.become-passfile
-chmod 600 core/inventory/.become-passfile
-```
-
 **Update hosts.yaml File**
 
 Copy the single node preset hosts config file to the working directory:
@@ -157,20 +182,23 @@ cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 > The '--models' argument allows you to specify one or more models by their numeric ID. [full list of available model IDs](../../../ubuntu-22.04/iac/README.md#pre-integrated-models-list)
 > If `--models` is omitted, the installer displays the full model list and prompts you to select a model interactively.
 
-Run the setup for Gaudi 
+**Run the setup for Gaudi**
 
 ```bash
 cd core
 chmod +x inference-stack-deploy.sh
-./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gaudi3"
+export KUBECONFIG=/home/user/.kube/config
+sudo -E ./inference-stack-deploy.sh --models "1" 
 ```
+> The deployment script runs with elevated privileges (sudo), which does not inherit environment variables by default. Export the `KUBECONFIG` variable before running `inference-stack-deploy.sh`.
 
-Run the setup for CPU
+**Run the setup for CPU**
 
 ```bash
 cd core
 chmod +x inference-stack-deploy.sh
-./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu"
+export KUBECONFIG=/home/user/.kube/config
+sudo -E ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu"
 ```
 
 When prompted, choose option **4) Brownfield Deployment** provide **Kubeconfig path**(e.g. ~/.kube/config **) and then select option **1) Initial deployment**
@@ -196,7 +224,7 @@ Expected:
 kubectl get pods -A
 ```
 
-Expected States:
+Expected states:
  - All pods Running
  - No CrashLoopBackOff
  - No Pending pods
@@ -278,9 +306,3 @@ You’ve successfully:
 - Verified system readiness
 - Deployed Intel® AI for Enterprise Inference on openshift
 - Tested a working model endpoint
-
-
-
-
-
-
