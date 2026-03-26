@@ -132,7 +132,7 @@ Save and exit the editor.
 **Verify PV Creation**
 
 Within a few seconds, the Local Storage Operator will create a new PV.
-``'bash
+```bash
 oc get pv
 ```
 Expected:

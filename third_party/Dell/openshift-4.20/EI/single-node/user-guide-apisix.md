@@ -1,4 +1,4 @@
-# Intel® AI for Enterprise InferencE - Openshift (APISIX)
+# Intel® AI for Enterprise Inference - Openshift (APISIX)
 ## Red Hat OpenShift Brownfield Deployment (Single Node OpenShift – SNO)
 
 ## Table of Contents
