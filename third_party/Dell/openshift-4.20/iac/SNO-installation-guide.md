@@ -47,7 +47,7 @@ In a Single Node OpenShift deployment:
 
 | Resource | Minimum | Recommended |
 |--------|---------|-------------|
-| CPU | 4 vCPU | 8+ vCPU |
+| CPU | 8 vCPU | 16+ vCPU |
 | Memory | 16 GB | 32+ GB |
 | Disk | 120 GB | 250+ GB |
 | Network | Outbound Internet access | Stable, low-latency |
