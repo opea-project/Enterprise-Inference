@@ -11,7 +11,7 @@
   gather_facts: true
   vars:
     cluster_url: "api.example.com"                        # Cluster name, change if you want to use a different DNS name for the service
-    cluster_ip: "127.0.0.1"                               # Cluster IP, this should be the IP of the Gaudi node that will be used to access the service
+    cluster_ip: "127.0.0.1"                               # Cluster IP, this should be the IP of the Intel® AI Accelerator node that will be used to access the service
     ai_user: "ai-inference"                               # Enterprise Inference Service OS user, change if you want to use a different user
     ssh_key_file: "/home/{{ ai_user }}/.ssh/id_rsa"       # Path to your private key, this playbook will create this
     keycloak_client_id: "api"                             # Keycloak client ID
@@ -20,7 +20,7 @@
     hf_token: "YourHuggingFaceToken"                      # Hugging Face token for all models, you need to supply your Hugging Face token to download models
     hf_token_falcon3: "YourHuggingFaceToken"              # Hugging Face token for Falcon 3, can be the same as hf_token
     models: "21"                                          # Comma-separated list of model IDs, see repo
-    cpu_or_gpu: "cpu"                                     # "cpu" or "gpu", set to "gpu" for Gaudi nodes
+    cpu_or_gpu: "cpu"                                     # "cpu" or "gpu", set to "gpu" for Intel® AI Accelerator nodes
     deploy_kubernetes_fresh: "on"
     deploy_ingress_controller: "on"
     deploy_keycloak_apisix: "on"
