@@ -114,6 +114,20 @@ Before you begin, ensure you have the following installed:
 - Docker and Docker Compose
 - Python 3.10+ (optional, for local development)
 
+### Required Models
+The following models must be deployed on Enterprise Inference before running this application:
+
+| Model | Purpose |
+|-------|---------|
+| `BAAI/bge-base-en-v1.5` | Embedding generation for dense retrieval |
+| `BAAI/bge-reranker-base` | Reranking retrieved results for improved relevance |
+| `Qwen/Qwen3-4B-Instruct-2507` | LLM for question answering and generation |
+
+Verify your models are available:
+```bash
+curl https://your-gateway-url/v1/models -H "Authorization: Bearer your-token"
+```
+
 ### Verify Docker Installation
 ```bash
 # Check Docker version
@@ -133,8 +147,8 @@ The system uses GenAI Gateway for authentication with API key-based access.
 
 ### Clone the Repository
 ```bash
-git clone https://github.com/cld2labs/GenAISamples.git
-cd GenAISamples/hybrid-search
+git clone https://github.com/opea-project/Enterprise-Inference.git
+cd Enterprise-Inference/sample_solutions/HybridSearch
 ```
 
 ### Set up the Environment
@@ -173,11 +187,13 @@ VERIFY_SSL=true
 Ensure your model endpoints match your deployment.
 
 ```bash
-# Model Endpoints
-INFERENCE_MODEL_NAME_SIMPLE=Qwen/Qwen2.5-32B-Instruct
-INFERENCE_MODEL_NAME_COMPLEX=Qwen/Qwen2.5-32B-Instruct
+# Model Configuration
+EMBEDDING_MODEL_ENDPOINT=BAAI/bge-base-en-v1.5
 EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
+RERANKER_MODEL_ENDPOINT=BAAI/bge-reranker-base
 RERANKER_MODEL_NAME=BAAI/bge-reranker-base
+LLM_MODEL_ENDPOINT=Qwen/Qwen3-4B-Instruct-2507
+LLM_MODEL_NAME=Qwen/Qwen3-4B-Instruct-2507
 ```
 
 ### Running the Application
