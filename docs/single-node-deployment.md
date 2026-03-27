@@ -12,7 +12,7 @@ Before running the automation, it is recommended to complete all [prerequisites]
 
 For single-node Xeon clusters, **Keycloak** and **APISIX** are recommended.
 
-For Gaudi or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
+For Intel® AI Accelerator or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
 
 ## Deployment
 
@@ -55,11 +55,11 @@ Run the command below to deploy the Llama 3.1 8B parameter model on CPU.
 ```bash
 ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
-#### Intel® Gaudi® AI Accelerators
+#### Intel® AI Accelerators
 
-> **📝 Note**: If running on Intel® Gaudi® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./gaudi-prerequisites.md#automated-installationupgrade-process) before deployment.
+> **📝 Note**: If running on Intel® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./intel-ai-accelerator-prerequisites.md#automated-installationupgrade-process) before deployment.
 
-Run the command below to deploy the Llama 3.1 8B parameter model on Intel® Gaudi®. For Gaudi 3, set `cpu-or-gpu` to `gaudi3` instead.
+Run the command below to deploy the Llama 3.1 8B parameter model on Intel® AI Accelerator. For Gaudi 3, set `cpu-or-gpu` to `gaudi3` instead.
 ```bash
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
@@ -88,7 +88,7 @@ To test on CPU only. Note `vllmcpu` is appended to the URL.
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
 
-To test on Intel® Gaudi® AI Accelerators:
+To test on Intel® AI Accelerators:
 ```bash
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
