@@ -4,6 +4,7 @@ Supports Server-Sent Events (SSE) for real-time streaming
 """
 
 import asyncio
+import threading
 import logging
 from collections import defaultdict
 from typing import Dict, List, Optional
@@ -29,7 +30,7 @@ class LogManager:
         self.max_logs_per_job = max_logs_per_job
         self._logs: Dict[str, List[AgentLog]] = defaultdict(list)
         self._subscribers: Dict[str, List[asyncio.Queue]] = defaultdict(list)
-        self._lock = asyncio.Lock()
+        self._lock = threading.Lock()
 
     async def add_log(self, log: AgentLog) -> None:
         """
@@ -38,7 +39,7 @@ class LogManager:
         Args:
             log: Agent log entry
         """
-        async with self._lock:
+        with self._lock:
             # Add to storage
             job_logs = self._logs[log.job_id]
             job_logs.append(log)
@@ -51,10 +52,10 @@ class LogManager:
             dead_queues = []
             for queue in self._subscribers[log.job_id]:
                 try:
-                    await asyncio.wait_for(queue.put(log), timeout=1.0)
-                except (asyncio.TimeoutError, asyncio.QueueFull):
+                    queue.put_nowait(log)
+                except asyncio.QueueFull:
                     dead_queues.append(queue)
-                    logger.warning(f"Queue full or timeout for job {log.job_id}")
+                    logger.warning(f"Queue full for job {log.job_id}")
 
             # Clean up dead queues
             for queue in dead_queues:
@@ -153,13 +154,13 @@ class LogManager:
             Queue that will receive new logs
         """
         queue: asyncio.Queue = asyncio.Queue(maxsize=100)
-        async with self._lock:
+        with self._lock:
             self._subscribers[job_id].append(queue)
 
             # Send existing logs immediately
             for log in self._logs.get(job_id, []):
                 try:
-                    await queue.put(log)
+                    queue.put_nowait(log)
                 except asyncio.QueueFull:
                     logger.warning(f"Initial logs queue full for job {job_id}")
                     break
@@ -174,7 +175,7 @@ class LogManager:
             job_id: Job identifier
             queue: Queue to remove
         """
-        async with self._lock:
+        with self._lock:
             if queue in self._subscribers[job_id]:
                 self._subscribers[job_id].remove(queue)
 

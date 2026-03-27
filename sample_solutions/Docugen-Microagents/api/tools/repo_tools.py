@@ -1028,7 +1028,7 @@ def validate_mermaid_syntax_tool(mermaid_code: str) -> str:
             # Check 3: Edge labels must not contain unsafe characters
             # Pattern: |label text|
             edge_label_pattern = r'\|([^|]+)\|'
-            unsafe_edge_chars = ['/', '(', ')', ':', '`', '"']
+            unsafe_edge_chars = ['/', '(', ')', ':', '`', '"', '{', '}']
             for line in lines[1:]:
                 if not line.strip():
                     continue
@@ -1045,6 +1045,18 @@ def validate_mermaid_syntax_tool(mermaid_code: str) -> str:
                                 f"Use simple label: |{safe_label}| or create a separate node for complex paths."
                             )
                             break
+
+            # Check 4: No self-referencing edges (Node --> Node)
+            self_ref_pattern = r'([A-Za-z][A-Za-z0-9_]*)\s*-->\s*\1(?:\s|$|\|)'
+            for line in lines[1:]:
+                if not line.strip():
+                    continue
+                matches = re.findall(self_ref_pattern, line)
+                for node_id in matches:
+                    errors.append(
+                        f"Self-referencing edge detected: {node_id} --> {node_id}. "
+                        f"Show data flow between different components instead."
+                    )
 
         # Check sequenceDiagram syntax
         if code.startswith("sequenceDiagram"):

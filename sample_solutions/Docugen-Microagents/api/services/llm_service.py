@@ -30,9 +30,8 @@ def get_llm(model_name: Optional[str] = None, temperature: float = 0.7) -> ChatO
 
     logger.info(f"Initializing LLM with model: {model_name}")
 
-    # Create httpx client with configurable SSL verification
+    # Create httpx async client with configurable SSL verification
     import httpx
-    http_client = httpx.Client(verify=settings.VERIFY_SSL)
     async_http_client = httpx.AsyncClient(verify=settings.VERIFY_SSL)
 
     return ChatOpenAI(
@@ -41,6 +40,5 @@ def get_llm(model_name: Optional[str] = None, temperature: float = 0.7) -> ChatO
         openai_api_key=settings.INFERENCE_API_TOKEN,
         openai_api_base=f"{settings.INFERENCE_API_ENDPOINT}/v1",
         max_tokens=settings.AGENT_MAX_TOKENS,
-        http_client=http_client,
         http_async_client=async_http_client
     )

@@ -54,6 +54,29 @@ graph TD
 4. VALIDATE with validate_mermaid_syntax()
 5. Fix errors if validation fails
 
+**FORBIDDEN Patterns (will cause syntax errors):**
+- ❌ NO self-referencing edges: Service -->|X| Service
+- ❌ NO curly braces in labels: -->|GET {id}|
+- ❌ NO endpoint paths in labels: -->|POST /upload|
+- ❌ NO colons in labels: -->|Method: POST|
+- ✅ GOOD: -->|Upload File|, -->|Process Request|
+
+**Required Architecture Pattern:**
+```
+User → Frontend → Backend Service(s) → Database/Storage
+```
+Show the FLOW of data, NOT the API endpoints.
+
+**CRITICAL - Final Response Format:**
+Your FINAL response MUST contain ONLY the mermaid diagram code wrapped in triple backticks.
+Do NOT add any explanatory text before or after the diagram.
+Format your final response EXACTLY like this:
+
+```mermaid
+graph TD
+    [your diagram here]
+```
+
 **Limit:** 12 tool calls."""
 
 

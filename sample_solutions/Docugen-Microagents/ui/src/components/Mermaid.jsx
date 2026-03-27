@@ -1,17 +1,18 @@
 import { useEffect, useRef } from 'react'
 import mermaid from 'mermaid'
 
-// Initialize mermaid with default config
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'strict',
-  fontFamily: 'ui-sans-serif, system-ui, sans-serif'
-})
-
 function Mermaid({ chart }) {
   const containerRef = useRef(null)
-  const idRef = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}`)
+
+  useEffect(() => {
+    // Initialize mermaid with config
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'strict',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
+    })
+  }, [])
 
   useEffect(() => {
     if (containerRef.current && chart) {
@@ -20,12 +21,16 @@ function Mermaid({ chart }) {
           // Clear previous content
           containerRef.current.innerHTML = ''
 
+          // Generate new ID for each render to avoid conflicts
+          const newId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
           // Render the mermaid chart
-          const { svg } = await mermaid.render(idRef.current, chart)
+          const { svg } = await mermaid.render(newId, chart)
           containerRef.current.innerHTML = svg
         } catch (error) {
           console.error('Mermaid rendering error:', error)
-          containerRef.current.innerHTML = `<pre style="color: red;">Error rendering diagram: ${error.message}</pre>`
+          console.error('Chart content:', chart)
+          containerRef.current.innerHTML = `<pre style="color: red; padding: 1rem; background: #fee; border-radius: 8px;">Error rendering diagram: ${error.message}</pre>`
         }
       }
 
@@ -33,7 +38,7 @@ function Mermaid({ chart }) {
     }
   }, [chart])
 
-  return <div ref={containerRef} />
+  return <div ref={containerRef} style={{ minHeight: '200px' }} />
 }
 
 export default Mermaid
