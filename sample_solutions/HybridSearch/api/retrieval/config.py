@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     #   - APISIX Gateway: Provide GENAI_GATEWAY_URL and GENAI_API_KEY
     genai_gateway_url: Optional[str] = None
     genai_api_key: Optional[str] = None
+
+    # Per-model endpoint URL (required for APISIX, optional for GenAI Gateway)
+    reranker_api_endpoint: Optional[str] = None
     
     # Reranker Model Configuration (for Enterprise)
     reranker_model_endpoint: str = "bge-reranker-base-vllmcpu"

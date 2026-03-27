@@ -36,8 +36,8 @@ class APIClient:
     """
 
     def __init__(self):
-        # Use GenAI Gateway URL
-        base_url = settings.genai_gateway_url
+        # Use per-model endpoint if set (APISIX), otherwise fall back to GenAI Gateway URL
+        base_url = settings.llm_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=120.0) if self.token else None
@@ -45,7 +45,7 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        logger.info(f"Using GenAI Gateway at {self.base_url}")
+        logger.info(f"Using gateway at {self.base_url}")
 
     def get_inference_client(self, endpoint: str = None):
         """

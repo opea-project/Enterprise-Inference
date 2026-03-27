@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     #   - APISIX Gateway: Provide GENAI_GATEWAY_URL and GENAI_API_KEY
     genai_gateway_url: Optional[str] = None
     genai_api_key: Optional[str] = None
+
+    # Per-model endpoint URL (required for APISIX, optional for GenAI Gateway)
+    # APISIX: Set to full URL with model path, e.g. https://api.example.com/bge-base-en-v1.5
+    # GenAI Gateway: Leave unset (falls back to GENAI_GATEWAY_URL)
+    embedding_api_endpoint: Optional[str] = None
     
     # Model Configuration (for Enterprise)
     embedding_model_endpoint: str = "bge-large-en-v1.5-vllmcpu"

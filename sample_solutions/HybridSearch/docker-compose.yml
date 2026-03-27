@@ -72,9 +72,10 @@ services:
       - SYSTEM_MODE=${SYSTEM_MODE:-document}
       - EMBEDDING_MODEL_ENDPOINT=${EMBEDDING_MODEL_ENDPOINT:-BAAI/bge-base-en-v1.5}
       - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-base-en-v1.5}
-      # GenAI Gateway Configuration
+      # GenAI Gateway / APISIX Configuration
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
+      - EMBEDDING_API_ENDPOINT=${EMBEDDING_API_ENDPOINT:-}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"
@@ -112,9 +113,10 @@ services:
       - EMBEDDING_SERVICE_URL=http://embedding:8001
       - RERANKER_MODEL_ENDPOINT=${RERANKER_MODEL_ENDPOINT:-BAAI/bge-reranker-base}
       - RERANKER_MODEL_NAME=${RERANKER_MODEL_NAME:-BAAI/bge-reranker-base}
-      # GenAI Gateway Configuration
+      # GenAI Gateway / APISIX Configuration
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
+      - RERANKER_API_ENDPOINT=${RERANKER_API_ENDPOINT:-}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"
@@ -149,9 +151,12 @@ services:
       - INFERENCE_MODEL_NAME_SIMPLE=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
       - INFERENCE_MODEL_ENDPOINT_COMPLEX=${LLM_MODEL_ENDPOINT:-Qwen/Qwen3-4B-Instruct-2507}
       - INFERENCE_MODEL_NAME_COMPLEX=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
-      # GenAI Gateway Configuration
+      - LLM_MODEL_ENDPOINT=${LLM_MODEL_ENDPOINT:-Qwen/Qwen3-4B-Instruct-2507}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
+      # GenAI Gateway / APISIX Configuration
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
+      - LLM_API_ENDPOINT=${LLM_API_ENDPOINT:-}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"

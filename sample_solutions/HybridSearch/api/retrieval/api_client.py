@@ -35,14 +35,14 @@ class APIClient:
     """
 
     def __init__(self):
-        # Use GenAI Gateway URL
-        base_url = settings.genai_gateway_url
+        # Use per-model endpoint if set (APISIX), otherwise fall back to GenAI Gateway URL
+        base_url = settings.reranker_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=60.0) if self.token else None
 
         if self.token and self.base_url:
-            logger.info(f"Using GenAI Gateway at {self.base_url}")
+            logger.info(f"Using gateway at {self.base_url}")
 
     def get_rerank_client(self):
         """

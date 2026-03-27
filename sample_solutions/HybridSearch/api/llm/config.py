@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     genai_gateway_url: Optional[str] = None
     genai_api_key: Optional[str] = None
 
+    # Per-model endpoint URL (required for APISIX, optional for GenAI Gateway)
+    llm_api_endpoint: Optional[str] = None
+
     # Model Configuration (for Enterprise)
     llm_model_endpoint: str = "Qwen/Qwen3-4B-Instruct-2507"
     llm_model_name: str = "Qwen/Qwen3-4B-Instruct-2507"
