@@ -15,7 +15,7 @@
    - [Single Node Deployment](#single-node-deployment)
    - [Single Master Multiple Workload Node Deployment](#single-master-multiple-workload-node-deployment)
    - [Multi Master Multi Workload Node Deployment](#multi-master-multi-workload-node-deployment)
-   - [Multi Master Multi Workload Node with Dedicated Intel Xeon, Intel® AI Accelerator and CPU nodes Deployment](#multi-master-multi-workload-node-with-dedicated-intel-xeon-ai-accelerator-and-cpu-nodes-deployment)
+   - [Multi Master Multi Workload Node with Dedicated Intel Xeon, Intel® AI Accelerator and CPU nodes Deployment](#multi-master-multi-workload-node-with-dedicated-intel-xeon,-intel-ai-accelerator-and-cpu-nodes-deployment)
 
    ##### Control Plane Node Sizing
    For an inference model deployment cluster in Kubernetes (K8s), the control plane nodes should have sufficient resources to handle the management and orchestration of the cluster. It's recommended to have at least 8 vCPUs and 32 GB of RAM per control plane node.    
