@@ -9,7 +9,7 @@
    - [Infrastructure Node Sizing](#infrastructure-node-sizing)
    - [Setting Dedicated Infra Nodes](#setting-dedicated-inference-infra-nodes)
    - [Setting Dedicated Intel Xeon Nodes](#setting-dedicated-inference-xeon-nodes)
-   - [Setting Dedicated Intel® AI Accelerator Nodes](#setting-dedicated-ai-accelerator-nodes)
+   - [Setting Dedicated Intel® AI Accelerator Nodes](#setting-dedicated-intel-ai-accelerator-nodes)
    - [Setting Dedicated Intel CPU Nodes](#setting-dedicated-cpu-nodes)
    - [Node Sizing Guide](#node-sizing-guide)
    - [Single Node Deployment](#single-node-deployment)
