@@ -201,7 +201,7 @@ Start all services together with Docker Compose:
 
 ```bash
 # Start services in detached mode
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 This will:
@@ -223,8 +223,13 @@ Expected output shows services with status "Up".
 # All services
 docker compose logs -f
 
-# Specific service
+# Individual services
 docker compose logs -f gateway
+docker compose logs -f embedding
+docker compose logs -f retrieval
+docker compose logs -f llm
+docker compose logs -f ingestion
+docker compose logs -f ui
 ```
 
 ### Verify the services are running:
