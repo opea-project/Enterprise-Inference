@@ -1,16 +1,16 @@
 # Setup Single Node Using Ansible
 
-These playbooks sets up a single node inference environment on either a Intel® Gaudi or Intel® Xeon node using Ansible. It is designed to be run on the Intel® Gaudi or Intel® Xeon node where the Intel® AI for Enterprise Inference Service will be deployed. The playbooks installs all necessary dependencies, configures the environment, and prepares the system for the Intel® AI for Enterprise Inference Service. If you are going to use Intel® Gaudi, you will need to have the Gaudi drivers and firmware installed on the system before running this playbook, for more information on installing the Gaudi drivers and firmware, refer to the [Gaudi Drivers Installation Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/core/catalog/docs/gaudi/gaudi-prerequisites.md).
+These playbooks sets up a single node inference environment on either a  Intel® AI Accelerator or Intel® Xeon node using Ansible. It is designed to be run on the  Intel® AI Accelerator or Intel® Xeon node where the Intel® AI for Enterprise Inference Service will be deployed. The playbooks installs all necessary dependencies, configures the environment, and prepares the system for the Intel® AI for Enterprise Inference Service. If you are going to use  Intel® AI Accelerator, you will need to have the  Intel® AI Accelerator drivers and firmware installed on the system before running this playbook, for more information on installing the Intel® AI Accelerator drivers and firmware, refer to the [Intel® AI Accelerator Drivers Installation Guide](https://github.com/opea-project/Enterprise-Inference/blob/main/core/catalog/docs/intel-ai-accelerator-prerequisites.md).
 
 Many of the defaults are setup to work out of the box, but you will need to update the **`cluster_ip`** and provide the **`hf_token`** for downloading models from Hugging Face.
 
 There is also a template directory that contains a set of templates for the various configuration files that are used by the AI Inference Service. These templates are used to generate the final configuration files based on the variables defined in the playbook. Do not modify these files directly.
 
-Depending on the deployment type or the size of the models used, the playbook may run up to 25 minutes, at the end of the playbook running it will output the results of the installation script. The models will be available sometime after the playbook is done, the models selected by default for the Intel® Gaudi deployment can take up to an hour for all four of them to be available. If you change the models that will be used, the start up time may be different.
+Depending on the deployment type or the size of the models used, the playbook may run up to 25 minutes, at the end of the playbook running it will output the results of the installation script. The models will be available sometime after the playbook is done, the models selected by default for the  Intel® AI Accelerator deployment can take up to an hour for all four of them to be available. If you change the models that will be used, the start up time may be different.
 
 | Deployment Type | Playbook File |
 |------------------|----------------|
-| Gaudi Single Node Playbook | einf-singlenode-gaudi.yml |
+| Intel® AI Accelerator Single Node Playbook | einf-singlenode-intel-ai-accelerator.yml |
 | Xeon Single Node Playbook | einf-singlenode-xeon.yml |
 
 
@@ -66,12 +66,13 @@ These settings are all set to `on` by default in the playbook, change these vari
 
 2. **Run the Playbook**
    
-   Execute the Gaudi playbook using the following command:
+   Execute the  Intel® AI Accelerator playbook using the following command:
 
    ```bash
    git clone https://github.com/opea-project/Enterprise-Inference.git
    cd Enterprise-Inference/docs/examples/single-node
-   sudo ansible-playbook einf-singlenode-gaudi.yml
+   sudo ansible-playbook einf-singlenode-intel-ai-accelerator.yml
+
    ```
 
    Execute the Xeon playbook using the following command:
