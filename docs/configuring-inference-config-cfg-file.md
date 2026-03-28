@@ -37,7 +37,7 @@ Make sure to update the values in the inference-config.cfg file according to you
 > - If `deploy_keycloak_apisix` is set to `off`, the `keycloak_client_id`, `keycloak_admin_user`, and `keycloak_admin_password` values will have no effect.
 > - The `hugging_face_token` is the token used for pulling LLM models from Hugging Face. 
 > - If `deploy_llm_models` is set to `off`, the `hugging_face_token` value will be ignored.
-> - The `cpu_or_gpu` value specifies whether to deploy models for CPU or Intel Gaudi.
+> - The `cpu_or_gpu` value specifies whether to deploy models for CPU or Intel® AI Accelerator.
 >
 
 For running behind corporate proxy, please refer to this [guide](./running-behind-proxy.md)

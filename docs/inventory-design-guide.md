@@ -5,17 +5,17 @@
    - [Control Plane Node Sizing](#control-plane-node-sizing)
    - [Workload Node Sizing](#workload-node-sizing)
    - [CPU-based Workloads (Intel Xeon)](#cpu-based-workloads-intel-xeon)
-   - [HPU-based Workloads (Intel Gaudi)](#hpu-based-workloads-intel-gaudi)
+   - [HPU-based Workloads (Intel® AI Accelerator)](#hpu-based-workloads-intel-ai-accelerator)
    - [Infrastructure Node Sizing](#infrastructure-node-sizing)
    - [Setting Dedicated Infra Nodes](#setting-dedicated-inference-infra-nodes)
    - [Setting Dedicated Intel Xeon Nodes](#setting-dedicated-inference-xeon-nodes)
-   - [Setting Dedicated Intel Gaudi Nodes](#setting-dedicated-gaudi-nodes)
+   - [Setting Dedicated Intel® AI Accelerator Nodes](#setting-dedicated-intel-ai-accelerator-nodes)
    - [Setting Dedicated Intel CPU Nodes](#setting-dedicated-cpu-nodes)
    - [Node Sizing Guide](#node-sizing-guide)
    - [Single Node Deployment](#single-node-deployment)
    - [Single Master Multiple Workload Node Deployment](#single-master-multiple-workload-node-deployment)
    - [Multi Master Multi Workload Node Deployment](#multi-master-multi-workload-node-deployment)
-   - [Multi Master Node with Dedicated Intel Xeon, Gaudi and CPU nodes Deployment](#multi-master-multi-workload-node-with-dedicated-intel-xeon-gaudi-and-cpu-nodes-deployment)
+   - [Multi Master Multi Workload Node with Dedicated Intel Xeon, Intel® AI Accelerator and CPU nodes Deployment](#multi-master-multi-workload-node-with-dedicated-intel-xeon-intel-ai-accelerator-and-cpu-nodes-deployment)
 
    ##### Control Plane Node Sizing
    For an inference model deployment cluster in Kubernetes (K8s), the control plane nodes should have sufficient resources to handle the management and orchestration of the cluster. It's recommended to have at least 8 vCPUs and 32 GB of RAM per control plane node.    
@@ -27,9 +27,9 @@
    ##### CPU-based Workloads (Intel Xeon)
    For CPU-based inference workloads, the workload nodes should have a sufficient number of vCPUs based on the number of models and the expected concurrency. A general guideline is to allocate 32 vCPUs per model instance, depending on the model complexity and resource requirements.
 
-   ##### HPU-based Workloads (Intel Gaudi)
-   For HPU-based inference workloads using Intel Gaudi HPUs, the workload nodes should be equipped with the appropriate number of Gaudi HPUs based on the number of models and the expected concurrency.
-   Each Gaudi HPU can handle multiple model instances, depending on the model size and resource requirements.
+   ##### HPU-based Workloads (Intel® AI Accelerator)
+   For HPU-based inference workloads using Intel® AI Accelerator, the workload nodes should be equipped with the appropriate number of Intel® AI Accelerator HPUs based on the number of models and the expected concurrency.
+   Each Intel® AI Accelerator can handle multiple model instances, depending on the model size and resource requirements.
    
    Additionally, the workload nodes should have sufficient RAM and storage capacity to accommodate the inference models and any associated data.
 
@@ -176,21 +176,21 @@
    ```
 
 
-   ### Setting Dedicated Gaudi Nodes:   
-   To configure a dedicated Gaudi nodes for deploying models, edit the file `inventory/hosts.yml` and add the label `inference-gaudi` to the nodes.
-   This group will be used to schedule the workloads dedicated to run on nodes with Intel Gaudi attached.
+   ### Setting Dedicated Intel® AI Accelerator Nodes:   
+   To configure a dedicated Intel® AI Accelerator nodes for deploying models, edit the file `inventory/hosts.yml` and add the label `inference-ai-accelerator` to the nodes.
+   This group will be used to schedule the workloads dedicated to run on nodes with Intel® AI Accelerator attached.
    
    follow these steps:
    1. Open the `inventory/hosts.yml` file in a text editor.
    2. Locate the section where you define your nodes. This is typically under the `all` group or any other group you've defined for your nodes.
-   3. For each node that you want to label as an `inference-gaudi`, add the following line under the node's IP or hostname:
+   3. For each node that you want to label as an `inference-ai-accelerator`, add the following line under the node's IP or hostname:
    ```yaml
    node_labels:
-     node-role.kubernetes.io/inference-gaudi: "true"
+     node-role.kubernetes.io/inference-ai-accelerator: "true"
    ```
-   4.After labeling the desired nodes, list the nodes under the group kube_inference_gaudi to include in this group. 
+   4.After labeling the desired nodes, list the nodes under the group kube_inference_ai-accelerator to include in this group. 
 
-   Please find the template for the inventory configuration with 2 dedicated Gaudi nodes for inference cluster
+   Please find the template for the inventory configuration with 2 dedicated Intel® AI Accelerator nodes for inference cluster
    ```yaml
       all:
         hosts:
@@ -198,13 +198,13 @@
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
             ansible_ssh_private_key_file: /path/to/your/ssh/key
-          inference-gaudi-node-01:
+          inference-ai-accelerator-node-01:
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
             ansible_ssh_private_key_file: /path/to/your/ssh/key
             node_labels:
-              node-role.kubernetes.io/inference-gaudi: "true"         
-          inference-gaudi-node-02:
+              node-role.kubernetes.io/inference-ai-accelerator: "true"         
+          inference-ai-accelerator-node-02:
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
             ansible_ssh_private_key_file: /path/to/your/ssh/key
@@ -220,12 +220,12 @@
               inference-control-plane-01:       
           kube_node:
             hosts:
-              inference-gaudi-node-01:
-              inference-gaudi-node-02:
+              inference-ai-accelerator-node-01:
+              inference-ai-accelerator-node-02:
               inference-infra-node-01:
-          kube_inference_gaudi:
-              inference-gaudi-node-01:
-              inference-gaudi-node-02:
+          kube_inference_ai-accelerator:
+              inference-ai-accelerator-node-01:
+              inference-ai-accelerator-node-02:
         etcd:
           hosts:
             inference-control-plane-01:       
@@ -233,7 +233,7 @@
           children:
             kube_control_plane:
             kube_node:
-            kube_inference_gaudi: 
+            kube_inference_ai-accelerator: 
    ```
 
    ### Setting Dedicated CPU Nodes:   
@@ -435,9 +435,9 @@
             hosts: {}
    ```
 
-   ### Multi Master Multi Workload Node with Dedicated Intel Xeon, Gaudi and CPU nodes Deployment:   
+   ### Multi Master Multi Workload Node with Dedicated Intel Xeon, Intel® AI Accelerator and CPU nodes Deployment:   
    For an enterprise-grade deployment with multiple control plane nodes and multiple workload nodes,
-   This setup uses workload nodes to be mix of Intel Xeon, Intel Gaudi and Intel CPU nodes for deploying models.
+   This setup uses workload nodes to be mix of Intel Xeon, Intel® AI Accelerator and Intel CPU nodes for deploying models.
    
    it is recommended to follow these guidelines:
    
@@ -491,18 +491,18 @@
             ansible_ssh_private_key_file: /path/to/your/ssh/key
             node_labels:
               node-role.kubernetes.io/inference-xeon: "true"         
-         inference-workload-gaudi-node-01:
+         inference-workload-ai-accelerator-node-01:
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
             ansible_ssh_private_key_file: /path/to/your/ssh/key
             node_labels:
-              node-role.kubernetes.io/inference-gaudi: "true"
-         inference-workload-gaudi-node-02:
+              node-role.kubernetes.io/inference-ai-accelerator: "true"
+         inference-workload-ai-accelerator-node-02:
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
             ansible_ssh_private_key_file: /path/to/your/ssh/key
             node_labels:
-              node-role.kubernetes.io/inference-gaudi: "true"
+              node-role.kubernetes.io/inference-ai-accelerator: "true"
          inference-workload-cpu-node-01:
             ansible_host: "{{ private_ip }}"
             ansible_user: "{{ ansible_user }}"
@@ -528,8 +528,8 @@
               inference-infra-node-03:
               inference-workload-xeon-node-01:
               inference-workload-xeon-node-02:
-              inference-workload-gaudi-node-01:
-              inference-workload-gaudi-node-02:
+              inference-workload-ai-accelerator-node-01:
+              inference-workload-ai-accelerator-node-02:
               inference-workload-cpu-node-01:
               inference-workload-cpu-node-02:
           etcd:
@@ -544,9 +544,9 @@
          kube_inference_xeon:
               inference-workload-xeon-node-01:
 	      inference-workload-xeon-node-02:
-         kube_inference_gaudi:
-              inference-workload-gaudi-node-01:
-	      inference-workload-gaudi-node-02:
+         kube_inference_ai-accelerator:
+              inference-workload-ai-accelerator-node-01:
+	      inference-workload-ai-accelerator-node-02:
          kube_inference_cpu:
               inference-workload-cpu-node-01:
 	      inference-workload-cpu-node-02:
@@ -556,7 +556,7 @@
               kube_node:
               kube_inference_infra:
               kube_inference_xeon:
-              kube_inference_gaudi:
+              kube_inference_ai-accelerator:
               kube_inference_cpu:
           calico_rr:
             hosts: {}
