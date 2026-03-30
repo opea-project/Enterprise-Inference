@@ -33,7 +33,7 @@ Firmware [SPI] Version : Preboot version hl-gaudi2-1.20.0-fw-58.0.0-sec-9 (Jan 1
 ```
 ###### For visual assistance, refer to the following snapshot for Firmware version:
 
-<img src="../docs/pictures/Enterprise-Inference-Intel-AI-Accelerator-Firmware-version.png" alt="AI Inference Firmware Snapshot" width="800" height="120"/>   
+<img src="../docs/pictures/Enterprise-Inference-Intel-Gaudi-Firmware-version.png" alt="AI Inference Firmware Snapshot" width="800" height="120"/>   
    
 
 #### Step 2: Check Driver Version
@@ -52,7 +52,7 @@ You'll see something like:
 ```
 ###### For visual assistance, refer to the following snapshot for Driver version:
 
-<img src="../docs/pictures/Enterprise-Inference-Intel-AI-Accelerator-Driver-version.png" alt="AI Inference Driver Snapshot" width="800" height="120"/>    
+<img src="../docs/pictures/Enterprise-Inference-Intel-Gaudi-Driver-version.png" alt="AI Inference Driver Snapshot" width="800" height="120"/>    
    
 #### Step 3: Check Runtime Version
 
