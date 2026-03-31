@@ -1,0 +1,46 @@
+openwebui:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/open-webui/open-webui
+    tag: main
+
+  service:
+    type: NodePort
+    port: 8080
+    nodePort: 31573     # = docker 5173:8080
+
+  persistence:
+    enabled: true        # = -v open-webui:/app/backend/data
+    size: 10Gi
+
+  pod:
+    hostAliases:         # = docker-compose extra_hosts
+      - ip: "150.239.223.4"
+        hostnames: ["einfapi.local"]
+
+  extraEnv:
+    - name: OPENAI_API_BASE_URLS
+      value: "http://einfapi.local:8000/v1"
+
+    - name: OPENAI_API_KEYS
+      value: "empty"
+
+    - name: ENABLE_OLLAMA_API
+      value: "False"
+
+    - name: PYTHONHTTPSVERIFY
+      value: "0"
+
+    - name: URLLIB3_DISABLE_WARNINGS
+      value: "1"
+
+    - name: AIOHTTP_CLIENT_SESSION_SSL
+      value: "False"
+
+    - name: ENABLE_API_BASE_URL
+      value: "True"
+
+    - name: ENABLE_ADMIN
+      value: "True"
