@@ -1,4 +1,4 @@
-## Bare-Metal RHEL Automation for Enterprise Inference (CPU & Gaudi3)
+## Bare-Metal RHEL Automation for Enterprise Inference (Intel® Xeon® 6 & Intel® Gaudi® 3)
 
 This guide explains how to use the provided **RHEL-based automation script to prepare a Red Hat Enterprise Linux (RHEL 9)** system and deploy the Enterprise Inference stack on a single-node server.
 
@@ -14,10 +14,11 @@ The script:
 
 | Requirement | Description |
 |--------------|-------------|
-| **Operating System** | RHEL 9.6 ([Red Hat Enterprise Linux 9.6](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index)) |
+| **Operating System** | [Red Hat Enterprise Linux 9.6](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index) |
 | **Access** | Root or sudo privileges |
 | **Network** | Internet connection for package installation  |
-| **Optional Accelerator SW Versions**  |  Intel® Gaudi® AI Accelerator hardware (for GPU workloads)  |
+| **Supported Processors** | Intel® Xeon® 6 (CPU deployment) |
+| **Optional Accelerator** | Intel® Gaudi® 3 AI Accelerator (for accelerated GPU workloads) |
 
 ---
 
@@ -37,6 +38,7 @@ chmod +x deploy-enterprise-inference.sh
 
 ### Run the script
 
+**For Intel® Gaudi® 3:**
 ```bash
 sudo ./deploy-enterprise-inference.sh \
 -u user \
@@ -44,7 +46,18 @@ sudo ./deploy-enterprise-inference.sh \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
 -a cluster-url \
--m "1" \
+-m "1"
+```
+
+**For Intel® Xeon® 6 (CPU):**
+```bash
+sudo ./deploy-enterprise-inference.sh \
+-u user \
+-p <your-sudo-password> \
+-t hf_xxxxxxxxxxxxx \
+-g cpu \
+-a cluster-url \
+-m "21"
 ```
 
 **Options & Defaults**
@@ -54,7 +67,7 @@ sudo ./deploy-enterprise-inference.sh \
 | `-u, --username` | Yes (deploy & uninstall) | (none) | Enterprise Inference owner username. Must match the invoking (sudo) user. |
 | `-t, --token` | Yes (deploy only) | (none) | Hugging Face access token used to validate and download selected models. |
 | `-p, --password` | No | (none) | User sudo password used for Ansible become operations. |
-| `-g, --gpu-type` | No | `gaudi3` | Deployment target type: `gaudi3` or `cpu`. |
+| `-g, --gpu-type` | No | `gaudi3` | Deployment target: `gaudi3` for Intel® Gaudi® 3, `cpu` for Intel® Xeon® 6. |
 | `-m, --models` | No | `""` (interactive mode) | Choose model ID from [Pre-Integrated Models List](../../ubuntu-22.04/iac/README.md#pre-integrated-models-list) , based on your deployment type (gaudi or cpu) . If not provided, deployment runs interactively. |
 | `-b, --branch` | No | `release-1.4.0` | Git branch of the Enterprise-Inference repository to clone. |
 | `-f, --firmware-version` | No | `1.22.1` | Gaudi3 firmware version (applies only when `-g gaudi3`). |
@@ -99,7 +112,8 @@ Deployment progress is tracked using a local state file: `/tmp/ei-deploy.state`
 - Clones the Enterprise-Inference repo
 - Updates inference-config.cfg with deployment parameters
 - Validates Hugging Face token and model access
-- Installs Gaudi3 firmware (if -g gaudi3)
+- Installs Intel® Gaudi® 3 firmware (if `-g gaudi3`)
+- Configures Intel® Xeon® 6 CPU settings (if `-g cpu`)
 - Applies kernel/IOMMU tuning (if required)
 - Configures SSH keys and sudo access
 - Generates self-signed SSL certificates
@@ -144,7 +158,7 @@ Check systemd services manually if needed:
 systemctl list-units --type=service | grep -i inference
 ```
 
-### 3. Gaudi3 Verification (Only if -g gaudi3)
+### 3. Intel® Gaudi® 3 Verification (only if `-g gaudi3`)
 Confirm Gaudi devices and firmware are detected.
 ```bash
 hl-smi
@@ -158,7 +172,16 @@ Verify kernel modules:
 lsmod | grep habanalabs
 ```
 
-### 4. API & Networking Validation
+### 4. Intel® Xeon® 6 Verification (only if `-g cpu`)
+Confirm the CPU is recognized and no accelerator-specific drivers are required.
+```bash
+lscpu | grep -E "Model name|Socket|CPU\(s\)"
+```
+Expected:
+- Intel® Xeon® 6 processor listed
+- Socket and CPU count match the hardware specification
+
+### 5. API & Networking Validation
 Verify hostname resolution:
 ```bash
 cat /etc/hosts | grep api.example.com
@@ -176,7 +199,7 @@ Expected:
 - key.pem
 
 
-### 5. API Health Check
+### 6. API Health Check
 Validate the inference gateway is reachable.
 ```bash
 curl -k https://api.example.com/health
@@ -186,7 +209,7 @@ Expected:
 
 ---
 
-### 6. Test Model Inference
+### 7. Test Model Inference
 
 Refer to the [RedHat9.6 Single-Node Deployment Guide](../EI/single-node/user-guide.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
 
@@ -194,4 +217,4 @@ Refer to the [RedHat9.6 Single-Node Deployment Guide](../EI/single-node/user-gui
 
 ## Summary
 
-This repository provides a clean, deterministic, enterprise-grade deployment pipeline on RHEL 9.6
+This repository provides a clean, deterministic, enterprise-grade deployment pipeline on RHEL 9.6 supporting both Intel® Xeon® 6 (CPU) and Intel® Gaudi® 3 (accelerated) deployments.
