@@ -14,7 +14,7 @@ The script:
 
 | Requirement | Description |
 |--------------|-------------|
-| **Operating System** | [Red Hat Enterprise Linux 9.6](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index) |
+| **Operating System** | RHEL 9.6 ([Red Hat Enterprise Linux 9.6](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index)) |
 | **Access** | Root or sudo privileges |
 | **Network** | Internet connection for package installation  |
 | **Optional Accelerator SW Versions**  |  Intel® Gaudi® AI Accelerator hardware (for GPU workloads)  |
@@ -188,7 +188,7 @@ Expected:
 
 ### 6. Test Model Inference
 
-Refer to the [RedHat9.6 Single-Node Deployment Guide](../EI/single-node/user-guide-apisix.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
+Refer to the [RedHat9.6 Single-Node Deployment Guide](../EI/single-node/user-guide.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
 
 ---
 
