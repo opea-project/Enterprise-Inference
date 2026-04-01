@@ -206,36 +206,31 @@
                   - "{{ secret_name }}"
                 secretName: "{{ secret_name }}"
 
-    - name: Create Grafana observability ingress with nginx (non-EKS)
+    - name: Create Grafana observability HTTPRoute (non-EKS)
       tags: deploy_observability
       when: kubernetes_platform is not defined or kubernetes_platform != "eks"
       community.kubernetes.k8s:
         state: present
         definition:
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
           metadata:
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: HTTP # Assuming Grafana is served over HTTP
-            name: observability-grafana-ingress
-            namespace: observability # Change this to the namespace where Grafana is deployed
+            name: observability-grafana-httproute
+            namespace: observability
           spec:
-            ingressClassName: nginx
+            parentRefs:
+              - name: enterprise-edge-gateway
+                namespace: envoy-gateway-system
+            hostnames:
+              - "{{ secret_name }}"
             rules:
-              - host: "{{ secret_name }}" # Replace with your desired hostname for Grafana
-                http:
-                  paths:
-                    - backend:
-                        service:
-                          name: observability-grafana
-                          port:
-                            number: 80
-                      path: /observability(/|$)(.*)
-                      pathType: ImplementationSpecific
-            tls:
-              - hosts:
-                  - "{{ secret_name }}"
-                secretName: "{{ secret_name }}"
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /observability
+                backendRefs:
+                  - name: observability-grafana
+                    port: 80
 
     - name: Add Bitnami Helm repository
       tags: deploy_logging

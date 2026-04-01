@@ -6,6 +6,10 @@ run_infrastructure_readiness_check() {
     echo "This will verify system compatibility and infrastructure requirements."
         
     if [ ! -f "$HOMEDIR/inventory/hosts.yaml" ]; then
+        echo -e "${YELLOW}Inventory file not found — auto-generating hosts.yaml for single-node...${NC}"
+        bash "$HOMEDIR/scripts/generate-hosts.sh"
+    fi
+    if [ ! -f "$HOMEDIR/inventory/hosts.yaml" ]; then
         echo -e "${RED}Error: Inventory file not found at $HOMEDIR/inventory/hosts.yaml${NC}"
         echo -e "${YELLOW}Please ensure the inventory file exists and contains the correct host information.${NC}"
         return 1

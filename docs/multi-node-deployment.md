@@ -116,7 +116,7 @@ chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
 
-### For Nodes with Gaudi Accelerators
+### For Nodes with Intel® AI Accelerator
 
 ```sh
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN

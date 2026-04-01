@@ -1,9 +1,9 @@
-# Gaudi Node Requirements and Setup Guide
+# Intel® AI Accelerator Node Requirements and Setup Guide
 
-This guide helps verify and automatically install the latest firmware and driver version for **Habana Gaudi** nodes in your Kubernetes or Standalone Environment.
+This guide helps verify and automatically install the latest firmware and driver version for **Intel® AI Accelerator** nodes in your Kubernetes or Standalone Environment.
 
 # What You Need
-- Intel® Gaudi® cards installed in your system 
+- Intel® AI Accelerator cards installed in your system 
 - Linux operating system
 - Internet connection
 - Root/sudo privileges
@@ -33,11 +33,11 @@ Firmware [SPI] Version : Preboot version hl-gaudi2-1.20.0-fw-58.0.0-sec-9 (Jan 1
 ```
 ###### For visual assistance, refer to the following snapshot for Firmware version:
 
-<img src="../docs/pictures/Enterprise-Inference-Gaudi-Firmware-version.png" alt="AI Inference Firmware Snapshot" width="800" height="120"/>   
+<img src="../docs/pictures/Enterprise-Inference-Intel-AI-Accelerator-Firmware-version.png" alt="AI Inference Firmware Snapshot" width="800" height="120"/>   
    
 
 #### Step 2: Check Driver Version
-Use the following commands to check the required driver version installed on your Gaudi nodes:
+Use the following commands to check the required driver version installed on your Intel® AI Accelerator nodes:
 
 ```bash
 hl-smi 
@@ -52,7 +52,7 @@ You'll see something like:
 ```
 ###### For visual assistance, refer to the following snapshot for Driver version:
 
-<img src="../docs/pictures/Enterprise-Inference-Gaudi-Driver-version.png" alt="AI Inference Driver Snapshot" width="800" height="120"/>    
+<img src="../docs/pictures/Enterprise-Inference-Intel-AI-Accelerator-Driver-version.png" alt="AI Inference Driver Snapshot" width="800" height="120"/>    
    
 #### Step 3: Check Runtime Version
 
@@ -126,7 +126,7 @@ If the numbers don't match, run:
 ```bash
 kubectl rollout restart ds habana-ai-device-plugin-ds -n habana-ai-operator
 ```
-> **For detailed documentation, refer to the official guide:** [Intel® Gaudi® Software Installation Documentation](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html)
+> **For detailed documentation, refer to the official guide:** [Intel® AI Accelerator Software Installation Documentation](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html)
 >
 > **For automation script details:** See [Firmware Update Script Documentation](../core/scripts/README.md)
 >
