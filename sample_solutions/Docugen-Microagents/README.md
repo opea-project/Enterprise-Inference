@@ -466,6 +466,7 @@ VERIFY_SSL=true
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **Model Names**: Use the exact model names from your inference service
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping
+- **SSL Verification**: set to false only for development with self-signed certificates
 
 **Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./api/.env` (backend) files.
 
