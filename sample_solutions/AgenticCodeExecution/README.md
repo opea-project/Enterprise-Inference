@@ -181,7 +181,6 @@ docker compose up --build
 This starts:
 - `tools-server` on `http://localhost:5050/sse`
 - `sandbox-server` on `http://localhost:5051/sse`
-- `flowise` on `http://localhost:3000`
 - `sandbox-server` waits for healthy `tools-server` before startup
 
 By default, `tools-server` runs in **retail** mode.
@@ -233,7 +232,7 @@ Notes:
 >
 > Then re-run `docker compose up --build -d`.
 
-> **Flowise version note:** The `docker-compose.yml` pins Flowise to `3.0.12`. Flowise `3.1.x` has a breaking change in its MCP SSE client that causes `Invalid response body, expected a web ReadableStream` errors.
+> **Flowise version note:** Flowise `3.1.x` has a breaking change in its MCP SSE client that causes `Invalid response body, expected a web ReadableStream` errors. The EI agenticai plugin pins Flowise to `3.0.12` which works correctly.
 
 Before first run, download the tau2-bench database files for **airline** and **retail** domains (or let the servers auto-download them on first startup):
 
@@ -262,22 +261,16 @@ docker compose down
 
 ## Flowise MCP Config
 
-Since Flowise runs in the same docker-compose stack, use the host bridge IP to reach sandbox-server:
-
-```json
-{
-    "url": "http://172.17.0.1:5051/sse",
-    "transport": "sse"
-}
-```
-
-Alternatively, use your machine's LAN IP (`hostname -I | awk '{print $1}'`):
+When adding the MCP Custom SSE node in Flowise, point it at the sandbox-server. Since Flowise runs inside the K8s cluster (deployed by EI), use the host IP or K8s service to reach the sandbox-server running on Docker:
 
 ```json
 {
     "url": "http://<host-ip>:5051/sse",
     "transport": "sse"
 }
+```
+
+> Find your host IP: `hostname -I | awk '{print $1}'`
 ```
 
 ## Flowise Flows & Prompt Field
@@ -468,9 +461,19 @@ curl -s http://localhost:8000/v1/models   # should return model name
 
 ## Configure Flowise
 
-Open **http://localhost:3000** in your browser.
+Flowise is deployed separately via the **Enterprise Inference agenticai plugin**. See [plugins/agenticai/docs/agenticai-quickstart.md](../../plugins/agenticai/docs/agenticai-quickstart.md) for full deployment and setup instructions.
 
-**First time only:** Create an admin account.
+**Quick summary:**
+
+1. Enable in `core/inventory/inference-config.cfg`:
+   ```properties
+   deploy_agenticai_plugin=on
+   ```
+2. Deploy: `cd core && bash inference-stack-deploy.sh` → select *Provision Enterprise Inference Cluster*
+3. Verify: `kubectl get pods -n flowise`
+4. Access: `https://flowise-<your-domain>`
+
+Once Flowise is running, configure it for this sample:
 
 ### a. Add credential
 
@@ -518,7 +521,7 @@ Replace `<vllm-host>:<port>` with your vLLM endpoint:
 |---|---|
 | URL | `http://<host-ip>:5051/sse` |
 
-> Use the host IP, not `localhost` — Flowise runs inside a container and needs to reach the sandbox-server via the host network.
+> Use the host IP or a resolvable hostname — Flowise runs in the K8s cluster and needs to reach the sandbox-server on the Docker host.
 
 ### d. Set system prompt
 
@@ -544,7 +547,7 @@ Click **Save**, give it a name, save.
 docker compose down
 ```
 
-To also remove volumes (Flowise data, session data):
+To also remove volumes (session data):
 ```bash
 docker compose down -v
 ```
@@ -569,7 +572,6 @@ helm uninstall vllm-qwen3-coder -n default
 | vLLM (Option B) | `http://localhost:8000/v1` | LLM API (Docker, port 8000) |
 | tools-server | `http://localhost:5050/sse` | MCP domain tools (used by sandbox internally) |
 | sandbox-server | `http://localhost:5051/sse` | MCP sandbox endpoint (Flowise connects here) |
-| Flowise | `http://localhost:3000` | Agent builder UI |
 
 ---
 
@@ -579,7 +581,6 @@ Settings in `.env`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `FLOWISE_PORT` | `3000` | Host port for Flowise UI |
 | `MCP_DOMAIN` | `retail` | Domain to run (retail, airline, stocks, banking, triage) |
 
 ---
@@ -606,28 +607,28 @@ Then re-run `docker compose up --build -d`. The proxy is only needed at build ti
 
 ### Flowise: `isDeniedIP: Access to this host is denied by policy`
 
-Flowise has a built-in HTTP deny list that blocks connections to private IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, etc.). The `docker-compose.yml` sets `HTTP_SECURITY_CHECK=false` to allow Flowise to reach MCP servers and vLLM on private IPs. If you see this error, verify the env var is set:
+Flowise has a built-in HTTP deny list that blocks connections to private IP ranges (`10.0.0.0/8`, `172.16.0.0/12`, etc.). When deployed via EI, ensure the `HTTP_SECURITY_CHECK` environment variable is set to `false` in the Flowise deployment. Check:
 
 ```bash
-docker exec flowise env | grep HTTP_SECURITY_CHECK
+kubectl exec -n flowise deploy/flowise -- env | grep HTTP_SECURITY_CHECK
 ```
 
 ### Flowise: `Invalid response body, expected a web ReadableStream`
 
-You are running Flowise `3.1.x` or newer, which broke MCP SSE compatibility. The `docker-compose.yml` pins Flowise to `3.0.12`. If you changed the image tag, revert it:
+You are running Flowise `3.1.x` or newer, which broke MCP SSE compatibility. The EI agenticai plugin pins Flowise to `3.0.12`. Verify the running version:
 
-```yaml
-image: flowiseai/flowise:3.0.12
+```bash
+kubectl get deployment -n flowise flowise -o jsonpath='{.spec.template.spec.containers[0].image}'
 ```
 
-Then `docker compose up -d flowise` to recreate.
+If it shows a version newer than `3.0.12`, update the image tag in `plugins/agenticai/vars/agenticai-plugin-vars.yml` and redeploy.
 
 ### Flowise can't reach vLLM
 
 - Confirm vLLM is healthy: `curl http://<vllm-host>:<port>/health`
 - Use the host IP, not `localhost`, in the Flowise LLM node Base Path
 - If using EI (Option A), the K8s service is on port **80** — do not append `:8000`
-- If using Docker (Option B) and Flowise also runs in Docker, use `172.17.0.1` (Docker bridge gateway) or your machine's LAN IP
+- Since Flowise runs in K8s, use the K8s internal service URL: `http://vllm-qwen3-coder-service.default.svc.cluster.local/v1`
 
 ### MCP tools not visible in Flowise
 

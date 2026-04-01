@@ -60,22 +60,6 @@ services:
       python mcp_server_codemode.py --host 0.0.0.0 --port 5051 --tools-url http://tools-server:5050/sse
     restart: unless-stopped
 
-  # Flowise (visual agent builder UI)
-  flowise:
-    image: flowiseai/flowise:3.0.12
-    container_name: flowise
-    depends_on:
-      sandbox-server:
-        condition: service_started
-    ports:
-      - "${FLOWISE_PORT:-3000}:3000"
-    environment:
-      HTTP_SECURITY_CHECK: "false"
-    volumes:
-      - flowise-data:/root/.flowise
-    restart: unless-stopped
-
 volumes:
-  flowise-data:
   tools-sessions:
   sandbox-sessions:
