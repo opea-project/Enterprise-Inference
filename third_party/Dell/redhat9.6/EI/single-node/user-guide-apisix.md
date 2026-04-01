@@ -1,4 +1,4 @@
-# Intel® AI for Enterprise Inference — Red Hat 9.6 Single-Node Deployment Guide
+# Intel® AI for Enterprise Inference - Red Hat 9.6 Single-Node Deployment Guide
 
 ## Table of Contents
 - [Overview](#overview)
@@ -122,8 +122,8 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
     ```
 
     This generates:
-    - `cert.pem` — TLS certificate
-    - `key.pem` — private key
+    - `cert.pem` - TLS certificate
+    - `key.pem` - private key
 
     > **Note:**
     > `api.example.com` is used as a placeholder throughout this guide.
@@ -153,7 +153,7 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
 1. Visit [huggingface.co](https://huggingface.co) and log in (or create an account).
 2. Go to **Settings → Access Tokens**.
 3. Click **New Token**, enter a name, select the appropriate scope, and copy the generated value.
-4. Store it securely — you will need it during deployment configuration.
+4. Store it securely. You will need it during deployment configuration.
 
 ---
 
@@ -161,9 +161,9 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
 This section explains how to deploy Intel® AI for Enterprise Inference on a single Red Hat Enterprise Linux 9.6 server.
 
 **Additional Prerequisites**
-- Red Hat Enterprise Linux 9.6 (Plow)
+- [Red Hat Enterprise Linux 9.6 (Plow)](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index)
 - Root or sudo access
-- Python 3.10+ — see [Red Hat Python installation guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/installing_and_using_dynamic_programming_languages/assembly_installing-and-using-python_installing-and-using-dynamic-programming-languages)
+- Python 3.10+, see [Red Hat Python installation guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/installing_and_using_dynamic_programming_languages/assembly_installing-and-using-python_installing-and-using-dynamic-programming-languages)
 - `pip`
 - `libselinux-python3`
 
@@ -180,7 +180,7 @@ vi Enterprise-Inference/core/inventory/inference-config.cfg
 ```
 
 > **Note:** Make the following changes for your deployment:
-> - Replace `cluster_url` with your FQDN — it must match the domain used during certificate generation.
+> - Replace `cluster_url` with your FQDN, it must match the domain used during certificate generation.
 > - Add your Hugging Face token.
 > - Set `cpu_or_gpu` to `"cpu"` for Xeon CPU-only deployments, or `"gaudi3"` for Intel® Gaudi® 3 accelerator deployments.
 > - Choose the configuration block below based on your chosen [deployment mode](#deployment-modes).
@@ -268,7 +268,7 @@ vi core/inventory/hosts.yaml
 
 > **Note:**
 > - Add `ansible_python_interpreter: /usr/libexec/platform-python` to explicitly set the Python interpreter for RHEL.
-> - The `ansible_user` field defaults to `ubuntu` — change it to the actual username on your system.
+> - The `ansible_user` field defaults to `ubuntu`, change it to the actual username on your system.
 
 **Example `hosts.yaml`:**
 ```yaml
@@ -321,12 +321,12 @@ Expected state:
 - All pods in `Running` status
 - No `CrashLoopBackOff` or `Pending` pods
 
-**APISIX mode — verify routes:**
+**APISIX mode - verify routes:**
 ```bash
 kubectl get apisixroutes -A
 ```
 
-**GenAI Gateway mode — verify LiteLLM proxy:**
+**GenAI Gateway mode - verify LiteLLM proxy:**
 ```bash
 kubectl get pods -n genai -l app=litellm
 ```
@@ -337,7 +337,7 @@ kubectl get pods -n genai -l app=litellm
 
 #### APISIX (Keycloak Auth)
 
-**Step 1 — Obtain an access token**
+**Step 1: Obtain an access token**
 
 Before generating the token, ensure all Keycloak-related values are correctly set in `Enterprise-Inference/core/scripts/generate-token.sh`. These values must match the Keycloak settings in `Enterprise-Inference/core/inventory/inference-config.cfg`.
 
@@ -347,7 +347,7 @@ chmod +x generate-token.sh
 . generate-token.sh
 ```
 
-**Step 2 — Verify the token**
+**Step 2: Verify the token**
 
 Confirm the token and base URL are available in your shell:
 ```bash
@@ -357,7 +357,7 @@ echo $TOKEN
 
 A valid token is a long JWT string. If empty, re-check your Keycloak configuration.
 
-**Step 3 — Run a test query**
+**Step 3: Run a test query**
 
 For Gaudi:
 ```bash
