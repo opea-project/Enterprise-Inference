@@ -1,7 +1,8 @@
-# Intel® AI for Enterprise Inference - RedHat (APISIX)
+# Intel® AI for Enterprise Inference — Red Hat 9.6 Single-Node Deployment Guide
 
 ## Table of Contents
 - [Overview](#overview)
+- [Deployment Modes](#deployment-modes)
 - [Prerequisites](#prerequisites)
   - [1. System Requirements](#1-system-requirements)
   - [2. SSH Key Setup](#2-ssh-key-setup)
@@ -12,21 +13,38 @@
   - [2. Run the Deployment](#2-run-the-deployment)
   - [3. Verify the Deployment](#3-verify-the-deployment)
   - [4. Test the Inference](#4-test-the-inference)
+    - [APISIX (Keycloak Auth)](#apisix-keycloak-auth)
+    - [GenAI Gateway (LiteLLM)](#genai-gateway-litellm)
 - [Troubleshooting](#troubleshooting)
 - [Summary](#summary)
 
 ---
 
 ## Overview
-This guide walks you through the setup and deployment of **Intel® AI for Enterprise Inference** on Redhat machine in a **single-node** environment.  
-It is designed for new users who may not be familiar with server configuration or AI inference deployment.
+This guide walks you through the setup and deployment of **Intel® AI for Enterprise Inference** on a Red Hat Enterprise Linux 9.6 machine in a **single-node** environment.
+It is designed for users who may not be familiar with server configuration or AI inference deployment.
 
-**You’ll Learn How To:**
+**You'll Learn How To:**
 
 - Prepare your system environment
 - Set up SSH, DNS, SSL/TLS, and Hugging Face tokens
-- Run automated scripts for Intel® Gaudi® accelerators
-- Deploy and test the inference stack on a single node  
+- Choose and configure a deployment mode (APISIX or GenAI Gateway)
+- Run automated deployment scripts for Xeon and Intel® Gaudi® accelerators
+- Deploy and test the inference stack on a single node
+
+---
+
+## Deployment Modes
+
+This guide supports two mutually exclusive deployment modes. Choose one based on your authentication and gateway requirements:
+
+| Feature | **APISIX + Keycloak** | **GenAI Gateway (LiteLLM)** |
+|---|---|---|
+| **API Gateway** | Apache APISIX | LiteLLM Proxy |
+| **Authentication** | Keycloak (OAuth2 / JWT) | LiteLLM Master Key |
+| **Observability** | Optional | Enabled by default |
+| **Config flag** | `deploy_keycloak_apisix=on` / `deploy_genai_gateway=off` | `deploy_keycloak_apisix=off` / `deploy_genai_gateway=on` |
+| **Best for** | Enterprise SSO / multi-tenant access control | Simplified multi-model routing and observability |
 
 ---
 
@@ -34,31 +52,34 @@ It is designed for new users who may not be familiar with server configuration o
 Before starting the deployment, ensure your system meets the following requirements.
 
 ### 1. System Requirements
-  		
+
 | Requirement | Description |
-|--------------|-------------|
-| **Operating System** | Red Hat Enterprise Linux release 9.6 |
+|---|---|
+| **Operating System** | Red Hat Enterprise Linux 9.6 |
 | **Access** | Root or sudo privileges |
-| **Network** | Internet connection for package installation  |
-| **Optional Accelerator SW Versions**  |  Intel® Gaudi® AI Accelerator hardware (for GPU workloads)  |
-| **HL-SMI Version (hl)**  |  ≥1.22.2 |
-| **Firmware Version (fw)**  | 61.3.2-sec-3 |
-| **SPI / Preboot Firmware (Gaudi3**)  | ≥1.19.2-fw-57.2.4-sec-2 |
-| **Driver Version** |   ≥1.22.2-5c9d282  |
-| **NIC Driver Version**  |  ≥1.22.2-5c9d282  |
-| **Habana Container Runtime** |  ≥1.22.2-32  |
-| **Enterprise Inference Version** |	release-1.4.0 or newer |
+| **Network** | Internet connection for package installation |
+| **Optional Accelerator** | Intel® Gaudi® AI Accelerator hardware (for GPU workloads) |
+| **HL-SMI Version (hl)** | ≥ 1.22.2 |
+| **Firmware Version (fw)** | 61.3.2-sec-3 |
+| **SPI / Preboot Firmware (Gaudi3)** | ≥ 1.19.2-fw-57.2.4-sec-2 |
+| **Driver Version** | ≥ 1.22.2-5c9d282 |
+| **NIC Driver Version** | ≥ 1.22.2-5c9d282 |
+| **Habana Container Runtime** | ≥ 1.22.2-32 |
+| **Enterprise Inference Version** | release-1.4.0 or newer |
 
 #### Sudo Setup
 
-Ensure `sudo` preserves `/usr/local/bin` in the PATH. Execute the following to check that `/usr/local/bin` is in /etc/sudoers `secure_path`:
+Ensure `sudo` preserves `/usr/local/bin` in the PATH. Run the following to verify that `/usr/local/bin` is present in `/etc/sudoers` `secure_path`:
 
 ```bash
-$ sudo cat /etc/sudoers | grep secure_path
-Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin
+sudo cat /etc/sudoers | grep secure_path
+# Expected output:
+# Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin
 ```
 
-If you do NOT see `/usr/local/bin`, use `sudo visudo` to edit the sudoers file and append it as you see in the sample output above.
+If `/usr/local/bin` is missing, use `sudo visudo` to edit the sudoers file and append it as shown above.
+
+---
 
 ### 2. SSH Key Setup
 SSH keys are required to allow **Ansible** or automation scripts to connect securely to your nodes.
@@ -67,31 +88,32 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
     ```bash
     ssh-keygen -t rsa -b 4096
     ```
-
-    - Press '**Enter**' to accept defaults.
-    - You can name your key if desired.
-    - Leave the password field blank.
+    - Press **Enter** to accept defaults.
+    - You can provide a custom key name if desired.
+    - Leave the passphrase field blank for non-interactive use.
 
 2. **Distribute the public key:**
 
-    Copy the contents of your `id_rsa.pub` file to authorized_keys:
+    Copy the contents of your `id_rsa.pub` file to `authorized_keys`:
     ```bash
     echo "<PUBLIC_KEY_CONTENTS>" >> ~/.ssh/authorized_keys
     ```
 
 3. **Verify access:**
 
-    Test SSH connectivity:
+    Test SSH connectivity to confirm the key works:
     ```bash
     chmod 600 <path_to_PRIVATE_KEY>
     ssh -i <path_to_PRIVATE_KEY> <USERNAME>@<IP_ADDRESS>
     ```
 
+---
+
 ### 3. DNS and SSL/TLS Setup
 
 1. **Generate a self-signed certificate:**
 
-    Use OpenSSL to generate a temporary certificate:
+    Use OpenSSL to generate a temporary certificate for your FQDN:
     ```bash
     mkdir -p ~/certs && cd ~/certs && \
     openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
@@ -99,77 +121,83 @@ SSH keys are required to allow **Ansible** or automation scripts to connect secu
       -addext "subjectAltName = DNS:api.example.com, DNS:trace-api.example.com"
     ```
 
-    This will generate:
-    `cert.pem` → certificate
-    `key.pem` → private key
+    This generates:
+    - `cert.pem` — TLS certificate
+    - `key.pem` — private key
 
-  > **Note:**  
-  > `api.example.com` is used throughout this guide as a sample.
-  > Replace it with **your own fully qualified domain name (FQDN)** wherever it appears.
+    > **Note:**
+    > `api.example.com` is used as a placeholder throughout this guide.
+    > Replace it with **your own fully qualified domain name (FQDN)** wherever it appears.
 
-2. **Map your DNS to your local IP (only if not registered in DNS):**
+2. **Map your domain to a local IP (only if not registered in DNS):**
 
-    If your domain is not registered in DNS, you can map it manually by editing your /etc/hosts file
+    If your domain is not registered in DNS, map it manually via `/etc/hosts`:
     ```bash
-    hostname -I   # Get your machine's private IP
+    hostname -I   # Retrieve the machine's IP address
     sudo nano /etc/hosts
     ```
- 
-    Add this line:
-    ```bash
-    127.0.0.1 api.example.com
+
+    Add the following line (replace with your actual IP and FQDN):
+    ```
+    <YOUR_IP> api.example.com
     ```
 
-    Save and exit with CTRL+X → Y → Enter.
+    Save and exit: **Ctrl+X → Y → Enter**
 
-  > **Note:** Replace api.example.com with the URL used to generate certs in above step , and this manual mapping is only required if your machine’s hostname is not resolvable via DNS.
-  > If your domain is already managed by a DNS provider, skip this step
+    > **Note:** This manual mapping is only required when your FQDN is not resolvable via DNS.
+    > If your domain is already managed by a DNS provider, skip this step.
+
+---
 
 ### 4. Hugging Face Token Setup
-  1. Visit huggingface.com and log in (or create an account).
-  2. Go to **Settings → Access** Tokens.
-  3. Click “**New Token**”, enter a name, and copy the generated value.
-  4. Store it securely — you’ll need it for deployment.
+1. Visit [huggingface.co](https://huggingface.co) and log in (or create an account).
+2. Go to **Settings → Access Tokens**.
+3. Click **New Token**, enter a name, select the appropriate scope, and copy the generated value.
+4. Store it securely — you will need it during deployment configuration.
 
 ---
 
 ## Single Node Deployment Guide
-This section explains how to deploy Intel® AI for Enterprise Inference on a single Redhat Enterprise Linux9.6 server.
+This section explains how to deploy Intel® AI for Enterprise Inference on a single Red Hat Enterprise Linux 9.6 server.
 
-**Prerequisites**
-- RHEL 9.6 (Plow)
+**Additional Prerequisites**
+- Red Hat Enterprise Linux 9.6 (Plow)
 - Root or sudo access
-- Python 3.10+ https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/installing_and_using_dynamic_programming_languages/assembly_installing-and-using-python_installing-and-using-dynamic-programming-languages
-- pip
-- libselinux-python3
+- Python 3.10+ — see [Red Hat Python installation guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/installing_and_using_dynamic_programming_languages/assembly_installing-and-using-python_installing-and-using-dynamic-programming-languages)
+- `pip`
+- `libselinux-python3`
 
 ---
 
 ### 1. Configure the Setup Files and Environment
 
-**Step1: Modify inference-config.cfg**
+**Step 1: Modify inference-config.cfg**
 
-Clone the repository, If repo is not downloaded on target machine.
+If the repository is not yet cloned on the target machine, clone it first. Then open the config file:
 
 ```bash
 vi Enterprise-Inference/core/inventory/inference-config.cfg
 ```
 
-> **Note:** Update configuration files for single node apisix deployment, Below are the changes needed.
-> * Replace cluster_url with your DNS , it must match with DNS used in certs generation.
-> * Set keycloak `keycloak_client_id` `keycloak_admin_user` `keycloak_admin_password` values
-> * Add your Hugging Face token
-> * Set the cpu_or_gpu value to "cpu" for Xeon models and "gaudi3" for Intel Gaudi 3 accelerator models
-> * Set deploy_keycloak_apisix to on and Set deploy_genai_gateway to off
+> **Note:** Make the following changes for your deployment:
+> - Replace `cluster_url` with your FQDN — it must match the domain used during certificate generation.
+> - Add your Hugging Face token.
+> - Set `cpu_or_gpu` to `"cpu"` for Xeon CPU-only deployments, or `"gaudi3"` for Intel® Gaudi® 3 accelerator deployments.
+> - Choose the configuration block below based on your chosen [deployment mode](#deployment-modes).
 
+---
 
-```
-cluster_url=api.example.com   # <-- Replace with your own FQDN
+#### Configuration for APISIX + Keycloak Mode
+
+Set `deploy_keycloak_apisix=on` and `deploy_genai_gateway=off`. Provide your Keycloak admin credentials.
+
+```ini
+cluster_url=api.example.com          # Replace with your FQDN
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=my-client-id  
-keycloak_admin_user=your-keycloak-admin-user   
-keycloak_admin_password=changeme 
+keycloak_client_id=my-client-id
+keycloak_admin_user=your-keycloak-admin-user
+keycloak_admin_password=changeme
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
@@ -186,92 +214,132 @@ deploy_istio=off
 uninstall_ceph=off
 ```
 
-To support non-interactive execution of inference-stack-deploy.sh, create a file named "core/inventory/.become-passfile" with your user's sudo password:
+---
+
+#### Configuration for GenAI Gateway (LiteLLM) Mode
+
+Set `deploy_genai_gateway=on` and `deploy_keycloak_apisix=off`. Observability is enabled by default in this mode.
+
+```ini
+cluster_url=api.example.com          # Replace with your FQDN
+cert_file=~/certs/cert.pem
+key_file=~/certs/key.pem
+keycloak_client_id=my-client-id
+keycloak_admin_user=your-keycloak-admin-user
+keycloak_admin_password=changeme
+hugging_face_token=your_hugging_face_token
+hugging_face_token_falcon3=your_hugging_face_token
+models=
+cpu_or_gpu=gaudi3
+vault_pass_code=place-holder-123
+deploy_kubernetes_fresh=on
+deploy_ingress_controller=on
+deploy_keycloak_apisix=off
+deploy_genai_gateway=on
+deploy_observability=on
+deploy_llm_models=on
+deploy_ceph=off
+deploy_istio=off
+uninstall_ceph=off
+```
+
+---
+
+To support non-interactive execution of `inference-stack-deploy.sh`, create a `.become-passfile` containing your sudo password:
 
 ```bash
 vi core/inventory/.become-passfile
 chmod 600 core/inventory/.become-passfile
 ```
 
-**Step2: Modify hosts.yaml**
+---
 
-Copy the single node preset hosts config file to the working directory:
+**Step 2: Modify hosts.yaml**
+
+Copy the single-node preset hosts config file to the working directory:
 ```bash
 cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
 ```
 
-Update hosts.yaml file:
-
+Open the file for editing:
 ```bash
 vi core/inventory/hosts.yaml
 ```
 
-> Note: add `ansible_python_interpreter: /usr/libexec/platform-python`, to explicity set  
-> The ansible_user field is set to ubuntu by default, Change it to the actual username used.
+> **Note:**
+> - Add `ansible_python_interpreter: /usr/libexec/platform-python` to explicitly set the Python interpreter for RHEL.
+> - The `ansible_user` field defaults to `ubuntu` — change it to the actual username on your system.
 
-example hosts.yaml file
-
-```bash
+**Example `hosts.yaml`:**
+```yaml
 all:
   hosts:
     master1:
       ansible_connection: local
-      ansible_user: ubuntu
+      ansible_user: your-username
       ansible_become: true
       ansible_python_interpreter: /usr/libexec/platform-python
 ```
+
 ---
 
 ### 2. Run the Deployment
 
 > **Note:**
-> The '--models' argument allows you to specify model by their numeric ID. [full list of available model IDs](../../../ubuntu-22.04/iac/README.md#pre-integrated-models-list)
-> If `--models` is omitted, the installer displays the full model list and prompts you to select a model interactively.
+> The `--models` argument lets you specify a model by its numeric ID.
+> See the [full list of available model IDs](../../../ubuntu-22.04/iac/README.md#pre-integrated-models-list).
+> If `--models` is omitted, the installer displays the full model list and prompts you to select interactively.
 
-**Run the setup for Gaudi**
-
+**Deploy on Intel® Gaudi® 3:**
 ```bash
 cd core
 chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gaudi3"
 ```
 
-**Run the setup for CPU**
-
+**Deploy on CPU (Xeon):**
 ```bash
 cd core
 chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu"
 ```
 
-When prompted, choose option **1) Provision Enterprise Inference Cluster** and confirm **Yes** to start installation.
-If using Intel® Gaudi® hardware, make sure firmware and drivers are updated before running this script.
+When prompted, choose option **1) Provision Enterprise Inference Cluster** and confirm **Yes** to begin installation.
+
+> **Important:** If using Intel® Gaudi® hardware, ensure firmware and drivers meet the minimum versions listed in [System Requirements](#1-system-requirements) before running this script.
 
 ---
 
 ### 3. Verify the Deployment
 
-Verify Pods Status
+**Check pod status:**
 ```bash
 kubectl get pods -A
 ```
-Expected States:
-- All pods Running
-- No CrashLoopBackOff
-- No Pending pods
 
-verify routes
+Expected state:
+- All pods in `Running` status
+- No `CrashLoopBackOff` or `Pending` pods
+
+**APISIX mode — verify routes:**
 ```bash
-kubectl get apisixroutes
+kubectl get apisixroutes -A
+```
+
+**GenAI Gateway mode — verify LiteLLM proxy:**
+```bash
+kubectl get pods -n genai -l app=litellm
 ```
 
 ---
 
 ### 4. Test the Inference
 
-**Obtain Access Token**
+#### APISIX (Keycloak Auth)
 
-Before generating the access token, ensure all Keycloak-related values are correctly set in the `Enterprise-Inference/core/scripts/generate-token.sh` and these values must match with keycloak values in `Enterprise-Inference/core/inventory/inference-config.cfg` .
+**Step 1 — Obtain an access token**
+
+Before generating the token, ensure all Keycloak-related values are correctly set in `Enterprise-Inference/core/scripts/generate-token.sh`. These values must match the Keycloak settings in `Enterprise-Inference/core/inventory/inference-config.cfg`.
 
 ```bash
 cd Enterprise-Inference/core/scripts
@@ -279,42 +347,82 @@ chmod +x generate-token.sh
 . generate-token.sh
 ```
 
-**Verify the Token**
+**Step 2 — Verify the token**
 
-After the script completes successfully, confirm that the token is available in your shell:
-
+Confirm the token and base URL are available in your shell:
 ```bash
 echo $BASE_URL
 echo $TOKEN
 ```
 
-If a valid token is returned (long JWT string), the environment is ready for inference testing.
+A valid token is a long JWT string. If empty, re-check your Keycloak configuration.
+
+**Step 3 — Run a test query**
+
+For Gaudi:
+```bash
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}'
+```
+
+For CPU:
+```bash
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}'
+```
+
+---
+
+#### GenAI Gateway (LiteLLM)
+
+Set the base URL and retrieve the master key from the vault file:
+```bash
+export BASE_URL=https://api.example.com    # Replace with your FQDN
+```
+
+> **Note:** The `litellm_master_key` is located in `core/inventory/metadata/vault.yml`.
 
 **Run a test query for Gaudi:**
 ```bash
-curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
--X POST \
--d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' \
--H 'Content-Type: application/json' \
--H "Authorization: Bearer $TOKEN"
+curl -k https://${BASE_URL}/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <litellm_master_key>" \
+  -d '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "prompt": "What is Deep Learning?",
+    "max_tokens": 25,
+    "temperature": 0
+  }'
 ```
 
 **Run a test query for CPU:**
 ```bash
-curl -k ${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
--X POST \
--d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' \
--H 'Content-Type: application/json' \
--H "Authorization: Bearer $TOKEN"
+curl -k https://${BASE_URL}/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <litellm_master_key>" \
+  -d '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "prompt": "What is Deep Learning?",
+    "max_tokens": 25,
+    "temperature": 0
+  }'
 ```
 
-If successful, the model will return a completion response.
+A successful response will contain a JSON completion from the model.
 
 ---
 
 ## Troubleshooting
 
-This document provides common deployment and runtime issues observed during Intel® AI for Enterprise Inference setup — along with step-by-step resolutions.
+This section documents common deployment and runtime issues observed during Intel® AI for Enterprise Inference setup, along with step-by-step resolutions.
 
 [**Troubleshooting Guide**](./troubleshooting.md)
 
@@ -322,31 +430,11 @@ This document provides common deployment and runtime issues observed during Inte
 
 ## Summary
 
-**You’ve successfully:**
+**You have successfully:**
 
-- Verified system readiness
-- Configured SSH, DNS, and SSL
-- Generated your Hugging Face token
-- Deployed Intel® AI for Enterprise Inference
-- Tested a working model endpoint
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- Verified system requirements and prerequisites
+- Configured SSH keys, DNS, and TLS certificates
+- Generated a Hugging Face access token
+- Chosen and configured a deployment mode (APISIX or GenAI Gateway)
+- Deployed Intel® AI for Enterprise Inference on a single Red Hat 9.6 node
+- Tested a working model inference endpoint
