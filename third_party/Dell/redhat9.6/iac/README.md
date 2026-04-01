@@ -188,7 +188,7 @@ Expected:
 
 ### 6. Test Model Inference
 
-Refer to the [Single-Node Deployment Guide](../EI/single-node/user-guide-apisix.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
+Refer to the [RedHat9.6 Single-Node Deployment Guide](../EI/single-node/user-guide-apisix.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
 
 ---
 
