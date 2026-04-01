@@ -1,0 +1,24 @@
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+
+# Environment files
+.env.*
+!.env.example
+!.env
+
+# Prompt-builder generated artifacts
+prompt-builder/data/retail/runs/
+prompt-builder/data/retail/optimization_report.json
+prompt-builder/data/retail/retail_optimized_system_prompt.txt
+prompt-builder/data/retail/retail_first10_validation.json
+prompt-builder/data/retail/sections/section1_generic.txt
+prompt-builder/data/retail/sections/section2_seed.txt
+prompt-builder/data/retail/sections/section3_policy.txt
+
+# tau2-bench database files (downloaded separately, see README)
+data/airline/db.json
+data/retail/db.json
+
+# Runtime session data
+tools-server/session_dbs/
