@@ -14,7 +14,7 @@ The script:
 
 | Requirement | Description |
 |--------------|-------------|
-| **Operating System** | RHEL 9.6 |
+| **Operating System** | [Red Hat Enterprise Linux 9.6](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/performing_a_standard_rhel_9_installation/index) |
 | **Access** | Root or sudo privileges |
 | **Network** | Internet connection for package installation  |
 | **Optional Accelerator SW Versions**  |  Intel® Gaudi® AI Accelerator hardware (for GPU workloads)  |
@@ -40,7 +40,7 @@ chmod +x deploy-enterprise-inference.sh
 ```bash
 sudo ./deploy-enterprise-inference.sh \
 -u user \
--p Linux123! \
+-p <your-sudo-password> \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
 -a cluster-url \
@@ -53,7 +53,7 @@ sudo ./deploy-enterprise-inference.sh \
 |--------|----------|----------|-------------|
 | `-u, --username` | Yes (deploy & uninstall) | (none) | Enterprise Inference owner username. Must match the invoking (sudo) user. |
 | `-t, --token` | Yes (deploy only) | (none) | Hugging Face access token used to validate and download selected models. |
-| `-p, --password` | No | `Linux123!` | User sudo password used for Ansible become operations. |
+| `-p, --password` | No | (none) | User sudo password used for Ansible become operations. |
 | `-g, --gpu-type` | No | `gaudi3` | Deployment target type: `gaudi3` or `cpu`. |
 | `-m, --models` | No | `""` (interactive mode) | Choose model ID from [Pre-Integrated Models List](../../ubuntu-22.04/iac/README.md#pre-integrated-models-list) , based on your deployment type (gaudi or cpu) . If not provided, deployment runs interactively. |
 | `-b, --branch` | No | `release-1.4.0` | Git branch of the Enterprise-Inference repository to clone. |
@@ -72,7 +72,7 @@ The deployment script is resume-safe. If a failure occurs, simply rerun the scri
 ```bash
 sudo ./deploy-enterprise-inference.sh \
 -u user \
--p Linux123! \
+-p <your-sudo-password> \
 -t hf_XXXXXXXXXXXX \
 -g gaudi3 \
 -a cluster-url \
@@ -188,9 +188,7 @@ Expected:
 
 ### 6. Test Model Inference
 
-if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference
-
-if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-node/user-guide-genai.md#5-test-the-inference) for generating api-key and testing the inference
+Refer to the [Single-Node Deployment Guide](../EI/single-node/user-guide-apisix.md#4-test-the-inference) for instructions on generating a token or API key and testing model inference for both APISIX and GenAI Gateway deployment modes.
 
 ---
 
