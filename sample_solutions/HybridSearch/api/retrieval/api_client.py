@@ -54,8 +54,7 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        # Standard OpenAI format
-        client_base_url = f"{self.base_url}/v1"
+        client_base_url = f"{self.base_url}"
         return client_base_url, self.token
 
     def rerank_pairs(self, query: str, docs: list[str]) -> list[float]:
@@ -75,10 +74,10 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        # Standard reranking endpoint
-        url = f"{self.base_url}/v1/rerank"
+        url = f"{self.base_url}/rerank"
 
         payload = {
+            "model": settings.reranker_model_name,
             "query": query,
             "documents": docs,
             "top_n": len(docs),

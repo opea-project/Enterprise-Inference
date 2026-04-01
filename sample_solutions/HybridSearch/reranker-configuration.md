@@ -1,5 +1,9 @@
 # BAAI/bge-reranker-base: Post-Deployment Configuration Workflow
 
+> **Scope:** Xeon CPU deployments only (vLLM + LiteLLM/GenAI Gateway backend).
+> For Gaudi deployments using TEI, the reranker works out of the box — simply set
+> `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL and skip this guide.
+
 > **Environment:** Intel Xeon CPU | vLLM backend | LiteLLM GenAI Gateway via APISIX
 > **Deployment tool:** `inference-deploy.sh` (Enterprise Inference CLI)
 > **Final service:** `bge-reranker-base-cpu-vllm-service.default`
@@ -42,12 +46,14 @@ kubectl get pods -n default | grep bge-reranker
 Before any configuration changes, test the rerank endpoint. **This will likely fail** with an OpenAI-format exception because the model is registered with incorrect defaults by the deployment script.
 
 ```bash
-BASE_URL="https://api.example.com:4000"
+# Generate a token first: bash core/scripts/generate-token.sh
+TOKEN="your-generated-token-here"
+BASE_URL="https://api.example.com"
 
 curl -k "${BASE_URL}/v1/rerank" \
   -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer Token" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{
     "model": "BAAI/bge-reranker-base",
     "query": "What is the name of the dataset introduced in this paper?",
@@ -94,12 +100,12 @@ The `model/update` curl command requires the internal LiteLLM model ID (a UUID),
 Replace `<MODEL_UUID>` with the UUID you copied from the UI in Step 3.
 
 ```bash
-BASE_URL="https://api.example.com:4000"
+# TOKEN and BASE_URL should be set from Step 2 above
 MODEL_UUID="77ce7b6e-3f75-4c66-9623-c735d0024e85"   # ← paste your UUID here
 
 curl -k -X POST "${BASE_URL}/model/update" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Token" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{
     "model_id": "'"${MODEL_UUID}"'",
     "model_name": "BAAI/bge-reranker-base",
@@ -163,13 +169,13 @@ Verify the following in the Edit Model form:
 
 ## Step 6: Re-run the Curl — Successful Result
 
-Run the exact same curl from Step 2:
+Run the exact same curl from Step 2 (using the same `TOKEN` and `BASE_URL` variables):
 
 ```bash
 curl -k "${BASE_URL}/v1/rerank" \
   -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer Token" \
+  -H "Authorization: Bearer ${TOKEN}" \
   -d '{
     "model": "BAAI/bge-reranker-base",
     "query": "What is the name of the dataset introduced in this paper?",
