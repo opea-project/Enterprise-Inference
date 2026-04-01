@@ -53,9 +53,9 @@ Before re-running deployment, verify and update your inference-config.cfg:
 cluster_url=api.example.com
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
-keycloak_client_id=api
-keycloak_admin_user=api-admin
-keycloak_admin_password=changeme!!
+keycloak_client_id=my-client-id
+keycloak_admin_user=your-keycloak-admin-user
+keycloak_admin_password=changeme
 hugging_face_token=your_hugging_face_token
 hugging_face_token_falcon3=your_hugging_face_token
 models=
