@@ -35,14 +35,15 @@ class APIClient:
     """
 
     def __init__(self):
-        # Use per-model endpoint if set (APISIX), otherwise fall back to GenAI Gateway URL
+        # Use per-model endpoint if set (APISIX/Keycloak), otherwise fall back to GenAI Gateway URL
+        self.use_apisix = bool(settings.reranker_api_endpoint)
         base_url = settings.reranker_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=60.0) if self.token else None
 
         if self.token and self.base_url:
-            logger.info(f"Using gateway at {self.base_url}")
+            logger.info(f"Using {'APISIX' if self.use_apisix else 'GenAI Gateway'} at {self.base_url}")
 
     def get_rerank_client(self):
         """
@@ -74,15 +75,26 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        url = f"{self.base_url}/rerank"
-
-        payload = {
-            "model": settings.reranker_model_name,
-            "query": query,
-            "documents": docs,
-            "top_n": len(docs),
-            "return_documents": False
-        }
+        # APISIX/Keycloak (vLLM/TEI): /rerank with "texts" field
+        # GenAI Gateway (LiteLLM):    /v1/rerank with "documents" field
+        if self.use_apisix:
+            url = f"{self.base_url}/rerank"
+            payload = {
+                "model": settings.reranker_model_name,
+                "query": query,
+                "texts": docs,
+                "top_n": len(docs),
+                "return_documents": False
+            }
+        else:
+            url = f"{self.base_url}/v1/rerank"
+            payload = {
+                "model": settings.reranker_model_name,
+                "query": query,
+                "documents": docs,
+                "top_n": len(docs),
+                "return_documents": False
+            }
 
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -98,12 +110,23 @@ class APIClient:
             logger.error(f"Reranker API error: {response.status_code} - {response.text}")
             response.raise_for_status()
 
-        # Expected format: {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
-        results = response.json().get("results", [])
-        # Reconstruct scores in input order
+        response_data = response.json()
+        logger.info(f"Reranker raw response: {response_data}")
+
+        # Handle both response formats:
+        # vLLM/APISIX:    [{"index": 0, "score": 0.9}, ...]
+        # LiteLLM/Cohere: {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
+        if isinstance(response_data, list):
+            results = response_data
+        else:
+            results = response_data.get("results", [])
+
         scores = [0.0] * len(docs)
         for res in results:
-            scores[res["index"]] = res["relevance_score"]
+            if isinstance(response_data, list):
+                scores[res["index"]] = res["score"]
+            else:
+                scores[res["index"]] = res["relevance_score"]
 
         return scores
 

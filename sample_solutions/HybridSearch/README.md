@@ -178,10 +178,10 @@ VERIFY_SSL=true
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
   - The API key is the `litellm_master_key` value from the generated `vault.yml` file
 
-- **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+- **Keycloak / APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
-  - The token is generated using Keycloak client credentials
-  - Note that APISIX requires the model name in the URL path (e.g., `https://apisix-gateway.example.com/Llama-3.1-8B-Instruct`)
+  - The token is generated using Keycloak client credentials (expires in 15 minutes)
+  - For Keycloak, each model has its own APISIX route path. Run `kubectl get apisixroutes` to find the route names for your deployed models (e.g., `bge-base-en-v1.5`, `bge-reranker-base`, `Qwen3-4B-Instruct-2507`)
 
 ### Configure Models
 Ensure your model endpoints match your deployment.
@@ -194,6 +194,15 @@ RERANKER_MODEL_ENDPOINT=BAAI/bge-reranker-base
 RERANKER_MODEL_NAME=BAAI/bge-reranker-base
 LLM_MODEL_ENDPOINT=Qwen/Qwen3-4B-Instruct-2507
 LLM_MODEL_NAME=Qwen/Qwen3-4B-Instruct-2507
+```
+
+**Keycloak / APISIX deployments:** You must also uncomment and set the per-model API endpoint variables in your `.env`. Each model needs its own APISIX route URL (use `kubectl get apisixroutes` to find the route paths):
+
+```bash
+# APISIX Gateway Per-Model Endpoints (required for Keycloak)
+EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5
+RERANKER_API_ENDPOINT=https://api.example.com/bge-reranker-base
+LLM_API_ENDPOINT=https://api.example.com/Qwen3-4B-Instruct-2507
 ```
 
 ### Running the Application
