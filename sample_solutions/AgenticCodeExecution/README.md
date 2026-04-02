@@ -21,16 +21,6 @@ Flowise (or other MCP client)
 
 **sandbox-server (port 5051)** — Exposes `execute_python` and proxies `actions.*` calls to tools-server. Uses session-aware routing (`mcp-session-id`) and stores run hashes in `sandbox-server/session_hashes/`. Starts independently and auto-refreshes tool discovery in the background. Dynamically regenerates `execute_python` description when connected tools change.
 
-## Domains
-
-| Domain | Tools server | System prompt | Database |
-|---|---|---|---|
-| retail | `mcp_retail_server.py` | `system-prompts/retail-system-prompt.txt` | Auto-downloaded from [τ-bench](https://github.com/sierra-research/tau2-bench) |
-| airline | `mcp_airline_server.py` | `system-prompts/airline-system-prompt.txt` | Auto-downloaded from τ-bench |
-| stocks | `mcp_stocks_server.py` | `system-prompts/stocks-system-prompt.txt` | Included (`data/stocks/db.json`) |
-| banking | `mcp_banking_server.py` | `system-prompts/banking-system-prompt.txt` | Included (`data/banking/db.json`) |
-| triage | `mcp_triage_server.py` | `system-prompts/triage-system-prompt.txt` | No database required |
-
 ## Quick Start (Docker)
 
 ```bash
