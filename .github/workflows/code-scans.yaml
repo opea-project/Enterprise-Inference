@@ -1,0 +1,167 @@
+name: SDLE Scans
+
+on:
+  workflow_dispatch:
+    inputs:
+      PR_number:
+        description: 'Pull request number'
+        required: true
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: sdle-${{ github.event.inputs.PR_number || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+
+# -----------------------------
+# 1) Trivy Scan
+# -----------------------------
+  trivy_scan:
+    name: Trivy Vulnerability Scan
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.PR_number && format('refs/pull/{0}/merge', github.event.inputs.PR_number) || '' }}
+      
+      - name: Create report directory
+        run: mkdir -p trivy-reports
+      
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln,misconfig,secret'
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          output: 'trivy-reports/trivy_scan_report.txt'
+            
+      - name: Run Trivy Image Scan - vllm-cpu
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          scan-type: 'image'
+          image-ref: 'public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.10.2'
+          severity: 'HIGH,CRITICAL'
+          format: 'table'
+          output: 'trivy-reports/trivy-vllm-cpu.txt'
+
+      - name: Upload Trivy Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: trivy-reports/
+          
+      - name: Show Trivy FS Report in Logs
+        if: always()
+        run: |
+          echo "========= TRIVY FS SCAN FINDINGS ========="
+          cat trivy-reports/trivy_scan_report.txt || echo "No FS scan report found"
+          echo "=========================================="
+
+# -----------------------------
+# 2) Bandit Scan
+# -----------------------------
+  bandit_scan:
+    name: Bandit security scan
+    runs-on: self-hosted
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.PR_number && format('refs/pull/{0}/merge', github.event.inputs.PR_number) || '' }}
+        submodules: 'recursive'
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+    - name: Install Bandit
+      run: pip install bandit
+    - name: Create Bandit configuration
+      run: |
+        cat > .bandit << 'EOF'
+        [bandit]
+        exclude_dirs = tests,test,venv,.venv,node_modules
+        skips = B101
+        EOF
+      shell: bash
+    - name: Run Bandit scan
+      run: |
+        bandit -r . -ll -iii -f screen
+        bandit -r . -ll -iii -f html -o bandit-report.html
+    - name: Upload Bandit Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: bandit-report
+        path: bandit-report.html
+        retention-days: 30
+# -----------------------------
+# 3) ShellCheck Scan
+# -----------------------------
+  shellcheck_scan:
+    name: ShellCheck script analysis
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.PR_number && format('refs/pull/{0}/merge', github.event.inputs.PR_number) || '' }}
+
+      - name: Create report directory
+        run: mkdir -p shellcheck-reports
+
+      - name: Install ShellCheck
+        run: |
+          # Check if shellcheck is already installed
+          if ! command -v shellcheck &> /dev/null; then
+            wget -qO- "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz" | tar -xJv
+            sudo cp shellcheck-stable/shellcheck /usr/local/bin/
+            rm -rf shellcheck-stable
+          fi
+          shellcheck --version
+          
+      - name: Find shell scripts
+        id: find_scripts
+        run: |
+          SCRIPT_COUNT=$(find . -type f -name "*.sh" ! -path "./.git/*" | wc -l)
+          echo "Shell scripts found: $SCRIPT_COUNT"
+          echo "script_count=$SCRIPT_COUNT" >> $GITHUB_OUTPUT
+          
+      - name: Run ShellCheck
+        if: steps.find_scripts.outputs.script_count > 0
+        continue-on-error: true
+        run: |
+          echo "ShellCheck Analysis Report" > shellcheck-reports/shellcheck-report.txt
+          echo "==========================" >> shellcheck-reports/shellcheck-report.txt
+          echo "" >> shellcheck-reports/shellcheck-report.txt
+          
+          find . -type f -name "*.sh" ! -path "./.git/*" | while read -r script; do
+            echo "Checking: $script" >> shellcheck-reports/shellcheck-report.txt
+            shellcheck -f gcc "$script" >> shellcheck-reports/shellcheck-report.txt 2>&1 || true
+            echo "" >> shellcheck-reports/shellcheck-report.txt
+          done
+          
+          cat shellcheck-reports/shellcheck-report.txt
+          
+      - name: Create empty report if no scripts
+        if: steps.find_scripts.outputs.script_count == 0
+        run: |
+          echo "ShellCheck Analysis Report" > shellcheck-reports/shellcheck-report.txt
+          echo "No shell scripts found to analyze." >> shellcheck-reports/shellcheck-report.txt
+        
+      - name: Upload ShellCheck Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shellcheck-report
+          path: shellcheck-reports/shellcheck-report.txt
