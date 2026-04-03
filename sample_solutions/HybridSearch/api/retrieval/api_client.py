@@ -37,13 +37,16 @@ class APIClient:
     def __init__(self):
         # Use per-model endpoint if set (APISIX/Keycloak), otherwise fall back to GenAI Gateway URL
         self.use_apisix = bool(settings.reranker_api_endpoint)
+        # TEI (Gaudi) does not use /v1 prefix; vLLM (Xeon) does
+        self.use_tei = settings.inference_backend.lower() == "tei"
         base_url = settings.reranker_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=60.0) if self.token else None
 
         if self.token and self.base_url:
-            logger.info(f"Using {'APISIX' if self.use_apisix else 'GenAI Gateway'} at {self.base_url}")
+            backend = "APISIX" if self.use_apisix else f"GenAI Gateway ({settings.inference_backend})"
+            logger.info(f"Using {backend} at {self.base_url}")
 
     def get_rerank_client(self):
         """
@@ -75,8 +78,9 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        # APISIX/Keycloak: /rerank   |   GenAI Gateway (LiteLLM): /v1/rerank
-        url = f"{self.base_url}/rerank" if self.use_apisix else f"{self.base_url}/v1/rerank"
+        # APISIX or TEI (Gaudi): /rerank   |   GenAI Gateway + vLLM (Xeon): /v1/rerank
+        use_no_v1 = self.use_apisix or self.use_tei
+        url = f"{self.base_url}/rerank" if use_no_v1 else f"{self.base_url}/v1/rerank"
 
         # Send both "documents" (vLLM / LiteLLM) and "texts" (TEI) so the
         # payload works regardless of the backend — each ignores the extra field.

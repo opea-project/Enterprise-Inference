@@ -40,12 +40,14 @@ class APIClient:
         base_url = settings.embedding_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
+        # TEI (Gaudi) does not use /v1 prefix; vLLM (Xeon) does
+        self.use_tei = settings.inference_backend.lower() == "tei"
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=30.0) if self.token else None
 
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        logger.info(f"Using gateway at {self.base_url}")
+        logger.info(f"Using gateway at {self.base_url} (backend: {settings.inference_backend})")
 
     def get_embedding_client(self):
         """
@@ -54,7 +56,8 @@ class APIClient:
         Returns:
             OpenAI: An instantiated OpenAI client configured for the GenAI Gateway.
         """
-        client_base_url = f"{self.base_url}/v1"
+        # TEI (Gaudi) serves at /embeddings; vLLM (Xeon) serves at /v1/embeddings
+        client_base_url = self.base_url if self.use_tei else f"{self.base_url}/v1"
         logger.info(f"Creating OpenAI client with base_url: {client_base_url}")
 
         http_client = httpx.Client(verify=settings.verify_ssl, timeout=30.0)

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Per-model endpoint URL (required for APISIX, optional for GenAI Gateway)
     llm_api_endpoint: Optional[str] = None
 
+    # Inference backend type: "vllm" (Xeon, default) or "tei" (Gaudi)
+    # TEI does not use the /v1 path prefix; vLLM does
+    inference_backend: str = "vllm"
+
     # Model Configuration (for Enterprise)
     llm_model_endpoint: str = "Qwen/Qwen3-4B-Instruct-2507"
     llm_model_name: str = "Qwen/Qwen3-4B-Instruct-2507"

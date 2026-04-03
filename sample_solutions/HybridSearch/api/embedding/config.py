@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # APISIX: Set to full URL with model path, e.g. https://api.example.com/bge-base-en-v1.5
     # GenAI Gateway: Leave unset (falls back to GENAI_GATEWAY_URL)
     embedding_api_endpoint: Optional[str] = None
+
+    # Inference backend type: "vllm" (Xeon, default) or "tei" (Gaudi)
+    # TEI does not use the /v1 path prefix; vLLM does
+    inference_backend: str = "vllm"
     
     # Model Configuration (for Enterprise)
     embedding_model_endpoint: str = "bge-large-en-v1.5-vllmcpu"

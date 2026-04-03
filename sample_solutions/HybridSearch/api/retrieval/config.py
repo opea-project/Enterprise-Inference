@@ -44,6 +44,10 @@ class Settings(BaseSettings):
 
     # Per-model endpoint URL (required for APISIX, optional for GenAI Gateway)
     reranker_api_endpoint: Optional[str] = None
+
+    # Inference backend type: "vllm" (Xeon, default) or "tei" (Gaudi)
+    # TEI does not use the /v1 path prefix; vLLM does
+    inference_backend: str = "vllm"
     
     # Reranker Model Configuration (for Enterprise)
     reranker_model_endpoint: str = "bge-reranker-base-vllmcpu"

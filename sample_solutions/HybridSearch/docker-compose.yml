@@ -76,6 +76,7 @@ services:
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
       - EMBEDDING_API_ENDPOINT=${EMBEDDING_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"
@@ -117,6 +118,7 @@ services:
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
       - RERANKER_API_ENDPOINT=${RERANKER_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"
@@ -157,6 +159,7 @@ services:
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}
       - LLM_API_ENDPOINT=${LLM_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
       - VERIFY_SSL=${VERIFY_SSL:-true}
     extra_hosts:
       - "${LOCAL_URL_ENDPOINT}:host-gateway"
