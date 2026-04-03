@@ -37,11 +37,13 @@ class APIClient:
 
     def __init__(self):
         # Use per-model endpoint if set (APISIX), otherwise fall back to GenAI Gateway URL
+        self.use_apisix = bool(settings.llm_api_endpoint)
         base_url = settings.llm_api_endpoint or settings.genai_gateway_url
         self.base_url = clean_url(base_url).rstrip('/') if base_url else None
         self.token = settings.genai_api_key
-        # TEI (Gaudi) does not use /v1 prefix; vLLM (Xeon) does
-        self.use_tei = settings.inference_backend.lower() == "tei"
+        # LLM is always vLLM (even on Gaudi), so only drop /v1 for GenAI Gateway + Gaudi.
+        # When APISIX is in use (LLM_API_ENDPOINT set), always keep /v1.
+        self.use_tei = settings.inference_backend.lower() == "tei" and not self.use_apisix
         self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=120.0) if self.token else None
 
         if not self.token or not self.base_url:
