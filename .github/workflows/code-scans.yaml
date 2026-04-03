@@ -36,7 +36,7 @@ jobs:
         run: mkdir -p trivy-reports
       
       - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@0.28.0
         continue-on-error: true
         with:
           scan-type: 'fs'
