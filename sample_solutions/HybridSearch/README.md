@@ -251,9 +251,12 @@ curl http://localhost:8000/api/v1/health/services
 ## Reranker Post-Deployment Configuration
 
 > [!IMPORTANT]
-> If you have enabled reranking (`USE_RERANKING=true`) and deployed `BAAI/bge-reranker-base` via the Enterprise Inference CLI, **the model requires a one-time post-deployment configuration step before it will work correctly.**
+> **GenAI Gateway (LiteLLM) deployments only.** If you deployed Enterprise Inference with GenAI Gateway and have enabled reranking (`USE_RERANKING=true`), the `BAAI/bge-reranker-base` model requires a one-time post-deployment configuration step before it will work correctly.
 >
 > The deployment script registers the model with the wrong provider (`openai`) and without the required `mode: rerank` field. Without this fix, all rerank requests will return a `400 BadRequestError` from LiteLLM and reranking will silently fall back or fail.
+
+> [!NOTE]
+> **Keycloak / APISIX deployments do not need this step.** The reranker works out of the box — just set `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL (e.g., `https://api.example.com/bge-reranker-base`) and ensure `USE_RERANKING=true`.
 
 The fix involves a single `curl` command to update the model registration in LiteLLM, changing the provider to `cohere` and setting `mode: rerank`. The full step-by-step workflow — including how to find the model UUID, the exact update payload, and how to verify the changes in the LiteLLM UI — is documented in:
 
@@ -267,9 +270,6 @@ The fix involves a single `curl` command to update the model registration in Lit
 | Model mode | *(missing)* | `rerank` |
 | Pass-through | `false` | `true` |
 | API base | *(may include `/v1` suffix)* | `...vllm-service.default` (no `/v1`) |
-
-> [!NOTE]
-> This step is only required when deploying the reranker via the Enterprise Inference CLI on a vLLM/LiteLLM stack. If `USE_RERANKING=false` (the default), no action is needed.
 
 ---
 

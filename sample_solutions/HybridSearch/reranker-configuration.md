@@ -1,17 +1,13 @@
 # BAAI/bge-reranker-base: Post-Deployment Configuration Workflow
 
+> **Scope:** GenAI Gateway (LiteLLM) deployments only.
+> **Keycloak / APISIX users — you do not need this guide.** The reranker works out of the
+> box. Just set `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL and
+> ensure `USE_RERANKING=true`.
+
+> **Environment:** GenAI Gateway (LiteLLM) | vLLM backend
 > **Deployment tool:** `inference-deploy.sh` (Enterprise Inference CLI)
 > **Final service:** `bge-reranker-base-cpu-vllm-service.default`
-
-This guide covers reranker configuration for both deployment types:
-
-| | Keycloak / APISIX | GenAI Gateway (LiteLLM) |
-|---|---|---|
-| **Backend** | vLLM / TEI (direct) | LiteLLM proxy |
-| **Rerank endpoint** | `{BASE_URL}/rerank` | `{BASE_URL}/v1/rerank` |
-| **Payload field** | `"texts"` | `"documents"` |
-| **Response format** | `[{"index": 0, "score": 0.9}]` | `{"results": [{"index": 0, "relevance_score": 0.9}]}` |
-| **Post-deploy config** | None — works out of the box | Steps 3–5 required (LiteLLM model update) |
 
 ---
 
@@ -47,64 +43,19 @@ kubectl get pods -n default | grep bge-reranker
 
 ## Step 2: Set Up Authentication
 
-Token setup depends on your deployment type:
-
-**Keycloak / APISIX:**
-```bash
-# Generate a Keycloak client credentials token (expires in 15 minutes)
-bash core/scripts/generate-token.sh
-# Copy the TOKEN value from the output
-TOKEN="your-generated-token-here"
-
-# BASE_URL must include the model route path
-BASE_URL="https://api.example.com/bge-reranker-base"
-```
-
-**GenAI Gateway (LiteLLM):**
 ```bash
 # Token is the litellm_master_key from core/inventory/metadata/vault.yml
 TOKEN="your-vault-token-here"
 
-# BASE_URL is the gateway URL without any model path
+# BASE_URL is the GenAI Gateway URL without any model path
 BASE_URL="https://api.example.com"
 ```
 
 ---
 
-## Step 3: Curl Test
+## Step 3: First Curl Test — Expect a Failure
 
-### Keycloak / APISIX
-
-```bash
-curl -k "${BASE_URL}/rerank" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -d '{
-    "model": "BAAI/bge-reranker-base",
-    "query": "What is the name of the dataset introduced in this paper?",
-    "texts": [
-      "The dataset MMHS150K contains 150,000 multimodal tweets.",
-      "We use GloVe embeddings for text.",
-      "The paper introduces MMHS150K for hate speech detection."
-    ],
-    "top_n": 3,
-    "return_documents": false
-  }'
-```
-
-**Expected successful response:**
-```json
-[
-  {"index": 2, "score": 0.9273633},
-  {"index": 0, "score": 0.9241418},
-  {"index": 1, "score": 0.010328152}
-]
-```
-
-> If this works, you are done — no further configuration needed for Keycloak/APISIX deployments. Set `RERANKER_API_ENDPOINT` in your `.env` to the `BASE_URL` value above and `USE_RERANKING=true`.
-
-### GenAI Gateway (LiteLLM)
+Before any configuration changes, test the rerank endpoint. **This will likely fail** because the model is registered with incorrect defaults by the deployment script.
 
 ```bash
 curl -k "${BASE_URL}/v1/rerank" \
@@ -140,9 +91,7 @@ curl -k "${BASE_URL}/v1/rerank" \
 
 ---
 
-## Step 4: Get the Model UUID (GenAI Gateway Only)
-
-> **Skip this step and Steps 5–6 if using Keycloak/APISIX.**
+## Step 4: Get the Model UUID
 
 The `model/update` curl command requires the internal LiteLLM model ID (a UUID), not the HuggingFace model name.
 
@@ -174,7 +123,7 @@ for m in data['data']:
 
 ---
 
-## Step 5: Run the Model Update Curl Command (GenAI Gateway Only)
+## Step 5: Run the Model Update Curl Command
 
 Replace `<MODEL_UUID>` with the UUID you copied from Step 4.
 
@@ -224,7 +173,7 @@ curl -k -X POST "${BASE_URL}/model/update" \
 
 ---
 
-## Step 6: Verify Changes in the LiteLLM UI (GenAI Gateway Only)
+## Step 6: Verify Changes in the LiteLLM UI
 
 After the update curl returns 200, go back to the LiteLLM UI and confirm every field updated correctly.
 
@@ -245,9 +194,9 @@ Verify the following in the Edit Model form:
 
 ---
 
-## Step 7: Re-run the Curl — Successful Result (GenAI Gateway Only)
+## Step 7: Re-run the Curl — Successful Result
 
-Run the same curl from Step 3 (GenAI Gateway variant):
+Run the same curl from Step 3:
 
 ```bash
 curl -k "${BASE_URL}/v1/rerank" \
@@ -297,4 +246,3 @@ curl -k "${BASE_URL}/v1/rerank" \
 | Step 7 still throws OpenAI exception | `mode: rerank` not set | Check Raw JSON tab — re-run Step 5 |
 | All relevance scores ~0.5 | vLLM loaded but not inferring | `kubectl logs <pod-name> -n default` |
 | `use_in_pass_through` not toggling | UI bug | Set via curl in Step 5 and confirm in Raw JSON |
-| 401 Unauthorized (Keycloak) | Token expired | Re-run `bash core/scripts/generate-token.sh` |

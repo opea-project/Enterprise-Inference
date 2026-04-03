@@ -75,26 +75,19 @@ class APIClient:
         if not self.token or not self.base_url:
             raise ValueError("GenAI Gateway configuration missing. Check GENAI_GATEWAY_URL and GENAI_API_KEY.")
 
-        # APISIX/Keycloak (vLLM/TEI): /rerank with "texts" field
-        # GenAI Gateway (LiteLLM):    /v1/rerank with "documents" field
-        if self.use_apisix:
-            url = f"{self.base_url}/rerank"
-            payload = {
-                "model": settings.reranker_model_name,
-                "query": query,
-                "texts": docs,
-                "top_n": len(docs),
-                "return_documents": False
-            }
-        else:
-            url = f"{self.base_url}/v1/rerank"
-            payload = {
-                "model": settings.reranker_model_name,
-                "query": query,
-                "documents": docs,
-                "top_n": len(docs),
-                "return_documents": False
-            }
+        # APISIX/Keycloak: /rerank   |   GenAI Gateway (LiteLLM): /v1/rerank
+        url = f"{self.base_url}/rerank" if self.use_apisix else f"{self.base_url}/v1/rerank"
+
+        # Send both "documents" (vLLM / LiteLLM) and "texts" (TEI) so the
+        # payload works regardless of the backend — each ignores the extra field.
+        payload = {
+            "model": settings.reranker_model_name,
+            "query": query,
+            "documents": docs,
+            "texts": docs,
+            "top_n": len(docs),
+            "return_documents": False
+        }
 
         headers = {
             "Authorization": f"Bearer {self.token}",
