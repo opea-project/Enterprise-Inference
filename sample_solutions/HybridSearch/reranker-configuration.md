@@ -1,11 +1,11 @@
 # BAAI/bge-reranker-base: Post-Deployment Configuration Workflow
 
-> **Scope:** GenAI Gateway (LiteLLM) deployments only.
-> **Keycloak / APISIX users — you do not need this guide.** The reranker works out of the
-> box. Just set `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL and
-> ensure `USE_RERANKING=true`.
+> **Scope:** GenAI Gateway (LiteLLM) + Xeon deployments only.
+> The following do **not** need this guide — the reranker works out of the box:
+> - **Keycloak / APISIX** (Xeon or Gaudi): Set `RERANKER_API_ENDPOINT` in `.env` and `USE_RERANKING=true`
+> - **GenAI Gateway + Gaudi**: Pre-validated model, no LiteLLM reconfiguration needed
 
-> **Environment:** GenAI Gateway (LiteLLM) | vLLM backend
+> **Environment:** GenAI Gateway (LiteLLM) | Xeon | vLLM backend
 > **Deployment tool:** `inference-deploy.sh` (Enterprise Inference CLI)
 > **Final service:** `bge-reranker-base-cpu-vllm-service.default`
 

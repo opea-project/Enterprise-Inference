@@ -180,7 +180,7 @@ VERIFY_SSL=true
 
 - **Keycloak / APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
-  - The token is generated using Keycloak client credentials (expires in 15 minutes)
+  - The token is generated using Keycloak client credentials (expires in 15 minutes by default; a Keycloak admin can configure longer-lived tokens in the Keycloak console)
   - For Keycloak, each model has its own APISIX route path. Run `kubectl get apisixroutes` to find the route names for your deployed models (e.g., `bge-base-en-v1.5`, `bge-reranker-base`, `Qwen3-4B-Instruct-2507`)
 
 ### Configure Models
@@ -251,12 +251,14 @@ curl http://localhost:8000/api/v1/health/services
 ## Reranker Post-Deployment Configuration
 
 > [!IMPORTANT]
-> **GenAI Gateway (LiteLLM) deployments only.** If you deployed Enterprise Inference with GenAI Gateway and have enabled reranking (`USE_RERANKING=true`), the `BAAI/bge-reranker-base` model requires a one-time post-deployment configuration step before it will work correctly.
+> **GenAI Gateway + Xeon deployments only.** If you deployed Enterprise Inference with GenAI Gateway on Xeon hardware and have enabled reranking (`USE_RERANKING=true`), the `BAAI/bge-reranker-base` model requires a one-time post-deployment configuration step before it will work correctly.
 >
 > The deployment script registers the model with the wrong provider (`openai`) and without the required `mode: rerank` field. Without this fix, all rerank requests will return a `400 BadRequestError` from LiteLLM and reranking will silently fall back or fail.
 
 > [!NOTE]
-> **Keycloak / APISIX deployments do not need this step.** The reranker works out of the box — just set `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL (e.g., `https://api.example.com/bge-reranker-base`) and ensure `USE_RERANKING=true`.
+> The following deployments do **not** require this step — the reranker works out of the box:
+> - **Keycloak / APISIX** (Xeon or Gaudi): Set `RERANKER_API_ENDPOINT` in your `.env` to your APISIX route URL and ensure `USE_RERANKING=true`
+> - **GenAI Gateway + Gaudi**: The reranker is pre-validated and works without LiteLLM reconfiguration
 
 The fix involves a single `curl` command to update the model registration in LiteLLM, changing the provider to `cohere` and setting `mode: rerank`. The full step-by-step workflow — including how to find the model UUID, the exact update payload, and how to verify the changes in the LiteLLM UI — is documented in:
 
