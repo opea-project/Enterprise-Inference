@@ -34,7 +34,7 @@ The inference stack must be deployed from a **separate machine**, not the SNO no
 
 ## Additional Pre-Deployment Steps
 
-### 1. Copy kubeconfig to the Deployment Machine
+### Copy kubeconfig to the Deployment Machine
 
 The brownfield guide assumes kubeconfig is already on the deployment machine. For SNO, copy it from your local machine first:
 
@@ -44,7 +44,7 @@ scp PATH_TO_YOUR_KUBECONFIG_FILE username@<VM2_IP>:/home/user/admin.kubeconfig
 
 Then follow [Prepare Kubeconfig](../../../../../docs/brownfield/brownfield_deployment.md#prepare-kubeconfig) to complete the setup.
 
-### 2. DNS Resolution (If No Corporate DNS)
+### DNS Resolution (If No Corporate DNS)
 
 SNO exposes additional routes not mentioned in the brownfield guide. Add these entries to `/etc/hosts` on the deployment machine:
 
@@ -59,11 +59,7 @@ sudo vi /etc/hosts
 
 > If enterprise DNS is configured correctly, this step is not required.
 
----
-
-## Additional Configuration Steps
-
-### 3. Activate Virtual Environment
+### Activate Virtual Environment
 
 ```bash
 cd ~/Enterprise-Inference/core/kubespray
@@ -71,7 +67,7 @@ source venv/bin/activate
 pip install kubernetes
 ```
 
-### 4. Create Certificate Files
+### Create Certificate Files
 
 ```bash
 mkdir -p ~/certs && \
@@ -81,10 +77,17 @@ openssl req -x509 -nodes -days 365 \
 -out ~/certs/ei.crt \
 -subj "/CN=okd.apps.<CLUSTER>.<DOMAIN>"
 ```
+---
 
-### 5. APISIX-Specific Config Overrides
+### Update the Configuration
 
 When updating `core/inventory/inference-config.cfg` per the brownfield guide, apply these APISIX-specific values:
+
+> Update cluster URL with your SNO cluster url in place of `<CLUSTER>.<DOMAIN>`
+> Set `deploy_kubernetes_fresh=off` and `deploy_ingress_controller=off`
+> Set `cpu_or_gpu` to `cpu` for Xeon models or `gaudi3` for Intel Gaudi 3.
+> Set Keycloack values
+> Replace hugging face token 
 
 ```
 cluster_url=okd.apps.<CLUSTER>.<DOMAIN>
@@ -102,10 +105,7 @@ deploy_keycloak_apisix=on
 deploy_genai_gateway=off
 ```
 
-> - Set `cpu_or_gpu` to `cpu` for Xeon models or `gaudi3` for Intel Gaudi 3.
-> - Keycloak values must match those in `core/scripts/generate-token.sh` — mismatches will cause token generation to fail.
-
-### 6. Update hosts.yaml
+### Update hosts.yaml
 
 ```bash
 cp -f docs/examples/single-node/hosts.yaml core/inventory/hosts.yaml
@@ -216,4 +216,3 @@ If successful, the model will return a completion response.
 ## Troubleshooting
 
 - [SNO Troubleshooting Guide](./troubleshooting.md)
-- [OpenShift Brownfield Troubleshooting](../../../../../docs/brownfield/brownfield_deployment_openshift.md#troubleshooting)
