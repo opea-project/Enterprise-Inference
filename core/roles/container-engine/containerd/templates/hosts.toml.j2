@@ -1,0 +1,9 @@
+server = "{{ item.server | default("https://" + item.prefix) }}"
+{% for mirror in item.mirrors %}
+[host."{{ mirror.host }}"]
+  capabilities = ["{{ ([ mirror.capabilities ] | flatten ) | join('","') }}"]
+  {% if mirror.skip_verify | default(false) %}
+  skip_verify = true
+  {% endif %}
+  override_path = {{ mirror.override_path | default('false') | string | lower }}
+{% endfor %}

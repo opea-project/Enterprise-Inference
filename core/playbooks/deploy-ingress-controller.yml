@@ -11,11 +11,20 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add the Ingress-NGINX Helm repository
+    - name: Add the Ingress-NGINX Helm repository (internet)
       community.kubernetes.helm_repository:
         name: ingress-nginx
         repo_url: https://kubernetes.github.io/ingress-nginx
         state: present
+      when: not airgap_enabled | bool
+
+    - name: Add the Ingress-NGINX Helm repository (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add ingress-nginx {{ helm_repo_ingress_nginx }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: airgap_enabled | bool
+      changed_when: false
     - name: Validate if the Helm repositories are configured correctly
       ansible.builtin.command: helm repo list
       register: helm_repo_list

@@ -5,3 +5,13 @@ remote_home_dir: "{{ lookup('env', 'PWD') }}/scripts"
 remote_helm_charts_base: "/tmp/helm-charts"
 ansible_python_interpreter: "{{ lookup('env', 'ANSIBLE_PYTHON_INTERPRETER') or '/usr/bin/python3' }}"
 remote_home_scripts_dir: "{{ lookup('env', 'PWD') }}/scripts"
+
+# ---------------------------------------------------------------------------
+# Airgap — Helm repository URLs
+# airgap_enabled, jfrog_url, jfrog_username, jfrog_password are sourced from
+# inference-config.cfg and passed in via --extra-vars by the shell layer.
+# When airgap_enabled=true  → routes to JFrog ei-helm-virtual on VM1.
+# When airgap_enabled=false → uses original upstream URLs (internet).
+# ---------------------------------------------------------------------------
+helm_repo_ingress_nginx: "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | bool else 'https://kubernetes.github.io/ingress-nginx' }}"
+helm_repo_langfuse: "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | bool else 'https://langfuse.github.io/langfuse-k8s' }}"

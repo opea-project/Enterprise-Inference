@@ -158,10 +158,20 @@
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
       run_once: true
     
-    - name: Add GenAI Gateway Trace Repository
+    - name: Add GenAI Gateway Trace Repository (internet)
       command: >
         helm repo add langfuse https://langfuse.github.io/langfuse-k8s
       run_once: true
+      when: not airgap_enabled | bool
+
+    - name: Add GenAI Gateway Trace Repository (airgap via JFrog)
+      command: >
+        helm repo add langfuse {{ helm_repo_langfuse }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      run_once: true
+      when: airgap_enabled | bool
+      changed_when: false
     - name: Update GenAI Gateway Trace Repositories
       command: >
         helm repo update
