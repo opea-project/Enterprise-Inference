@@ -196,6 +196,13 @@ LLM_MODEL_ENDPOINT=Qwen/Qwen3-4B-Instruct-2507
 LLM_MODEL_NAME=Qwen/Qwen3-4B-Instruct-2507
 ```
 
+**Gaudi hardware (TEI backend):** Set `INFERENCE_BACKEND=tei` in your `.env`. TEI serves endpoints without the `/v1` prefix (`/embeddings`, `/rerank`) unlike vLLM which uses `/v1`. Xeon deployments use the default `INFERENCE_BACKEND=vllm`.
+
+```bash
+# Gaudi hardware only
+INFERENCE_BACKEND=tei
+```
+
 **Keycloak / APISIX deployments:** You must also uncomment and set the per-model API endpoint variables in your `.env`. Each model needs its own APISIX route URL (use `kubectl get apisixroutes` to find the route paths):
 
 ```bash
