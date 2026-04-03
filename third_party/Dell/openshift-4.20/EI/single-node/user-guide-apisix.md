@@ -79,15 +79,16 @@ openssl req -x509 -nodes -days 365 \
 ```
 ---
 
-### Update the Configuration
+### Update Inference Configuration
 
 When updating `core/inventory/inference-config.cfg` per the brownfield guide, apply these APISIX-specific values:
 
-> Update cluster URL with your SNO cluster url in place of `<CLUSTER>.<DOMAIN>`
-> Set `deploy_kubernetes_fresh=off` and `deploy_ingress_controller=off`
-> Set `cpu_or_gpu` to `cpu` for Xeon models or `gaudi3` for Intel Gaudi 3.
-> Set Keycloack values
-> Replace hugging face token 
+> **Note:**
+> - Replace `<CLUSTER>.<DOMAIN>` with your SNO cluster URL
+> - Set `cpu_or_gpu` to `cpu` for Xeon models or `gaudi3` for Intel Gaudi 3
+> - Set Keycloak values: `keycloak_client_id`, `keycloak_admin_user`, `keycloak_admin_password`
+> - Replace `hugging_face_token` with your Hugging Face token
+> - `deploy_kubernetes_fresh=off` and `deploy_ingress_controller=off` are required for brownfield
 
 ```
 cluster_url=okd.apps.<CLUSTER>.<DOMAIN>
