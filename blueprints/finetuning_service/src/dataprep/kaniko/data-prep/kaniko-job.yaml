@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kaniko-data-prep-backend
+  namespace: dataprep
+spec:
+  template:
+    spec:
+      # Kaniko requires root to manipulate container filesystem layers during image builds
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:latest
+          args:
+            - "--dockerfile=/workspace/dataprep/kaniko/data-prep/Dockerfile"
+            - "--context=dir:///workspace"
+            - "--destination=${REGISTRY_URL}/data-prep-backend:latest"
+          env:
+            - name: REGISTRY_URL
+              value: "$REGISTRY_URL"
+          # Kaniko requires root and write access to build container images
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # Required: kaniko writes filesystem layers during build
+            privileged: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: build-context
+              mountPath: /workspace
+      restartPolicy: Never
+      volumes:
+        - name: build-context
+          hostPath:
+            path: $BUILD_CONTEXT
+            type: Directory

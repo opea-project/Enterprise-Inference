@@ -1,0 +1,280 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+###########################################################################
+# Deploy Data Preparation Service
+###########################################################################
+
+###########################################################################
+# Validation
+###########################################################################
+- name: Validate Required Keycloak Variables
+  fail:
+    msg: |
+      ERROR: {{ item.name }} is not defined!
+      When running this playbook independently, you must provide Keycloak credentials.
+      Either:
+      1. Run via deploy-all.yml (automatically sets up Keycloak)
+      2. Manually run setup-keycloak-finetuning.sh and pass variables:
+         -e "finetune_keycloak_backend_client_id=finetuning-backend"
+         -e "finetune_keycloak_backend_client_secret=<secret-from-keycloak>"
+  when: vars[item.var] is not defined or vars[item.var] | length == 0
+  loop:
+    - { var: 'finetune_keycloak_backend_client_id', name: 'Keycloak Backend Client ID' }
+    - { var: 'finetune_keycloak_backend_client_secret', name: 'Keycloak Backend Client Secret' }
+  run_once: true
+
+###########################################################################
+# Deploy Infrastructure
+###########################################################################
+- name: Deploy MinIO Shared Storage
+  shell: |
+    helm upgrade --install dataprep-minio {{ dataprep_source_path }}/helmcharts/minio-data-store \
+      --namespace {{ dataprep_namespace }} \
+      --set auth.rootUser={{ finetune_minio_access_key }} \
+      --set auth.rootPassword={{ finetune_minio_secret_key }} \
+      --set persistence.enabled=true \
+      --set persistence.storageClass={{ finetune_persistence_storage_class }} \
+      --set persistence.size={{ finetune_minio_storage_size }} \
+      --wait --timeout 10m
+  run_once: true
+
+- name: Deploy DataPrep PostgreSQL
+  shell: |
+    helm upgrade --install dataprep-postgres {{ dataprep_source_path }}/helmcharts/postgres \
+      --namespace {{ dataprep_namespace }} \
+      --set postgresql.username={{ dataprep_postgres_username }} \
+      --set postgresql.password={{ dataprep_postgres_password }} \
+      --set postgresql.database={{ dataprep_postgres_database }} \
+      --set persistence.enabled=true \
+      --set persistence.storageClass={{ finetune_persistence_storage_class }} \
+      --set persistence.size={{ dataprep_postgres_storage_size }} \
+      --wait --timeout 10m
+  run_once: true
+
+- name: Deploy DataPrep Redis
+  shell: |
+    helm upgrade --install dataprep-redis {{ dataprep_source_path }}/helmcharts/redis-broker \
+      --namespace {{ dataprep_namespace }} \
+      --set persistence.enabled=true \
+      --set persistence.storageClass={{ finetune_persistence_storage_class }} \
+      --set persistence.size={{ dataprep_redis_storage_size }} \
+      --wait --timeout 10m
+  run_once: true
+
+###########################################################################
+# Deploy DataPrep Application
+###########################################################################
+- name: Create APISIX OIDC Secret for Keycloak Backend Client
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: finetuning-backend-secret
+        namespace: "{{ dataprep_namespace }}"
+      type: Opaque
+      stringData:
+        client_id: "{{ finetune_keycloak_backend_client_id }}"
+        client_secret: "{{ finetune_keycloak_backend_client_secret }}"
+  run_once: true
+
+- name: Create Keycloak Client Secret (required by data-prep-backend helm chart secretEnv)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: keycloak-client-secret
+        namespace: "{{ dataprep_namespace }}"
+      type: Opaque
+      stringData:
+        client-secret: "{{ finetune_keycloak_backend_client_secret }}"
+  run_once: true
+
+- name: Create Data Prep ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: dataprep-config
+        namespace: "{{ dataprep_namespace }}"
+      data:
+        HOST: "0.0.0.0"
+        PORT: "{{ dataprep_service_port }}"
+        DB_HOST: "postgres.{{ dataprep_namespace }}.svc.cluster.local"
+        DB_PORT: "{{ dataprep_postgres_port }}"
+        DB_NAME: "{{ dataprep_postgres_database }}"
+        DB_USER: "{{ dataprep_postgres_username }}"
+        DB_POOL_SIZE: "10"
+        DB_MAX_OVERFLOW: "20"
+        DB_POOL_RECYCLE: "3600"
+        CELERY_BROKER_URL: "redis://dataprep-redis-redis.{{ dataprep_namespace }}.svc.cluster.local:{{ dataprep_redis_port }}/0"
+        CELERY_RESULT_BACKEND: "redis://dataprep-redis-redis.{{ dataprep_namespace }}.svc.cluster.local:{{ dataprep_redis_port }}/0"
+        MINIO_ENDPOINT: "dataprep-minio.{{ dataprep_namespace }}.svc.cluster.local:{{ finetune_minio_port }}"
+        MINIO_BUCKET_NAME: "{{ dataprep_minio_bucket }}"
+        MINIO_ACCESS_KEY: "{{ finetune_minio_access_key }}"
+        MINIO_SECURE: "{{ finetune_minio_secure | string }}"
+        MINIO_REGION: "{{ finetune_minio_region }}"
+        MINIO_CERT_VERIFY: "false"
+        KEYCLOAK_ENABLED: "{{ finetune_keycloak_enabled | default('true') | string }}"
+        KEYCLOAK_URL: "{{ finetune_keycloak_url }}"
+        KEYCLOAK_REALM: "{{ finetune_keycloak_realm }}"
+        KEYCLOAK_CLIENT_ID: "{{ finetune_keycloak_backend_client_id }}"
+        KEYCLOAK_VERIFY_SSL: "false"
+        # LLM Configuration for Q&A generation (auto-populated from Nvidia backend)
+        LLM_API_BASE: "{{ dataprep_llm_api_url }}"
+        LLM_MODEL_ID: "{{ dataprep_llm_model_name }}"
+  run_once: true
+
+- name: Create Data Prep Secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: dataprep-secret
+        namespace: "{{ dataprep_namespace }}"
+      type: Opaque
+      stringData:
+        DB_PASSWORD: "{{ dataprep_postgres_password }}"
+        MINIO_SECRET_KEY: "{{ finetune_minio_secret_key }}"
+        KEYCLOAK_CLIENT_SECRET: "{{ finetune_keycloak_backend_client_secret }}"
+        LLM_API_KEY: "{{ dataprep_llm_api_key }}"
+  run_once: true
+
+- name: Build Data Prep Helm env overrides
+  set_fact:
+    dataprep_backend_env:
+      - { name: "HOST", value: "0.0.0.0" }
+      - { name: "PORT", value: "{{ dataprep_service_port }}" }
+      - { name: "API_BASE_PATH", value: "{{ dataprep_base_path }}/dataprep" }
+      - { name: "ROOT_PATH", value: "{{ dataprep_base_path }}/dataprep" }
+      - { name: "MINIO_ENDPOINT", value: "dataprep-minio.{{ dataprep_namespace }}.svc.cluster.local:{{ finetune_minio_port }}" }
+      - { name: "MINIO_ACCESS_KEY", value: "{{ finetune_minio_access_key }}" }
+      - { name: "MINIO_SECRET_KEY", value: "{{ finetune_minio_secret_key }}" }
+      - { name: "MINIO_BUCKET_NAME", value: "{{ dataprep_minio_bucket }}" }
+      - { name: "MINIO_SECURE", value: "{{ finetune_minio_secure | string }}" }
+      - { name: "MINIO_REGION", value: "{{ finetune_minio_region }}" }
+      - { name: "MINIO_CERT_VERIFY", value: "false" }
+      - { name: "DB_HOST", value: "postgres.{{ dataprep_namespace }}.svc.cluster.local" }
+      - { name: "DB_PORT", value: "{{ dataprep_postgres_port }}" }
+      - { name: "DB_NAME", value: "{{ dataprep_postgres_database }}" }
+      - { name: "DB_USER", value: "{{ dataprep_postgres_username }}" }
+      - { name: "DB_PASSWORD", value: "{{ dataprep_postgres_password }}" }
+      - { name: "DB_POOL_SIZE", value: "10" }
+      - { name: "DB_MAX_OVERFLOW", value: "20" }
+      - { name: "DB_POOL_RECYCLE", value: "3600" }
+      - { name: "CELERY_BROKER_URL", value: "redis://dataprep-redis-redis.{{ dataprep_namespace }}.svc.cluster.local:{{ dataprep_redis_port }}/0" }
+      - { name: "CELERY_RESULT_BACKEND", value: "redis://dataprep-redis-redis.{{ dataprep_namespace }}.svc.cluster.local:{{ dataprep_redis_port }}/0" }
+      - { name: "KEYCLOAK_ENABLED", value: "{{ finetune_keycloak_enabled | default('true') | string }}" }
+      - { name: "KEYCLOAK_URL", value: "{{ finetune_keycloak_url }}" }
+      - { name: "KEYCLOAK_REALM", value: "{{ finetune_keycloak_realm }}" }
+      - { name: "KEYCLOAK_CLIENT_ID", value: "{{ finetune_keycloak_backend_client_id }}" }
+      - { name: "KEYCLOAK_VERIFY_SSL", value: "false" }
+      - { name: "LLM_API_BASE", value: "{{ dataprep_llm_api_url }}" }
+      - { name: "LLM_MODEL_ID", value: "{{ dataprep_llm_model_name }}" }
+      - { name: "LLM_API_KEY", value: "{{ dataprep_llm_api_key }}" }
+      - { name: "ALLOWED_ORIGINS", value: "https://{{ cluster_url }}" }
+  run_once: true
+
+- name: Remove legacy Data Prep deployment if old container naming exists
+  shell: |
+    if kubectl get deployment data-prep-backend -n {{ dataprep_namespace }} -o jsonpath='{.spec.template.spec.containers[*].name}' | grep -q 'dataprep-backend'; then
+      kubectl delete deployment data-prep-backend -n {{ dataprep_namespace }} --ignore-not-found=true
+      kubectl wait --for=delete deployment/data-prep-backend -n {{ dataprep_namespace }} --timeout=120s || true
+    fi
+  run_once: true
+
+- name: Deploy Data Prep Backend Helm Chart (includes Deployment, Service, APISIXRoute)
+  shell: |
+    helm upgrade --install data-prep-backend {{ dataprep_source_path }}/helmcharts/data-prep-backend \
+      --namespace {{ dataprep_namespace }} \
+      --set replicaCount={{ dataprep_replica_count | int }} \
+      --set image.repository={{ dataprep_image_repository }} \
+      --set image.tag={{ dataprep_image_tag }} \
+      --set image.pullPolicy={{ dataprep_image_pull_policy }} \
+      --set service.port={{ dataprep_service_port | int }} \
+      --set service.targetPort={{ dataprep_service_port | int }} \
+      --set-string apisix.domain={{ cluster_url | quote }} \
+      --set apisix.enabled=true \
+      --set apisix.oidc.enabled=true \
+      --set-string apisix.oidc.realm={{ finetune_keycloak_realm | quote }} \
+      --set-string apisix.oidc.discovery={{ (finetune_keycloak_url + '/realms/' + finetune_keycloak_realm + '/.well-known/openid-configuration') | quote }} \
+      --set-string apisix.oidc.introspection_endpoint={{ (finetune_keycloak_url + '/realms/' + finetune_keycloak_realm + '/protocol/openid-connect/token/introspect') | quote }} \
+      --set-string apisix.oidc.secret_ref=finetuning-backend-secret \
+        --set-json env='{{ dataprep_backend_env | to_json }}' \
+        --force \
+      --wait --timeout 10m
+  run_once: true
+
+###########################################################################
+# Deploy Celery Workers
+###########################################################################
+- name: Create Celery Worker Deployment
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: dataprep-celery-worker
+        namespace: "{{ dataprep_namespace }}"
+        labels:
+          app: dataprep-celery-worker
+          component: worker
+      spec:
+        replicas: "{{ dataprep_celery_replica_count }}"
+        selector:
+          matchLabels:
+            app: dataprep-celery-worker
+        template:
+          metadata:
+            labels:
+              app: dataprep-celery-worker
+              component: worker
+          spec:
+            containers:
+            - name: celery-worker
+              image: "{{ dataprep_celery_image_repository }}:{{ dataprep_celery_image_tag }}"
+              imagePullPolicy: "{{ dataprep_image_pull_policy }}"
+              command: ["celery"]
+              args:
+                - "-A"
+                - "core.celery.celery_config"
+                - "worker"
+                - "--loglevel=info"
+                - "--queues=dataprep_queue"
+                - "--concurrency=2"
+              envFrom:
+              - configMapRef:
+                  name: dataprep-config
+              - secretRef:
+                  name: dataprep-secret
+              resources:
+                requests:
+                  cpu: "{{ dataprep_celery_cpu_request }}"
+                  memory: "{{ dataprep_celery_memory_request }}"
+                limits:
+                  cpu: "{{ dataprep_celery_cpu_limit }}"
+                  memory: "{{ dataprep_celery_memory_limit }}"
+  when: dataprep_celery_enabled | bool
+  run_once: true
+
+- name: Restart Celery Worker Deployment to pick latest config
+  shell: |
+    kubectl rollout restart deployment/dataprep-celery-worker -n {{ dataprep_namespace }}
+  when: dataprep_celery_enabled | bool
+  run_once: true
+
+- name: Wait for Data Prep Services to be Ready
+  shell: |
+    kubectl rollout status deployment/{{ dataprep_name }} \
+      --namespace={{ dataprep_namespace }} \
+      --timeout=300s
+  run_once: true

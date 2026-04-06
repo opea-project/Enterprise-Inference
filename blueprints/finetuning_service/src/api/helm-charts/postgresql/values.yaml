@@ -1,0 +1,65 @@
+replicaCount: 1
+
+image:
+  repository: postgres
+  tag: "15"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5432
+
+auth:
+  username: finetuning
+  password: ""  # REQUIRED - set via --set
+  database: finetuning
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  # Backup configuration (requires additional backup solution)
+  # backup:
+  #   enabled: false
+  #   schedule: "0 2 * * *"
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false  # Enable for production security
+
+# Security Context - Production Grade PostgreSQL Security
+# PostgreSQL official image runs as UID 999 (postgres user)
+# Reference: https://hub.docker.com/_/postgres
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 999  # Official postgres image user
+  runAsGroup: 999  # Match user group
+  fsGroup: 999  # Ensure volume ownership
+  fsGroupChangePolicy: "OnRootMismatch"  # Only change if needed (faster)
+  readOnlyRootFilesystem: false  # PostgreSQL needs write access
+  allowPrivilegeEscalation: false
+  # Additional hardening
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+      - ALL
+
+# Pod termination grace period
+terminationGracePeriodSeconds: 60

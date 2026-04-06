@@ -1,0 +1,14 @@
+replicaCount: 1
+image:
+  repository: redis
+  tag: "7.0"
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 6379
+resources: {}
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "finetuning-service.fullname" . }}-config
+  labels:
+    {{- include "finetuning-service.labels" . | nindent 4 }}
+data:
+  KEYCLOAK_ISSUER: {{ .Values.app.config.keycloakIssuer | default (printf "https://%s/realms/finetuning" .Values.ingress.baseDomain) | quote }}
+  # API Base Path - used for root_path in FastAPI
+  {{- if .Values.apisix.enabled }}
+  API_BASE_PATH: "/enterprise-ai"
+  {{- else }}
+  API_BASE_PATH: {{ .Values.ingress.basePath | default "/enterprise-ai" | quote }}
+  {{- end }}
+
+  # Nvidia/Unsloth Configuration
+  NVIDIA_API_URL: {{ .Values.app.config.nvidiaApiUrl | quote }}
+  NVIDIA_KEYCLOAK_VERIFY_SSL: {{ .Values.app.config.nvidiaKeycloakVerifySsl | default "true" | quote }}
+  ENABLE_NVIDIA: {{ .Values.app.config.enableNvidia | default "true" | quote }}
+
+  # Rate Limiting Configuration
+  RATE_LIMIT_ENABLED: {{ .Values.app.config.rateLimitEnabled | default "true" | quote }}
+  RATE_LIMIT_DEFAULT: {{ .Values.app.config.rateLimitDefault | default "200" | quote }}
+  RATE_LIMIT_HEALTH: {{ .Values.app.config.rateLimitHealth | default "100" | quote }}
+  RATE_LIMIT_MODELS: {{ .Values.app.config.rateLimitModels | default "100" | quote }}
+  RATE_LIMIT_JOB_CREATE: {{ .Values.app.config.rateLimitJobCreate | default "10" | quote }}
+  RATE_LIMIT_JOB_READ: {{ .Values.app.config.rateLimitJobRead | default "60" | quote }}
+  RATE_LIMIT_JOB_CANCEL: {{ .Values.app.config.rateLimitJobCancel | default "20" | quote }}
+  RATE_LIMIT_JOB_EVENTS: {{ .Values.app.config.rateLimitJobEvents | default "60" | quote }}
+
+  # Observability Configuration (Lightweight monitoring)
+  OBSERVABILITY_ENABLED: {{ .Values.app.config.observabilityEnabled | default "true" | quote }}
+  OBSERVABILITY_JSON_LOGS: {{ .Values.app.config.observabilityJsonLogs | default "true" | quote }}
+  OBSERVABILITY_LOG_USER_ACTIONS: {{ .Values.app.config.observabilityLogUserActions | default "true" | quote }}
+  OBSERVABILITY_METRICS_ENABLED: {{ .Values.app.config.observabilityMetricsEnabled | default "true" | quote }}
+  OBSERVABILITY_TRACK_USER_METRICS: {{ .Values.app.config.observabilityTrackUserMetrics | default "true" | quote }}
+  OBSERVABILITY_COLLECT_SYSTEM_METRICS: {{ .Values.app.config.observabilityCollectSystemMetrics | default "true" | quote }}

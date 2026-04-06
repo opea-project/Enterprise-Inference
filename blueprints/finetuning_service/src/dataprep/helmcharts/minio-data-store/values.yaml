@@ -1,0 +1,43 @@
+# Default values for MinIO deployment
+replicaCount: 1
+
+image:
+  repository: minio/minio
+  tag: RELEASE.2024-10-13T13-34-11Z
+  pullPolicy: IfNotPresent
+
+# MinIO credentials
+auth:
+  rootUser: admin
+  rootPassword: minio123
+  # For production, use a Secret instead
+
+service:
+  type: ClusterIP
+  port: 9000
+  consolePort: 9001
+
+# Storage configuration
+persistence:
+  enabled: true
+  storageClass: ""  # Use default storage class
+  accessMode: ReadWriteOnce
+  size: 120Gi
+
+# Resource limits
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+
+# Node selector for pod assignment
+nodeSelector: {}
+
+# Tolerations for pod assignment
+tolerations: []
+
+# Affinity for pod assignment
+affinity: {}
