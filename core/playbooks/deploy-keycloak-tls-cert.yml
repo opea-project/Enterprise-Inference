@@ -75,13 +75,26 @@
         namespace: genai-gateway
       ignore_errors: true
    
+    - name: Add ei-helm repository for Keycloak (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add ei-helm {{ jfrog_url }}/ei-helm-virtual
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: airgap_enabled | bool and deploy_keycloak == "yes"
+      changed_when: false
+
+    - name: Update Helm repositories for Keycloak (airgap)
+      ansible.builtin.command: helm repo update
+      when: airgap_enabled | bool and deploy_keycloak == "yes"
+      changed_when: false
+
     - name: Deploy Keycloak System
       run_once: true
       register: helm_output
       when: deploy_keycloak == "yes"
       community.kubernetes.helm:
         name: keycloak
-        chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak
+        chart_ref: "{{ 'ei-helm/keycloak' if airgap_enabled | bool else 'oci://registry-1.docker.io/bitnamicharts/keycloak' }}"
         release_namespace: default # Set the namespace where Keycloak will be installed
         create_namespace: true
         chart_version: "{{ keycloak_chart_version|default('22.1.0') }}"
@@ -368,6 +381,25 @@
         path: "{{ remote_helm_charts_base }}/keycloak/templates/ingress_eks.yaml"
         state: absent
       when: kubernetes_platform != "eks"
+    - name: Add APISIX Helm repository (internet)
+      ansible.builtin.command: >
+        helm repo add apisix https://charts.apiseven.com --force-update
+      when: deploy_apisix == "yes" and not airgap_enabled | bool
+      changed_when: false
+
+    - name: Add APISIX Helm repository (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add apisix {{ helm_repo_apisix }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: deploy_apisix == "yes" and airgap_enabled | bool
+      changed_when: false
+
+    - name: Update Helm repositories for APISIX
+      ansible.builtin.command: helm repo update
+      when: deploy_apisix == "yes"
+      changed_when: false
+
     - name: Synchronize dependencies for APISIX
       ansible.builtin.command: helm dependency update "{{ remote_helm_charts_base }}/apisix-helm/"
       register: helm_dependency_update

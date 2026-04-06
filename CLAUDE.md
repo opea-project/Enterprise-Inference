@@ -80,80 +80,66 @@ helm repo update
 ---
 
 ## What Was Pre-loaded ✅
-**Docker images**: vllm-cpu v0.10.2, tgi 2.4.0-intel-cpu, tei cpu-1.7, litellm v1.75.8,
-bitnamilegacy/postgresql, bitnamilegacy/redis, bitnami/minio, ubuntu:22.04, Langfuse images (clickhouse, web, worker)
 
-**Helm charts**: ingress-nginx 4.12.2, langfuse 1.5.1 (pushed as OCI — need re-upload via curl)
+**Docker images** (cached in JFrog remote repos via `ei-docker-virtual`):
+| Image | Tag | Registry |
+|---|---|---|
+| vllm-cpu-release-repo | v0.10.2 | public.ecr.aws |
+| text-generation-inference | 2.4.0-intel-cpu | ghcr.io |
+| text-embeddings-inference | cpu-1.7 | ghcr.io |
+| litellm-non_root | main-v1.75.8-stable | ghcr.io |
+| langfuse / langfuse-worker | 3.106.1 | docker.io |
+| bitnamilegacy/postgresql | 16.3.0-debian-12-r23, 17.5.0-debian-12-r0 | docker.io |
+| bitnamilegacy/redis | 8.0.1-debian-12-r0 | docker.io |
+| bitnamilegacy/etcd | 3.5.10-debian-11-r2 | docker.io |
+| bitnamilegacy/keycloak | 25.0.2-debian-12-r2 | docker.io |
+| bitnamilegacy/os-shell | 12-debian-12-r48 | docker.io |
+| bitnami/minio + mc | 2024.12.18 | docker.io |
+| bitnamilegacy/clickhouse | 25.2.1-debian-12-r0 | docker.io |
+| bitnamilegacy/valkey | 8.0.2-debian-12-r2 | docker.io |
+| bitnamilegacy/zookeeper | 3.9.3-debian-12-r8 | docker.io |
+| apache/apisix | 3.9.1-debian | docker.io |
+| ingress-nginx/controller | v1.12.2 | registry.k8s.io |
+| ingress-nginx/kube-webhook-certgen | v1.5.1 | registry.k8s.io |
+| ubuntu | 22.04 | docker.io |
+| All Kubernetes components | v1.31.4 | registry.k8s.io |
+| calico (cni, node, kube-controllers) | v3.29.1 | docker.io |
+| coredns | v1.11.3 | registry.k8s.io |
+| pause | 3.10 | registry.k8s.io |
+| local-path-provisioner | v0.0.24 | docker.io |
 
-**PyPI**: ansible, ansible-core, attrs, cffi, cryptography, jinja2, jmespath, jsonschema,
-markupsafe, netaddr, packaging, pycparser, pyyaml, referencing, resolvelib, rpds-py, typing-extensions
+**How to pre-cache an image** (run on VM1 — JFrog fetches and caches from internet):
+```bash
+docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>
+```
 
-**Ansible collections**: community.kubernetes 2.0.1, community.general 12.5.0
+**Helm charts** (all uploaded to `ei-helm-local` as HTTP tarballs + index.yaml):
+| Chart | Version |
+|---|---|
+| ingress-nginx | 4.12.2 |
+| langfuse | 1.5.1 |
+| apisix | 2.8.1 |
+| keycloak | 22.1.0 |
+| postgresql | 16.7.4 |
+| redis | 21.1.3 |
+| clickhouse | 8.0.5 |
+| minio | 14.10.5 |
+| valkey | 2.2.4 |
+
+**PyPI**: ansible, ansible-core, attrs, certifi, cffi, charset-normalizer, cryptography,
+durationpy, idna, jinja2, jmespath, jsonpatch, jsonpointer, jsonschema, kubernetes,
+markupsafe, netaddr, oauthlib, packaging, pycparser, python-dateutil, pyyaml, referencing,
+requests, requests-oauthlib, resolvelib, rpds-py, six, typing-extensions, urllib3, websocket-client
+
+**Ansible collections**: community.kubernetes 2.0.1, community.general 12.5.0, kubernetes.core 6.3.0, ansible.posix latest
 
 **Binaries**: kubectl, helm, yq, kubectx, kubens, kubespray.tar.gz
 
-**Model**: Meta-Llama-3.1-8B-Instruct (~30 GB)
+**Model**: Meta-Llama-3.1-8B-Instruct (~30 GB, all 4 safetensor shards + tokenizer)
 
 ---
 
 ## GAPS — What Is Still Missing
-
-### 🔴 CRITICAL — Deployment fails without these
-
-#### Docker Images
-| Image | Needed By | Fix |
-|---|---|---|
-| `bitnamilegacy/etcd:3.5.10-debian-11-r2` | APISIX (`apisix-helm/values.yaml`) | `docker pull 100.67.152.212:8082/ei-docker-virtual/bitnamilegacy/etcd:3.5.10-debian-11-r2` |
-| `bitnamilegacy/valkey:latest` | Langfuse cache | `docker pull 100.67.152.212:8082/ei-docker-virtual/bitnamilegacy/valkey:latest` |
-| `bitnamilegacy/zookeeper:latest` | ClickHouse dep | `docker pull 100.67.152.212:8082/ei-docker-virtual/bitnamilegacy/zookeeper:latest` |
-| ingress-nginx controller | Ingress | Add `ei-docker-k8s` remote → `registry.k8s.io` in JFrog, add to ei-docker-virtual |
-| Keycloak image | Auth | Pulled via Keycloak Helm chart through ei-docker-dockerhub |
-
-#### Helm Charts
-| Chart | Version | Needed By | Fix |
-|---|---|---|---|
-| apisix | 2.8.1 | `apisix-helm/Chart.yaml` hard dependency | `helm pull apisix/apisix --version 2.8.1` → upload via curl to ei-helm-local |
-| keycloak | latest | `deploy-keycloak-tls-cert.yml` | `helm pull bitnami/keycloak` → upload via curl to ei-helm-local |
-
-#### PyPI Packages
-`setup-bastion.yml` installs these separately from ansible — not in current upload:
-| Package | Needed By |
-|---|---|
-| `kubernetes` | Every `kubernetes.core.k8s:` Ansible task across all playbooks |
-| `jsonpatch` | Kubernetes patch operations |
-| `requests` | HTTP calls in Ansible modules |
-| `urllib3` | HTTP client dependency |
-
-```bash
-pip3 download kubernetes jsonpatch requests urllib3 -d ~/pip-wheels
-twine upload --repository-url http://100.67.152.212:8082/artifactory/api/pypi/ei-pypi-local \
-  -u admin -p password ~/pip-wheels/*.whl
-```
-
-#### Ansible Collections
-`setup-bastion.yml` installs 4 collections — only 2 uploaded:
-| Collection | Needed By |
-|---|---|
-| `kubernetes.core` | Every `kubernetes.core.k8s:` task — most critical missing item |
-| `ansible.posix` | File/system tasks across playbooks |
-
-```bash
-ansible-galaxy collection download kubernetes.core --download-path ~/ansible-collections
-ansible-galaxy collection download ansible.posix   --download-path ~/ansible-collections
-curl -u admin:password -T kubernetes-core-*.tar.gz \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/ansible-collections/kubernetes-core-latest.tar.gz"
-curl -u admin:password -T ansible-posix-*.tar.gz \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/ansible-collections/ansible-posix-latest.tar.gz"
-```
-
-#### Helm Charts: Re-upload via HTTP (not OCI)
-ingress-nginx and langfuse were pushed via `helm push` (OCI) — must re-upload via curl so ei-helm-virtual can serve them over HTTP:
-```bash
-curl -u admin:password -T ingress-nginx-4.12.2.tgz \
-  "http://100.67.152.212:8082/artifactory/ei-helm-local/ingress-nginx-4.12.2.tgz"
-curl -u admin:password -T langfuse-1.5.1.tgz \
-  "http://100.67.152.212:8082/artifactory/ei-helm-local/langfuse-1.5.1.tgz"
-```
 
 ### 🟡 MEDIUM — Fails at specific steps
 | Item | Issue | Fix |
@@ -178,6 +164,9 @@ jfrog_password=password
 ```yaml
 helm_repo_ingress_nginx: "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | bool else 'https://kubernetes.github.io/ingress-nginx' }}"
 helm_repo_langfuse:      "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | bool else 'https://langfuse.github.io/langfuse-k8s' }}"
+helm_repo_apisix:        "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | bool else 'https://charts.apiseven.com' }}"
+helm_oci_jfrog_host:     "{{ jfrog_url | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}"
+# helm_oci_jfrog_host extracts '100.67.152.212:8082' from jfrog_url for use in helm OCI pull commands
 ```
 
 ### Shell scripts — JFrog vars passed as --extra-vars
@@ -229,6 +218,33 @@ Pattern used in all 4 playbooks — original task kept with `when: not airgap_en
 | `core/playbooks/deploy-keycloak-controller.yml` | ingress-nginx |
 | `core/playbooks/deploy-keycloak-service.yml` | ingress-nginx |
 | `core/playbooks/deploy-genai-gateway.yml` | langfuse |
+| `core/playbooks/deploy-keycloak-tls-cert.yml` | apisix (added — was missing entirely) |
+
+### APISIX helm repo — `deploy-keycloak-tls-cert.yml`
+Previously `helm dependency update apisix-helm/` ran with no helm repo registered for `apisix`. Fixed by adding dual tasks before the dependency update:
+- Internet: `helm repo add apisix https://charts.apiseven.com --force-update`
+- Airgap: `helm repo add apisix {{ helm_repo_apisix }} --username ... --force-update`
+
+### Keycloak chart install — `deploy-keycloak-tls-cert.yml`
+Previously used `chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak` — helm uses its own HTTP client for OCI pulls, **bypassing containerd mirrors**. Fails in true airgap.
+
+Fixed with:
+- Added task to register `ei-helm` → `{{ jfrog_url }}/ei-helm-virtual` when airgap
+- `chart_ref` is now conditional:
+```yaml
+chart_ref: "{{ 'ei-helm/keycloak' if airgap_enabled | bool else 'oci://registry-1.docker.io/bitnamicharts/keycloak' }}"
+```
+
+### GenAI Gateway subchart dependencies — `deploy-genai-gateway.yml`
+`genai-gateway/Chart.yaml` depends on postgresql and redis via `oci://registry-1.docker.io/bitnamicharts`. Helm OCI bypasses containerd mirrors — `helm dependency update` would contact docker.io directly in airgap mode.
+
+Fixed by making `helm dependency update` internet-only and adding an airgap path:
+1. Create `genai-gateway/charts/` dir on remote
+2. `helm pull oci://{{ helm_oci_jfrog_host }}/bitnamicharts/postgresql --version 16.7.4 --plain-http`
+3. `helm pull oci://{{ helm_oci_jfrog_host }}/bitnamicharts/redis --version 21.1.3 --plain-http`
+4. `helm dependency build` (uses local tarballs, skips internet)
+
+**Note**: `--plain-http` is required because JFrog runs on HTTP. JFrog's `ei-docker-dockerhub` (remote → `registry-1.docker.io`) caches the bitnami chart OCI layers and serves them via `oci://100.67.152.212:8082/bitnamicharts/...`.
 
 ### containerd mirror — `core/inventory/metadata/all.yml` ✅ WORKING
 ```yaml
@@ -365,14 +381,16 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 2. ✅ Create `ei-docker-k8s` remote → `registry.k8s.io` in JFrog UI, add to `ei-docker-virtual`
 3. ✅ Create `ei-docker-quay` remote → `quay.io` in JFrog UI, add to `ei-docker-virtual`
 4. ✅ Test registry.k8s.io and quay.io mirrors — both validated (pause:3.10, calico/node:v3.29.1)
-5. ✅ Upload all Helm charts to ei-helm-local (ingress-nginx 4.12.2, langfuse 1.5.1, apisix 2.8.1, keycloak 22.1.0)
-6. ✅ Generate and upload index.yaml manually — JFrog HelmOCI does not auto-generate it
-7. ✅ Upload missing pip packages (kubernetes 35.0.0, jsonpatch 1.33, requests 2.33.1, urllib3 2.6.3 + all deps) to ei-pypi-local
-8. ✅ Upload missing Ansible collections (ansible.posix 2.1.0) to ei-generic-binaries — kubernetes.core 6.3.0 was already there
-9. ✅ Add Kubespray template patch to `core/roles/container-engine/containerd/templates/hosts.toml.j2` — auto-applied on every fresh deploy via `cp -r core/roles/* kubespray/roles/` in setup-env.sh
-10. Set all JFrog remote repos to **Offline** to simulate true airgap
-11. Set `airgap_enabled=on` in `inference-config.cfg` and run full deployment on VM2
-12. Validate end-to-end with internet blocked
+5. ✅ Upload all Helm charts to ei-helm-local via HTTP curl (9 charts: ingress-nginx, langfuse, apisix, keycloak, postgresql, redis, clickhouse, minio, valkey) + regenerate index.yaml
+6. ✅ Generate and upload index.yaml — verified via `helm search repo ei-helm` showing all 9 charts
+7. ✅ Upload missing pip packages (kubernetes, jsonpatch, requests, urllib3 + all deps) to ei-pypi-local
+8. ✅ Upload missing Ansible collections (ansible.posix, kubernetes.core) to ei-generic-binaries
+9. ✅ Add Kubespray template patch to `core/roles/container-engine/containerd/templates/hosts.toml.j2`
+10. ✅ Fix all helm-related URL gaps: apisix repo registration, keycloak OCI chart_ref, genai-gateway OCI subchart dependencies
+11. ✅ Pre-cache all required Docker images in JFrog via `docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>` on VM1
+12. Set all JFrog remote repos to **Offline** in JFrog UI (Administration → Repositories → each remote → Advanced → Offline)
+13. Set `airgap_enabled=on` in `inference-config.cfg` on VM2 and run full deployment
+14. Validate end-to-end with internet blocked (use iptables rules in Airgap Simulation section)
 
 ## Airgap Simulation — Block Internet on VM2
 ```bash
