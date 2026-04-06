@@ -184,17 +184,18 @@ VERIFY_SSL=true
   - For Keycloak, each model has its own APISIX route path. Run `kubectl get apisixroutes` to find the route names for your deployed models (e.g., `bge-base-en-v1.5`, `bge-reranker-base`, `Qwen3-4B-Instruct-2507`)
 
 ### Configure Models
-Ensure your model endpoints match your deployment.
+Model endpoint names differ by deployment type. Use the table below to determine the correct values:
 
-```bash
-# Model Configuration
-EMBEDDING_MODEL_ENDPOINT=BAAI/bge-base-en-v1.5
-EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
-RERANKER_MODEL_ENDPOINT=BAAI/bge-reranker-base
-RERANKER_MODEL_NAME=BAAI/bge-reranker-base
-LLM_MODEL_ENDPOINT=Qwen/Qwen3-4B-Instruct-2507
-LLM_MODEL_NAME=Qwen/Qwen3-4B-Instruct-2507
-```
+| Variable | Xeon + Keycloak/APISIX | Xeon + GenAI Gateway | Gaudi (TEI) |
+|---|---|---|---|
+| `EMBEDDING_MODEL_ENDPOINT` | `bge-base-en-v1.5-vllmcpu` | `BAAI/bge-base-en-v1.5` | `BAAI/bge-base-en-v1.5` |
+| `EMBEDDING_MODEL_NAME` | `BAAI/bge-base-en-v1.5` | `BAAI/bge-base-en-v1.5` | `BAAI/bge-base-en-v1.5` |
+| `RERANKER_MODEL_ENDPOINT` | `bge-reranker-base-vllmcpu` | `BAAI/bge-reranker-base` | `BAAI/bge-reranker-base` |
+| `RERANKER_MODEL_NAME` | `BAAI/bge-reranker-base` | `BAAI/bge-reranker-base` | `BAAI/bge-reranker-base` |
+| `LLM_MODEL_ENDPOINT` | `Qwen3-4B-Instruct-2507-vllmcpu` | `Qwen/Qwen3-4B-Instruct-2507` | `Qwen/Qwen3-4B-Instruct-2507` |
+| `LLM_MODEL_NAME` | `Qwen/Qwen3-4B-Instruct-2507` | `Qwen/Qwen3-4B-Instruct-2507` | `Qwen/Qwen3-4B-Instruct-2507` |
+
+> `MODEL_ENDPOINT` is the route/model identifier sent to your gateway. For Keycloak/APISIX it is the APISIX route name (run `kubectl get apisixroutes` to verify the exact names for your deployment). `MODEL_NAME` is always the HuggingFace model ID used in the API request payload.
 
 **Gaudi hardware (TEI backend):** Set `INFERENCE_BACKEND=tei` in your `.env`. TEI serves endpoints without the `/v1` prefix (`/embeddings`, `/rerank`) unlike vLLM which uses `/v1`. Xeon deployments use the default `INFERENCE_BACKEND=vllm`.
 
@@ -203,13 +204,13 @@ LLM_MODEL_NAME=Qwen/Qwen3-4B-Instruct-2507
 INFERENCE_BACKEND=tei
 ```
 
-**Keycloak / APISIX deployments:** You must also uncomment and set the per-model API endpoint variables in your `.env`. Each model needs its own APISIX route URL (use `kubectl get apisixroutes` to find the route paths):
+**Keycloak / APISIX deployments:** Uncomment and set the per-model API endpoint variables in your `.env`. Each model needs its own APISIX route URL. Xeon route names use the `-vllmcpu` suffix by default:
 
 ```bash
 # APISIX Gateway Per-Model Endpoints (required for Keycloak)
-EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5
-RERANKER_API_ENDPOINT=https://api.example.com/bge-reranker-base
-LLM_API_ENDPOINT=https://api.example.com/Qwen3-4B-Instruct-2507
+EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5-vllmcpu
+RERANKER_API_ENDPOINT=https://api.example.com/bge-reranker-base-vllmcpu
+LLM_API_ENDPOINT=https://api.example.com/Qwen3-4B-Instruct-2507-vllmcpu
 ```
 
 ### Running the Application
