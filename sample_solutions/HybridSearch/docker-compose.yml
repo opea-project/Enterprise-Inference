@@ -114,6 +114,7 @@ services:
       - EMBEDDING_SERVICE_URL=http://embedding:8001
       - RERANKER_MODEL_ENDPOINT=${RERANKER_MODEL_ENDPOINT:-BAAI/bge-reranker-base}
       - RERANKER_MODEL_NAME=${RERANKER_MODEL_NAME:-BAAI/bge-reranker-base}
+      - RERANKER_MAX_BATCH_SIZE=${RERANKER_MAX_BATCH_SIZE:-32}
       # GenAI Gateway / APISIX Configuration
       - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
       - GENAI_API_KEY=${GENAI_API_KEY}

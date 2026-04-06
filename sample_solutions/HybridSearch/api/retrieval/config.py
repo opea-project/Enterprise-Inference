@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     # Reranker Model Configuration (for Enterprise)
     reranker_model_endpoint: str = "bge-reranker-base-vllmcpu"
     reranker_model_name: str = "BAAI/bge-reranker-base"
+    reranker_max_batch_size: int = 32  # Max docs per rerank request (model-dependent)
     
     # Index Storage Path - default to /data/indexes in Docker
     index_storage_path: str = "/data/indexes"

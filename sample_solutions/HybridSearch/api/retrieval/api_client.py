@@ -82,48 +82,58 @@ class APIClient:
         use_no_v1 = self.use_apisix or self.use_tei
         url = f"{self.base_url}/rerank" if use_no_v1 else f"{self.base_url}/v1/rerank"
 
-        # Send both "documents" (vLLM / LiteLLM) and "texts" (TEI) so the
-        # payload works regardless of the backend — each ignores the extra field.
-        payload = {
-            "model": settings.reranker_model_name,
-            "query": query,
-            "documents": docs,
-            "texts": docs,
-            "top_n": len(docs),
-            "return_documents": False
-        }
+        if not self.http_client:
+            self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=60.0)
 
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
         }
 
-        if not self.http_client:
-            self.http_client = httpx.Client(verify=settings.verify_ssl, timeout=60.0)
+        # Truncate each doc to ~500 chars (~125 tokens) so query + doc
+        # stays well within the reranker model's 512-token max sequence length.
+        # 500 chars handles worst-case tokenization (technical text ~2 chars/token)
+        # and keeps total tokens safely under the model's 512-token max.
+        max_doc_chars = 500
+        truncated_docs = [d[:max_doc_chars] for d in docs]
 
-        response = self.http_client.post(url, json=payload, headers=headers)
-
-        if response.status_code != 200:
-            logger.error(f"Reranker API error: {response.status_code} - {response.text}")
-            response.raise_for_status()
-
-        response_data = response.json()
-        logger.info(f"Reranker raw response: {response_data}")
-
-        # Handle both response formats:
-        # vLLM/APISIX:    [{"index": 0, "score": 0.9}, ...]
-        # LiteLLM/Cohere: {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
-        if isinstance(response_data, list):
-            results = response_data
-        else:
-            results = response_data.get("results", [])
-
+        # Split into batches to respect the model's max batch size
+        batch_size = settings.reranker_max_batch_size
         scores = [0.0] * len(docs)
-        for res in results:
+
+        for batch_start in range(0, len(truncated_docs), batch_size):
+            batch = truncated_docs[batch_start:batch_start + batch_size]
+
+            # Send both "documents" (vLLM/LiteLLM) and "texts" (TEI) —
+            # each backend ignores the field it doesn't recognise.
+            payload = {
+                "model": settings.reranker_model_name,
+                "query": query,
+                "documents": batch,
+                "texts": batch,
+                "top_n": len(batch),
+                "return_documents": False
+            }
+
+            response = self.http_client.post(url, json=payload, headers=headers)
+
+            if response.status_code != 200:
+                logger.error(f"Reranker API error: {response.status_code} - {response.text}")
+                response.raise_for_status()
+
+            response_data = response.json()
+
+            # Handle both response formats:
+            # vLLM/APISIX:    [{"index": 0, "score": 0.9}, ...]
+            # LiteLLM/Cohere: {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
             if isinstance(response_data, list):
-                scores[res["index"]] = res["score"]
+                results = response_data
             else:
-                scores[res["index"]] = res["relevance_score"]
+                results = response_data.get("results", [])
+
+            for res in results:
+                original_idx = batch_start + res["index"]
+                scores[original_idx] = res["score"] if isinstance(response_data, list) else res["relevance_score"]
 
         return scores
 
