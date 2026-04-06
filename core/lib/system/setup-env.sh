@@ -72,7 +72,7 @@ setup_initial_env() {
     fi                 
         
     export PIP_BREAK_SYSTEM_PACKAGES=1
-    if [[ "$airgap_enabled" == "on" ]]; then
+    if [[ "$airgap_enabled" == "yes" ]]; then
         jfrog_pip_index="${jfrog_url}/api/pypi/ei-pypi-virtual/simple"
         jfrog_host="${jfrog_url#*://}"
         jfrog_host="${jfrog_host%%/*}"
@@ -167,7 +167,7 @@ setup_initial_env() {
     echo "Infrastructure readiness check completed successfully."    
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
-    if [[ "$airgap_enabled" == "on" ]]; then
+    if [[ "$airgap_enabled" == "yes" ]]; then
         echo "Installing Ansible collections from JFrog Artifactory (airgap mode)..."
         for coll_entry in "kubernetes-core:kubernetes.core" "ansible-posix:ansible.posix" "community-kubernetes:community.kubernetes" "community-general:community.general"; do
             coll_file="${coll_entry%%:*}"

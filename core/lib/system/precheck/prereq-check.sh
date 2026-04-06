@@ -75,7 +75,7 @@ run_system_prerequisites_check() {
     # Check internet or JFrog connectivity
     echo "Checking connectivity..."
     if command -v curl &> /dev/null; then
-        if [[ "$airgap_enabled" == "on" ]]; then
+        if [[ "$airgap_enabled" == "yes" ]]; then
             # In airgap mode, verify JFrog Artifactory is reachable instead of the internet
             if curl -s --connect-timeout 10 --max-time 15 \
                     -u "${jfrog_username}:${jfrog_password}" \
@@ -129,7 +129,7 @@ run_system_prerequisites_check() {
     fi
     
 
-    if [[ "$airgap_enabled" != "on" ]]; then
+    if [[ "$airgap_enabled" != "yes" ]]; then
         echo "Updating system package lists..."
         if command -v apt &> /dev/null; then
             echo "Updating package lists using apt Ubuntu..."
@@ -178,7 +178,7 @@ run_system_prerequisites_check() {
         
         # Handle internet/JFrog connectivity issues first - EXIT IMMEDIATELY (cannot be auto-fixed)
         if [ ${#connectivity_issues[@]} -gt 0 ]; then
-            if [[ "$airgap_enabled" == "on" ]]; then
+            if [[ "$airgap_enabled" == "yes" ]]; then
                 echo -e "${RED}Critical connectivity requirements not met:${NC}"
                 echo -e "${RED}  - JFrog Artifactory is unreachable at ${jfrog_url}${NC}"
                 echo ""
