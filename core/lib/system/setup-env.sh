@@ -72,8 +72,17 @@ setup_initial_env() {
     fi                 
         
     export PIP_BREAK_SYSTEM_PACKAGES=1
-    $VENVDIR/bin/python3 -m pip install --upgrade pip
-    $VENVDIR/bin/python3 -m pip install -U -r requirements.txt    
+    if [[ "$airgap_enabled" == "on" ]]; then
+        jfrog_pip_index="${jfrog_url}/api/pypi/ei-pypi-virtual/simple"
+        jfrog_host="${jfrog_url#*://}"
+        jfrog_host="${jfrog_host%%/*}"
+        pip_extra_args="--index-url http://${jfrog_username}:${jfrog_password}@${jfrog_host}/artifactory/api/pypi/ei-pypi-virtual/simple --trusted-host ${jfrog_host}"
+        $VENVDIR/bin/python3 -m pip install --upgrade pip $pip_extra_args
+        $VENVDIR/bin/python3 -m pip install -U -r requirements.txt $pip_extra_args
+    else
+        $VENVDIR/bin/python3 -m pip install --upgrade pip
+        $VENVDIR/bin/python3 -m pip install -U -r requirements.txt
+    fi
     
     echo "Verifying Ansible Installation..."
     if $VENVDIR/bin/python3 -c "import ansible" &> /dev/null; then
@@ -158,7 +167,23 @@ setup_initial_env() {
     echo "Infrastructure readiness check completed successfully."    
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
-    ansible-galaxy collection install community.kubernetes        
+    if [[ "$airgap_enabled" == "on" ]]; then
+        echo "Installing Ansible collections from JFrog Artifactory (airgap mode)..."
+        for coll_entry in "kubernetes-core:kubernetes.core" "ansible-posix:ansible.posix" "community-kubernetes:community.kubernetes" "community-general:community.general"; do
+            coll_file="${coll_entry%%:*}"
+            coll_name="${coll_entry##*:}"
+            tarball_url="${jfrog_url}/ei-generic-binaries/ansible-collections/${coll_file}-latest.tar.gz"
+            tmp_file="/tmp/${coll_file}.tar.gz"
+            echo "Installing ${coll_name} from JFrog..."
+            if curl -sf -u "${jfrog_username}:${jfrog_password}" -o "${tmp_file}" "${tarball_url}"; then
+                ansible-galaxy collection install "${tmp_file}" --force
+            else
+                echo -e "${YELLOW}Warning: ${coll_name} not found in JFrog at ${tarball_url} — skipping${NC}"
+            fi
+        done
+    else
+        ansible-galaxy collection install community.kubernetes
+    fi
 }
 
 

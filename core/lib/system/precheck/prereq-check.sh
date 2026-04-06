@@ -72,21 +72,33 @@ run_system_prerequisites_check() {
         echo -e "${GREEN}✓ curl found${NC}"
     fi
     
-    # Check internet connectivity (essential for Docker images, packages, repositories)
-    echo "Checking internet connectivity..."
+    # Check internet or JFrog connectivity
+    echo "Checking connectivity..."
     if command -v curl &> /dev/null; then
-        # Test multiple reliable endpoints to ensure connectivity
-        if curl -s --connect-timeout 10 --max-time 15 https://google.com > /dev/null 2>&1 || \
-           curl -s --connect-timeout 10 --max-time 15 https://github.com > /dev/null 2>&1 || \
-           curl -s --connect-timeout 10 --max-time 15 https://registry-1.docker.io > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Internet connectivity confirmed${NC}"
+        if [[ "$airgap_enabled" == "on" ]]; then
+            # In airgap mode, verify JFrog Artifactory is reachable instead of the internet
+            if curl -s --connect-timeout 10 --max-time 15 \
+                    -u "${jfrog_username}:${jfrog_password}" \
+                    "${jfrog_url}/api/system/ping" > /dev/null 2>&1; then
+                echo -e "${GREEN}✓ JFrog Artifactory connectivity confirmed (airgap mode)${NC}"
+            else
+                echo -e "${RED}✗ Cannot reach JFrog Artifactory at ${jfrog_url}${NC}"
+                missing_deps+=("internet-connectivity")
+            fi
         else
-            echo -e "${RED}✗ No internet connectivity detected${NC}"
-            missing_deps+=("internet-connectivity")
+            # Test multiple reliable endpoints to ensure internet connectivity
+            if curl -s --connect-timeout 10 --max-time 15 https://google.com > /dev/null 2>&1 || \
+               curl -s --connect-timeout 10 --max-time 15 https://github.com > /dev/null 2>&1 || \
+               curl -s --connect-timeout 10 --max-time 15 https://registry-1.docker.io > /dev/null 2>&1; then
+                echo -e "${GREEN}✓ Internet connectivity confirmed${NC}"
+            else
+                echo -e "${RED}✗ No internet connectivity detected${NC}"
+                missing_deps+=("internet-connectivity")
+            fi
         fi
     else
         # If curl is not available, we'll check this later after curl is installed
-        warnings+=("Internet connectivity check skipped - curl not available")
+        warnings+=("Connectivity check skipped - curl not available")
     fi
     
     # Check if pip is available for the configured Python interpreter
@@ -117,25 +129,29 @@ run_system_prerequisites_check() {
     fi
     
 
-    echo "Updating system package lists..."
-    if command -v apt &> /dev/null; then
-        echo "Updating package lists using apt Ubuntu..."
-        if sudo apt update; then
-            echo -e "${GREEN}Package lists updated successfully${NC}"
+    if [[ "$airgap_enabled" != "on" ]]; then
+        echo "Updating system package lists..."
+        if command -v apt &> /dev/null; then
+            echo "Updating package lists using apt Ubuntu..."
+            if sudo apt update; then
+                echo -e "${GREEN}Package lists updated successfully${NC}"
+            else
+                echo -e "${YELLOW}Package list update failed, continuing anyway${NC}"
+            fi
+        elif command -v dnf &> /dev/null; then
+            echo "Updating package lists using dnf (RHEL/CentOS)..."
+            if sudo dnf check-update || [ $? -eq 100 ]; then
+                echo -e "${GREEN} Package lists updated successfully${NC}"
+            else
+                echo -e "${YELLOW} Package list update failed, continuing anyway${NC}"
+            fi
         else
-            echo -e "${YELLOW}Package list update failed, continuing anyway${NC}"
+            echo -e "${YELLOW}Unknown package manager, skipping package list update${NC}"
         fi
-    elif command -v dnf &> /dev/null; then
-        echo "Updating package lists using dnf (RHEL/CentOS)..."
-        if sudo dnf check-update || [ $? -eq 100 ]; then
-            echo -e "${GREEN} Package lists updated successfully${NC}"
-        else
-            echo -e "${YELLOW} Package list update failed, continuing anyway${NC}"
-        fi
+        echo ""
     else
-        echo -e "${YELLOW}Unknown package manager, skipping package list update${NC}"
+        echo -e "${YELLOW}Skipping package list update in airgap mode (no package mirror configured)${NC}"
     fi
-    echo ""
 
     # Check if any critical dependencies are missing and handle appropriately
     if [ ${#missing_deps[@]} -gt 0 ]; then
@@ -160,20 +176,31 @@ run_system_prerequisites_check() {
             fi
         done
         
-        # Handle internet connectivity issues first - EXIT IMMEDIATELY (cannot be auto-fixed)
+        # Handle internet/JFrog connectivity issues first - EXIT IMMEDIATELY (cannot be auto-fixed)
         if [ ${#connectivity_issues[@]} -gt 0 ]; then
-            echo -e "${RED}Critical connectivity requirements not met:${NC}"
-            echo -e "${RED}  - Internet connectivity is required for:${NC}"
-            echo -e "${RED}    * Pulling Docker images${NC}"
-            echo -e "${RED}    * Downloading packages and dependencies${NC}"
-            echo -e "${RED}    * Accessing container registries${NC}"
-            echo -e "${RED}    * Cloning Git repositories${NC}"
-            echo ""
-            echo -e "${YELLOW}Please ensure internet connectivity and try again.${NC}"
-            echo -e "${YELLOW}Common solutions:${NC}"
-            echo -e "${YELLOW}  - Check network configuration${NC}"
-            echo -e "${YELLOW}  - Verify firewall/proxy settings${NC}"
-            echo -e "${YELLOW}  - Test: curl -I https://google.com${NC}"
+            if [[ "$airgap_enabled" == "on" ]]; then
+                echo -e "${RED}Critical connectivity requirements not met:${NC}"
+                echo -e "${RED}  - JFrog Artifactory is unreachable at ${jfrog_url}${NC}"
+                echo ""
+                echo -e "${YELLOW}In airgap mode all packages and images are served by JFrog.${NC}"
+                echo -e "${YELLOW}Common solutions:${NC}"
+                echo -e "${YELLOW}  - Verify JFrog is running on VM1${NC}"
+                echo -e "${YELLOW}  - Check jfrog_url, jfrog_username, jfrog_password in inference-config.cfg${NC}"
+                echo -e "${YELLOW}  - Test: curl -u \${jfrog_username}:\${jfrog_password} ${jfrog_url}/api/system/ping${NC}"
+            else
+                echo -e "${RED}Critical connectivity requirements not met:${NC}"
+                echo -e "${RED}  - Internet connectivity is required for:${NC}"
+                echo -e "${RED}    * Pulling Docker images${NC}"
+                echo -e "${RED}    * Downloading packages and dependencies${NC}"
+                echo -e "${RED}    * Accessing container registries${NC}"
+                echo -e "${RED}    * Cloning Git repositories${NC}"
+                echo ""
+                echo -e "${YELLOW}Please ensure internet connectivity and try again.${NC}"
+                echo -e "${YELLOW}Common solutions:${NC}"
+                echo -e "${YELLOW}  - Check network configuration${NC}"
+                echo -e "${YELLOW}  - Verify firewall/proxy settings${NC}"
+                echo -e "${YELLOW}  - Test: curl -I https://google.com${NC}"
+            fi
             exit 1
         fi
         

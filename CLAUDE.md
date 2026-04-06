@@ -388,26 +388,41 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 9. ✅ Add Kubespray template patch to `core/roles/container-engine/containerd/templates/hosts.toml.j2`
 10. ✅ Fix all helm-related URL gaps: apisix repo registration, keycloak OCI chart_ref, genai-gateway OCI subchart dependencies
 11. ✅ Pre-cache all required Docker images in JFrog via `docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>` on VM1
-12. Set all JFrog remote repos to **Offline** in JFrog UI (Administration → Repositories → each remote → Advanced → Offline)
-13. Set `airgap_enabled=on` in `inference-config.cfg` on VM2 and run full deployment
-14. Validate end-to-end with internet blocked (use iptables rules in Airgap Simulation section)
+12. ✅ Set all JFrog remote repos to Offline in JFrog UI
+13. ✅ Set `airgap_enabled=on` in `inference-config.cfg` on VM2
+14. ✅ Block internet on VM2 — validated: google.com BLOCKED, JFrog REACHABLE
+15. Run full deployment on VM2: `cd ~/Enterprise-Inference && ./inference-stack-deploy.sh`
+16. Validate all pods reach Running state and LLM endpoint responds
 
 ## Airgap Simulation — Block Internet on VM2
+
+**VM IPs**: VM1 (JFrog) = `100.67.152.212`, VM2 = `100.67.153.208`, SSH client = `100.64.29.144`
+
 ```bash
-# Allow only VM1 (JFrog) + local traffic, block everything else
+# Check SSH source IP first — must be in allowed ranges or you will be locked out
+echo $SSH_CLIENT
+
+# Block internet — allow only JFrog + cluster subnet + SSH client + internal ranges
 sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -A OUTPUT -o lo -j ACCEPT
-sudo iptables -A OUTPUT -d 100.67.152.212 -j ACCEPT
-sudo iptables -A OUTPUT -d 10.0.0.0/8 -j ACCEPT
-sudo iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT
+sudo iptables -A OUTPUT -d 100.67.0.0/16 -j ACCEPT   # VM1 + VM2 + cluster nodes
+sudo iptables -A OUTPUT -d 100.64.0.0/10 -j ACCEPT   # SSH client subnet
+sudo iptables -A OUTPUT -d 10.0.0.0/8 -j ACCEPT      # Kubernetes pod/service CIDRs
+sudo iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT  # Kubernetes pod/service CIDRs
 sudo iptables -A OUTPUT -j DROP
+
+# Verify
+curl -s --max-time 5 https://google.com && echo "OPEN" || echo "BLOCKED"
+curl -s --max-time 5 http://100.67.152.212:8082/artifactory/api/system/ping && echo "JFROG OK"
 
 # To unblock
 sudo iptables -D OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -D OUTPUT -o lo -j ACCEPT
-sudo iptables -D OUTPUT -d 100.67.152.212 -j ACCEPT
+sudo iptables -D OUTPUT -d 100.67.0.0/16 -j ACCEPT
+sudo iptables -D OUTPUT -d 100.64.0.0/10 -j ACCEPT
 sudo iptables -D OUTPUT -d 10.0.0.0/8 -j ACCEPT
 sudo iptables -D OUTPUT -d 192.168.0.0/16 -j ACCEPT
 sudo iptables -D OUTPUT -j DROP
 ```
-⚠️ Check `echo $SSH_CLIENT` before blocking — ensure your SSH source IP is in the allowed ranges or you will be locked out.
+
+**Validated ✅** — google.com BLOCKED, JFrog ping returns OK.
