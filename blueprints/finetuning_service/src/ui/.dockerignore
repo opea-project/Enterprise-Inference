@@ -1,0 +1,22 @@
+# Docker ignore file for finetuning-ui
+.git
+.gitignore
+README.md
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next
+.vercel
+.DS_Store
+*.tsbuildinfo
+node_modules
+dist
+coverage
+.nyc_output
+.env.test
+.env.production
+.vscode
+.idea
+*.log

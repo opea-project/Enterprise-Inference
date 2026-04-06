@@ -1,0 +1,42 @@
+{{- if .Values.apisixRoute.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "finetuning-ui.fullname" . }}-apisixroute
+  labels:
+    {{- include "finetuning-ui.labels" . | nindent 4 }}
+spec:
+  http:
+  - name: {{ .Values.apisixRoute.name | default "finetuning-ui-route" }}
+    match:
+      hosts:
+      {{- range .Values.apisixRoute.hosts }}
+      - {{ . | quote }}
+      {{- end }}
+      paths:
+      {{- range .Values.apisixRoute.paths }}
+      - {{ . | quote }}
+      {{- end }}
+    backends:
+    - serviceName: {{ include "finetuning-ui.fullname" . }}
+      servicePort: {{ .Values.service.port }}
+    plugins:
+    {{- if .Values.apisixRoute.proxyRewrite.enabled }}
+    - name: proxy-rewrite
+      enable: {{ .Values.apisixRoute.proxyRewrite.enabled }}
+      config:
+        regex_uri:
+        - {{ .Values.apisixRoute.proxyRewrite.regexUri.from | quote }}
+        - {{ .Values.apisixRoute.proxyRewrite.regexUri.to | quote }}
+    {{- end }}
+    {{- if .Values.apisixRoute.proxyControl.enabled }}
+    - name: proxy-control
+      enable: {{ .Values.apisixRoute.proxyControl.enabled }}
+      config:
+        upstream_proxy_buffer_size: {{ .Values.apisixRoute.proxyControl.upstreamProxyBufferSize | quote }}
+        upstream_proxy_buffers:
+          number: {{ .Values.apisixRoute.proxyControl.upstreamProxyBuffers.number }}
+          size: {{ .Values.apisixRoute.proxyControl.upstreamProxyBuffers.size | quote }}
+    {{- end }}
+    priority: {{ .Values.apisixRoute.priority | default 80 }}
+{{- end }}

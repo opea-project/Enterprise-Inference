@@ -1,0 +1,28 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# FastAPI and server
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.22  # CVE-2024-53981 fix (was 0.0.18)
+slowapi==0.1.9  # Rate limiting (DoS protection)
+
+# MinIO/S3 storage
+minio==7.2.12
+
+# Data validation
+pydantic
+
+# Environment management
+python-dotenv==1.0.1
+
+# Authentication - Keycloak JWT validation
+python-keycloak==7.0.0
+
+# Celery and Redis
+celery[redis]==5.5.0
+redis==5.2.1
+
+# PostgreSQL and ORM
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic

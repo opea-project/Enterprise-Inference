@@ -1,0 +1,75 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+###########################################################################
+# Build Container Images using Kaniko
+###########################################################################
+- name: Display Build Message
+  debug:
+    msg:
+      - "=============================================="
+      - "Building container images with Kaniko..."
+      - "This will take several minutes."
+      - "Build Order: DataPrep → API → UI"
+      - "=============================================="
+  run_once: true
+
+- name: Ensure Kaniko scripts are executable
+  shell: |
+    chmod +x {{ dataprep_source_path }}/kaniko/data-prep/deploy-dataprep.sh
+    chmod +x {{ dataprep_source_path }}/kaniko/celery/deploy-celery.sh
+    chmod +x {{ finetune_api_source_path }}/kaniko/deploy-finetuning.sh
+    chmod +x {{ finetune_ui_source_path }}/deployment/kaniko/deploy-frontend.sh
+  run_once: true
+
+- name: Build Data Prep Backend Image with Kaniko
+  shell: |
+    kubectl delete job kaniko-data-prep-backend -n {{ dataprep_namespace }} --ignore-not-found=true 2>/dev/null || true
+    cd {{ dataprep_source_path }}/kaniko/data-prep && \
+    NAMESPACE={{ dataprep_namespace }} ./deploy-dataprep.sh
+
+  run_once: true
+
+###########################################################################
+# Build Data Prep Celery Worker Image with Kaniko
+###########################################################################
+- name: Build Celery Worker Image with Kaniko
+  shell: |
+    kubectl delete job kaniko-celery-worker -n {{ dataprep_namespace }} --ignore-not-found=true 2>/dev/null || true
+    cd {{ dataprep_source_path }}/kaniko/celery && \
+    NAMESPACE={{ dataprep_namespace }} ./deploy-celery.sh
+    kubectl wait --for=condition=complete --timeout=200s job/kaniko-celery-worker -n {{ dataprep_namespace }}
+  run_once: true
+
+###########################################################################
+# Build Fine-Tuning API Image with Kaniko (SECOND - uses MinIO from DataPrep)
+###########################################################################
+- name: Build Fine-Tuning API Image with Kaniko
+  shell: |
+    cd {{ finetune_api_source_path }}/kaniko && \
+    NAMESPACE={{ finetune_api_namespace }} ./deploy-finetuning.sh
+  run_once: true
+
+###########################################################################
+# Build Fine-Tuning UI Image with Kaniko (THIRD)
+###########################################################################
+- name: Build Fine-Tuning UI Image with Kaniko
+  shell: |
+    cd {{ finetune_ui_source_path }}/deployment/kaniko && \
+    NAMESPACE={{ finetune_ui_namespace }} \
+    NEXT_PUBLIC_BASE_PATH=/enterprise-ai/ui \
+    NEXT_PUBLIC_AUTH_URL={{ ('https://' + cluster_url + '/realms/' + finetune_keycloak_realm) | quote }} \
+    NEXT_PUBLIC_FILES_BASE_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_PUBLIC_DATAPREP_BASE_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_PUBLIC_FINETUNING_API_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_TELEMETRY_DISABLED=1 \
+    ./deploy-frontend.sh
+  run_once: true
+
+- name: Display Build Complete Message
+  debug:
+    msg:
+      - "=============================================="
+      - "Container images built successfully!"
+      - "=============================================="
+  run_once: true

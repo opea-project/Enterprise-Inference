@@ -49,7 +49,7 @@ resources:
 
 For single-node Xeon clusters, **Keycloak** and **APISIX** are recommended.
 
-For Gaudi or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
+For  Intel® AI Accelerator or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
 
 ## Status Verification
  

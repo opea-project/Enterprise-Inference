@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: PostgreSQL database for Fine-Tuning Service
+version: 0.1.0
+appVersion: "15"
+type: application

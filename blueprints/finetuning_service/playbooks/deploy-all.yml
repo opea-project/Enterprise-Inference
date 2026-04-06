@@ -1,0 +1,237 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+###########################################################################
+# Fine-Tuning Plugin - Main Orchestration Playbook
+#
+# This is a wrapper playbook that orchestrates the deployment of all
+# Fine-Tuning components. Components can also be deployed independently
+# using their respective playbooks:
+#   - deploy-dataprep.yml
+#   - deploy-finetuning-api.yml
+#   - deploy-ui.yml
+###########################################################################
+
+- name: Deploy Fine-Tuning Plugin
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+
+  vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_delegate.yml"
+    - "{{ lookup('env', 'PWD') }}/../../blueprints/finetuning_service/vars/finetune-plugin-vars.yml"
+    - "{{ lookup('env', 'PWD') }}/config/vault.yml"
+
+  pre_tasks:
+    - name: Read Fine-Tuning Plugin Configuration
+      include_vars:
+        file: "{{ lookup('env', 'PWD') }}/../../blueprints/finetuning_service/finetune-config.cfg"
+        name: finetune_config
+
+    - name: Read cluster_url from Enterprise Inference Config
+      shell: grep '^cluster_url=' {{ lookup('env', 'PWD') }}/../inventory/inference-config.cfg | cut -d'=' -f2
+      register: cluster_url_result
+      run_once: true
+
+    - name: Set cluster_url fact
+      set_fact:
+        cluster_url: "{{ cluster_url_result.stdout }}"
+      run_once: true
+
+    - name: Validate Required Configuration
+      fail:
+        msg: |
+          ERROR: {{ item.name }} is not set!
+          Please configure it in blueprints/finetuning_service/finetune-config.cfg
+      when: finetune_config[item.key] is not defined or finetune_config[item.key] | length == 0
+      loop:
+        - { key: 'nvidia_finetune_backend_url', name: 'Nvidia Fine-Tuning Backend URL' }
+        - { key: 'nvidia_keycloak_token_url', name: 'Nvidia Keycloak Token URL' }
+        - { key: 'nvidia_keycloak_client_id', name: 'Nvidia Keycloak Client ID' }
+        - { key: 'nvidia_keycloak_client_secret', name: 'Nvidia Keycloak Client Secret' }
+      run_once: true
+
+    - name: Set Configuration Variables
+      set_fact:
+        # User-provided Nvidia backend credentials
+        nvidia_finetune_backend_url: "{{ finetune_config.nvidia_finetune_backend_url }}"
+        nvidia_keycloak_token_url: "{{ finetune_config.nvidia_keycloak_token_url }}"
+        nvidia_keycloak_client_id: "{{ finetune_config.nvidia_keycloak_client_id }}"
+        nvidia_keycloak_client_secret: "{{ finetune_config.nvidia_keycloak_client_secret }}"
+        nvidia_keycloak_verify_ssl: "{{ finetune_config.nvidia_keycloak_verify_ssl | default('true') }}"
+        # Auto-populate LLM config for DataPrep (uses same Nvidia backend)
+        dataprep_llm_api_url: "{{ finetune_config.nvidia_finetune_backend_url }}"
+        dataprep_llm_api_key: "{{ finetune_config.nvidia_keycloak_client_secret }}"
+        dataprep_llm_model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
+        # Auto-populate service URLs
+        dataprep_service_url: "https://{{ cluster_url }}/dataprep"
+        finetune_api_service_url: "https://{{ cluster_url }}/training"
+        finetune_ui_service_url: "https://{{ cluster_url }}/finetune/ui"
+      run_once: true
+
+  roles:
+    - role: inference-tools
+
+  tasks:
+    ###########################################################################
+    # Deployment Overview
+    ###########################################################################
+    - name: Display Fine-Tuning Plugin Deployment Configuration
+      debug:
+        msg:
+          - "=============================================="
+          - "Deploying Fine-Tuning Plugin"
+          - "=============================================="
+          - "Namespaces:"
+          - "  - {{ dataprep_namespace }} (Data Prep Service)"
+          - "  - {{ finetune_api_namespace }} (Fine-Tuning API)"
+          - "  - {{ finetune_ui_namespace }} (Fine-Tuning UI)"
+          - "Domain: {{ cluster_url }}"
+          - "Deployment Sequence:"
+          - "  1. Setup Keycloak realm & clients"
+          - "  2. Build container images"
+          - "  3. Deploy Data Prep (MinIO, PostgreSQL, Redis, Backend, Celery)"
+          - "  4. Deploy Fine-Tuning API (PostgreSQL, API service)"
+          - "  5. Deploy Fine-Tuning UI (Frontend)"
+          - "Authentication: Keycloak (realm: finetuning)"
+          - "=============================================="
+      run_once: true
+
+    ###########################################################################
+    # Create Namespaces
+    ###########################################################################
+    - name: Ensure DataPrep Namespace Exists
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ dataprep_namespace }}"
+      run_once: true
+
+    - name: Ensure Fine-Tuning API Namespace Exists
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ finetune_api_namespace }}"
+      run_once: true
+
+    - name: Ensure Fine-Tuning UI Namespace Exists
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ finetune_ui_namespace }}"
+      run_once: true
+
+    ###########################################################################
+    # Validate Secrets
+    ###########################################################################
+    - name: Validate Database Passwords from Vault
+      fail:
+        msg: "ERROR: {{ item.name }} password not set! Run: core/scripts/generate-vault-secrets.sh"
+      when: vars[item.var] is not defined or vars[item.var] | length == 0
+      loop:
+        - { var: 'finetune_api_postgres_password', name: 'Fine-Tuning API PostgreSQL' }
+        - { var: 'dataprep_postgres_password', name: 'Data Prep PostgreSQL' }
+        - { var: 'dataprep_redis_password', name: 'Data Prep Redis' }
+      run_once: true
+
+    ###########################################################################
+    # Setup Keycloak
+    ###########################################################################
+    - name: Setup Keycloak Fine-Tuning Realm and Clients
+      shell: |
+        bash {{ finetune_plugin_path }}/scripts/setup-keycloak-finetuning.sh
+      register: keycloak_setup_result
+      run_once: true
+
+    - name: Display Keycloak Setup Results
+      debug:
+        msg: "{{ keycloak_setup_result.stdout_lines }}"
+      run_once: true
+
+    - name: Extract Keycloak Backend Client Secret
+      set_fact:
+        finetune_keycloak_backend_client_secret: "{{ keycloak_setup_result.stdout | regex_search('Backend Client Secret: (.+)', '\\1') | first }}"
+      when: keycloak_setup_result.stdout is search('Backend Client Secret')
+      run_once: true
+
+    - name: Set Keycloak Configuration Variables
+      set_fact:
+        finetune_keycloak_enabled: "true"
+        finetune_keycloak_url: "http://keycloak.default.svc.cluster.local:80"
+        finetune_keycloak_realm: "finetuning"
+        finetune_keycloak_backend_client_id: "finetuning-backend"
+        finetune_keycloak_ui_client_id: "finetuning-ui"
+        finetune_nextauth_secret: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') | b64encode }}"
+      run_once: true
+
+    ###########################################################################
+    # Build Images
+    ###########################################################################
+    - name: Build Container Images
+      include_tasks: build-images.yml
+      run_once: true
+
+    ###########################################################################
+    # Deploy Components using separate playbooks
+    ###########################################################################
+    - name: Deploy Data Preparation Service
+      include_tasks: deploy-dataprep.yml
+      run_once: true
+
+    - name: Deploy Fine-Tuning API
+      include_tasks: deploy-finetuning-api.yml
+      run_once: true
+
+    - name: Deploy Fine-Tuning UI
+      include_tasks: deploy-ui.yml
+      run_once: true
+
+    ###########################################################################
+    # Verification
+    ###########################################################################
+    - name: Wait for All Components to be Ready
+      debug:
+        msg:
+          - "=============================================="
+          - "Fine-Tuning Plugin Deployment Complete!"
+          - "=============================================="
+          - "Access URLs:"
+          - "  UI:      https://{{ cluster_url }}/enterprise-ai/ui"
+          - "  API:     https://{{ cluster_url }}/enterprise-ai/api/docs"
+          - "  DataPrep: https://{{ cluster_url }}/enterprise-ai/dataprep/docs"
+          - ""
+          - "Keycloak:"
+          - "  Realm:   finetuning"
+          - "  UI Client: {{ finetune_keycloak_ui_client_id }}"
+          - "  Backend Client: {{ finetune_keycloak_backend_client_id }}"
+          - "=============================================="
+      run_once: true
+
+    - name: Verify Pod Status
+      shell: |
+        echo "DataPrep Namespace:"
+        kubectl get pods -n {{ dataprep_namespace }}
+        echo ""
+        echo "Fine-Tuning API Namespace:"
+        kubectl get pods -n {{ finetune_api_namespace }}
+        echo ""
+        echo "Fine-Tuning UI Namespace:"
+        kubectl get pods -n {{ finetune_ui_namespace }}
+      register: pod_status
+      run_once: true
+
+    - name: Display Pod Status
+      debug:
+        msg: "{{ pod_status.stdout_lines }}"
+      run_once: true

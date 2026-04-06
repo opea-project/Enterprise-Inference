@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "postgres.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "postgres.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "postgres.name" . }}
+    spec:
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+        {{- if .Values.securityContext.fsGroupChangePolicy }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
+        {{- end }}
+        {{- if .Values.securityContext.seccompProfile }}
+        seccompProfile:
+          type: {{ .Values.securityContext.seccompProfile.type }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- end }}
+      # Init container to fix PVC permissions before PostgreSQL starts
+      # This is a production-grade solution for local-path and NFS storage issues
+      # Init container to fix PVC permissions (production-grade security)
+      # This is necessary for local-path provisioner which creates volumes as root
+      initContainers:
+        - name: init-chmod-data
+          # Production: Use pinned Alpine with SHA256 digest for security
+          image: alpine:3.19@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Fixing PVC permissions for PostgreSQL..."
+              # Change ownership to postgres user (UID 999)
+              chown -R 999:999 /var/lib/postgresql/data || true
+              # Set proper permissions (owner read/write/execute only)
+              chmod -R 700 /var/lib/postgresql/data || true
+              echo "✓ Permissions fixed successfully"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          # Security: Run as root only in init container (required for chown)
+          # Main container still runs as non-root
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true  # Read-only root for security
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN  # Only add CHOWN capability needed
+                - FOWNER
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            {{- if .Values.securityContext.readOnlyRootFilesystem }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            {{- end }}
+            {{- if .Values.securityContext.capabilities }}
+            capabilities:
+              {{- toYaml .Values.securityContext.capabilities | nindent 14 }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.auth.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgres.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: {{ .Values.auth.database | quote }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "postgres.fullname" . }}-data

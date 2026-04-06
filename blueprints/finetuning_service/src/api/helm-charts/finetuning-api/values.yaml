@@ -1,0 +1,202 @@
+# Fine-Tuning Service Configuration
+
+# Application settings
+app:
+  name: finetuning-service
+  replicaCount: 2  # Minimum 2 for zero-downtime deployments
+  image:
+    repository: registry.kube-system.svc.cluster.local:5000/finetuning-service
+    tag: "latest"
+    pullPolicy: Always
+
+  # Image pull secrets for private registry (not needed for insecure local registry)
+  # imagePullSecrets:
+  #   - name: registry-secret
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  # Resource limits
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  # Pod termination grace period
+  terminationGracePeriodSeconds: 60
+
+  # Environment configuration
+  config:
+    # Keycloak Configuration
+    # Automatically constructed from baseDomain if left empty, or override explicitly
+    keycloakIssuer: ""  # e.g., "https://example.com/realms/finetuning"
+
+    # Nvidia/Unsloth API Configuration
+    # REQUIRED: Set to your training backend URL (Nvidia APIs on port 8443)
+    nvidiaApiUrl: ""  # e.g., "https://your-training-backend.com:8443"
+    nvidiaKeycloakVerifySsl: "true"  # Whether to verify SSL when calling Keycloak
+    enableNvidia: "true"
+
+    # Rate Limiting Configuration
+    # Enable/disable rate limiting globally
+    rateLimitEnabled: "true"
+    # Default rate limit for all endpoints (requests per minute)
+    rateLimitDefault: "200"
+    # Health check endpoints (lightweight operations)
+    rateLimitHealth: "100"
+    # Model list/retrieve endpoints (read operations)
+    rateLimitModels: "100"
+    # Job creation endpoint (resource-intensive)
+    rateLimitJobCreate: "10"
+    # Job listing/retrieve endpoints
+    rateLimitJobRead: "60"
+    # Job cancellation endpoint
+    rateLimitJobCancel: "20"
+    # Job events endpoint
+    rateLimitJobEvents: "60"
+
+    # Observability Configuration (Lightweight monitoring)
+    # Enable/disable observability features (adds ~5-10MB per pod)
+    observabilityEnabled: "true"
+    # Use JSON structured logging (recommended for production)
+    observabilityJsonLogs: "true"
+    # Track user actions in metrics
+    observabilityLogUserActions: "true"
+    # Enable Prometheus metrics endpoint
+    observabilityMetricsEnabled: "true"
+    # Track per-user request metrics
+    observabilityTrackUserMetrics: "true"
+    # Collect system metrics (CPU, memory)
+    observabilityCollectSystemMetrics: "true"
+
+# Ingress Configuration
+ingress:
+  enabled: false  # Disabled when using APISIX
+  className: "nginx"
+
+  # Domain configuration (path-based routing)
+  # Base domain - CHANGE THIS to your domain (e.g., "example.com")
+  baseDomain: "example.com"
+  # Base path for the API - all endpoints will be under this path
+  # CHANGE THIS if your architect suggests a different path name
+  basePath: "/enterprise-ai"
+  # Full URL will be: https://{{ .baseDomain }}{{ .basePath }}
+  # Result: https://example.com/enterprise-ai
+
+  # TLS secret name (will be auto-created from certs folder by deploy script)
+  tlsSecretName: "finetuning-api-tls"
+
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+
+  # Hosts configuration - deprecated, kept for backward compatibility
+  hosts:
+    - host: "{{ .Values.ingress.baseDomain }}"
+      paths:
+        - path: /
+          pathType: Prefix
+
+  tls:
+    - secretName: "{{ .Values.ingress.tlsSecretName }}"
+      # TLS secret created by deploy script from certs folder
+      hosts:
+        - "{{ .Values.ingress.baseDomain }}"
+
+# APISIX Gateway Configuration
+# Enable this when integrating with Enterprise Inference APISIX
+apisix:
+  enabled: true  # Set to true to use APISIX instead of nginx ingress
+  cors:
+    enabled: true
+    allowOrigins: "http://localhost:3000"
+    allowMethods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+    allowHeaders: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    exposeHeaders: "Content-Length,Content-Range"
+    allowCredentials: true
+    maxAge: 3600
+  oidc:
+    enabled: true
+    realm: finetuning
+    introspection_endpoint_auth_method: client_secret_basic
+    scope: openid profile email
+    bearer_only: true
+    secret_ref: finetuning-backend-secret
+
+# Secrets Configuration
+# These should be set via --set flags or a separate values file
+secrets:
+  # Database URL (REQUIRED)
+  # Format: postgresql://username:password@host:port/database
+  databaseUrl: ""
+
+  # Keycloak OAuth2 Configuration for Nvidia Backend (REQUIRED)
+  # These should be provided via --set flags during deployment
+  nvidiaKeycloakTokenUrl: ""      # e.g., "https://keycloak.example.com:8444/realms/nvidia/protocol/openid-connect/token"
+  nvidiaKeycloakClientId: ""       # e.g., "finetune-api-client"
+  nvidiaKeycloakClientSecret: ""   # Client secret from Keycloak
+
+# Autoscaling Configuration
+autoscaling:
+  enabled: true  # Enable HPA for production
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  scaleDownStabilizationWindowSeconds: 300
+  scaleUpStabilizationWindowSeconds: 0
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1  # Keep at least 1 pod available during disruptions
+  # maxUnavailable: 1  # Alternative: allow max 1 pod to be unavailable
+
+# Network Policy
+# Network Policy Configuration
+networkPolicy:
+  enabled: true
+  ingress:
+    fromNamespaces:
+      - auth-apisix
+    fromPodLabels: {}
+  egress:
+    keycloakNamespace: ""
+
+# Security Context
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  readOnlyRootFilesystem: false  # Set to true if app doesn't need to write to filesystem
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Probes Configuration
+probes:
+  startup:
+    enabled: true
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30  # 30 * 5s = 150s max startup time
+  liveness:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
