@@ -7,7 +7,7 @@ on:
         description: 'Pull request number'
         required: true
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -36,7 +36,7 @@ jobs:
         run: mkdir -p trivy-reports
       
       - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         continue-on-error: true
         with:
           scan-type: 'fs'
@@ -44,15 +44,17 @@ jobs:
           scanners: 'vuln,misconfig,secret'
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          exit-code: 0
           output: 'trivy-reports/trivy_scan_report.txt'
             
       - name: Run Trivy Image Scan - vllm-cpu
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         continue-on-error: true
         with:
           scan-type: 'image'
           image-ref: 'public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.10.2'
           severity: 'HIGH,CRITICAL'
+          exit-code: 0
           format: 'table'
           output: 'trivy-reports/trivy-vllm-cpu.txt'
 
