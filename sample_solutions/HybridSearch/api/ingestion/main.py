@@ -171,10 +171,10 @@ async def get_embeddings(texts: List[str]) -> List[List[float]]:
     Raises:
         httpx.HTTPError: If embedding service fails.
     """
-    # Batch size limit from embedding service
-    BATCH_SIZE = 32
+    BATCH_SIZE = settings.embedding_batch_size
+    logger.info(f"Embedding batch size: {BATCH_SIZE}")
     all_embeddings = []
-    
+
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Process in batches if needed
         for i in range(0, len(texts), BATCH_SIZE):

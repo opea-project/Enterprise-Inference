@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 100
     supported_formats: str = "pdf,docx,xlsx,ppt,txt"
     embedding_dim: int = 768  # BAAI/bge-base-en-v1.5 dimensions
+    embedding_batch_size: int = 32  # must match batch size from embedding service
     
     # Product Catalog Settings
     system_mode: str = "document"  # "document" or "product"

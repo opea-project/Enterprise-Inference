@@ -104,16 +104,23 @@ class APIClient:
         for batch_start in range(0, len(truncated_docs), batch_size):
             batch = truncated_docs[batch_start:batch_start + batch_size]
 
-            # Send both "documents" (vLLM/LiteLLM) and "texts" (TEI) —
-            # each backend ignores the field it doesn't recognise.
-            payload = {
-                "model": settings.reranker_model_name,
-                "query": query,
-                "documents": batch,
-                "texts": batch,
-                "top_n": len(batch),
-                "return_documents": False
-            }
+            # Keycloak/APISIX uses "texts"; GenAI Gateway (LiteLLM/Cohere) uses "documents"
+            if self.use_apisix:
+                payload = {
+                    "model": settings.reranker_model_name,
+                    "query": query,
+                    "texts": batch,
+                    "top_n": len(batch),
+                    "return_documents": False
+                }
+            else:
+                payload = {
+                    "model": settings.reranker_model_name,
+                    "query": query,
+                    "documents": batch,
+                    "top_n": len(batch),
+                    "return_documents": False
+                }
 
             response = self.http_client.post(url, json=payload, headers=headers)
 
@@ -122,10 +129,11 @@ class APIClient:
                 response.raise_for_status()
 
             response_data = response.json()
+            logger.info(f"Reranker raw response: {response_data}")
 
             # Handle both response formats:
-            # vLLM/APISIX:    [{"index": 0, "score": 0.9}, ...]
-            # LiteLLM/Cohere: {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
+            # Format 1 (vLLM/APISIX):    [{"index": 0, "score": 0.9}, ...]
+            # Format 2 (LiteLLM/Cohere): {"results": [{"index": 0, "relevance_score": 0.9}, ...]}
             if isinstance(response_data, list):
                 results = response_data
             else:
@@ -133,7 +141,10 @@ class APIClient:
 
             for res in results:
                 original_idx = batch_start + res["index"]
-                scores[original_idx] = res["score"] if isinstance(response_data, list) else res["relevance_score"]
+                if isinstance(response_data, list):
+                    scores[original_idx] = res["score"]
+                else:
+                    scores[original_idx] = res["relevance_score"]
 
         return scores
 

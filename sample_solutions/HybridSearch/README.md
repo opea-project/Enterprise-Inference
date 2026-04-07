@@ -241,12 +241,23 @@ Expected output shows services with status "Up".
 docker compose logs -f
 
 # Individual services
+docker compose logs -f ui
 docker compose logs -f gateway
 docker compose logs -f embedding
 docker compose logs -f retrieval
 docker compose logs -f llm
 docker compose logs -f ingestion
-docker compose logs -f ui
+```
+
+Check each service started correctly:
+
+```bash
+docker compose logs ui | grep -E "Running|Error|startup"
+docker compose logs gateway | grep -E "Running|Error|startup"
+docker compose logs embedding | grep -E "Running|Error|startup"
+docker compose logs retrieval | grep -E "Running|Error|startup"
+docker compose logs llm | grep -E "Running|Error|startup"
+docker compose logs ingestion | grep -E "Running|Error|startup"
 ```
 
 ### Verify the services are running:
@@ -342,12 +353,12 @@ docker compose down -v
 
 **Services won't start:**
 ```bash
-docker-compose logs -f [service-name]
-docker-compose restart [service-name]
+docker compose logs -f [service-name]
+docker compose restart [service-name]
 ```
 
 **Connection errors:**
-- Verify all services are running: `docker-compose ps`
+- Verify all services are running: `docker compose ps`
 - Check service health: `curl http://localhost:8000/api/v1/health/services`
 
 **Authentication errors:**
