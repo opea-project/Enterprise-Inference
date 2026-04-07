@@ -16,11 +16,14 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 
+# Add parent directory to sys.path for shared modules (error_hints)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from error_hints import analyze_execution_error
 from stocks_data_model import StocksDB
 
 
-DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "stocks" / "db.json")
+DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
 
 
 def ensure_db(db_path: str) -> None:
@@ -48,7 +51,7 @@ Always verify account identity before any trade. Ask for explicit confirmation b
 _db: Optional[Dict[str, Any]] = None
 _original_db_path: str = ""
 _session_dbs: Dict[str, Dict[str, Any]] = {}
-SESSION_DB_DIR = Path(__file__).parent / "session_dbs"
+SESSION_DB_DIR = Path(__file__).resolve().parent.parent / "session_dbs"
 SESSION_DB_DIR.mkdir(exist_ok=True)
 
 

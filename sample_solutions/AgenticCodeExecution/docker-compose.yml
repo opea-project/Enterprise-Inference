@@ -2,22 +2,16 @@ services:
   tools-server:
     build:
       context: .
-      dockerfile: tools-server/Dockerfile
+      dockerfile: examples/Dockerfile
     container_name: mcp-tools-server
     ports:
       - "5050:5050"
     environment:
       MCP_DOMAIN: ${MCP_DOMAIN:-retail}
-      RETAIL_DB_PATH: ${RETAIL_DB_PATH:-/data/retail/db.json}
-      AIRLINE_DB_PATH: ${AIRLINE_DB_PATH:-/data/airline/db.json}
-      STOCKS_DB_PATH: ${STOCKS_DB_PATH:-/data/stocks/db.json}
-      BANKING_DB_PATH: ${BANKING_DB_PATH:-/data/banking/db.json}
-      TRIAGE_DB_PATH: ${TRIAGE_DB_PATH:-}
       NO_PROXY: tools-server,mcp-tools-server,localhost,127.0.0.1
       no_proxy: tools-server,mcp-tools-server,localhost,127.0.0.1
     volumes:
-      - tools-sessions:/app/tools-server/session_dbs
-      - ./data:/data
+      - tools-sessions:/app/examples/session_dbs
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5050/sse', timeout=3)"]
       interval: 5s
@@ -26,15 +20,15 @@ services:
       start_period: 5s
     command: >
       sh -c 'if [ "$${MCP_DOMAIN}" = "airline" ]; then
-        python mcp_airline_server.py --host 0.0.0.0 --port 5050 --db-path "$${AIRLINE_DB_PATH}";
+        cd airline && python mcp_airline_server.py --host 0.0.0.0 --port 5050;
       elif [ "$${MCP_DOMAIN}" = "stocks" ]; then
-        python mcp_stocks_server.py --host 0.0.0.0 --port 5050 --db-path "$${STOCKS_DB_PATH}";
+        cd stocks && python mcp_stocks_server.py --host 0.0.0.0 --port 5050;
       elif [ "$${MCP_DOMAIN}" = "banking" ]; then
-        python mcp_banking_server.py --host 0.0.0.0 --port 5050 --db-path "$${BANKING_DB_PATH}";
+        cd banking && python mcp_banking_server.py --host 0.0.0.0 --port 5050;
       elif [ "$${MCP_DOMAIN}" = "triage" ]; then
-        python mcp_triage_server.py --host 0.0.0.0 --port 5050;
+        cd triage && python mcp_triage_server.py --host 0.0.0.0 --port 5050;
       else
-        python mcp_retail_server.py --host 0.0.0.0 --port 5050 --db-path "$${RETAIL_DB_PATH}";
+        cd retail && python mcp_retail_server.py --host 0.0.0.0 --port 5050;
       fi'
     restart: unless-stopped
 

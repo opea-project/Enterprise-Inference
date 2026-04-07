@@ -15,6 +15,9 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 
+# Add parent directory to sys.path for shared modules (error_hints)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from retail_data_model import (
     RetailDB,
     Order,
@@ -33,8 +36,8 @@ from retail_data_model import (
 from error_hints import analyze_execution_error
 
 
-# Default DB path (repo-relative)
-DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "retail" / "db.json")
+# Default DB path (sibling data/ directory)
+DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
 
 TAU2_BENCH_URL = (
     "https://raw.githubusercontent.com/sierra-research/tau2-bench/"
@@ -80,7 +83,7 @@ modifying orders or processing returns/exchanges."""
 _db: Optional[RetailDB] = None  # Read-only template DB
 _original_db_path: str = ""  # Path to the original pristine DB file
 _session_dbs: Dict[str, RetailDB] = {}  # Per-session DB copies
-SESSION_DB_DIR = Path(__file__).parent / "session_dbs"
+SESSION_DB_DIR = Path(__file__).resolve().parent.parent / "session_dbs"
 SESSION_DB_DIR.mkdir(exist_ok=True)
 
 

@@ -15,6 +15,9 @@ from typing import Any, Dict, Optional, cast
 
 from fastmcp import FastMCP
 
+# Add parent directory to sys.path for shared modules (error_hints)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from banking_data_model import (
     BankingDB,
     BlockReason,
@@ -29,7 +32,7 @@ from banking_data_model import (
 from error_hints import analyze_execution_error
 
 
-DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "banking" / "db.json")
+DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
 ALLOWED_BLOCK_REASONS = {"lost", "stolen", "suspected_fraud", "customer_request"}
 
 
@@ -58,7 +61,7 @@ Always verify the customer's identity before revealing card details or making ch
 _db: Optional[BankingDB] = None
 _original_db_path: str = ""
 _session_dbs: Dict[str, BankingDB] = {}
-SESSION_DB_DIR = Path(__file__).parent / "session_dbs"
+SESSION_DB_DIR = Path(__file__).resolve().parent.parent / "session_dbs"
 SESSION_DB_DIR.mkdir(exist_ok=True)
 
 

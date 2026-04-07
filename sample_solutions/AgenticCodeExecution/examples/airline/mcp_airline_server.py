@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
+
+# Add parent directory to sys.path for shared modules (error_hints)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from airline_data_model import (
     AirportCode,
     CabinClass,
@@ -33,7 +37,7 @@ from airline_data_model import (
 from error_hints import analyze_execution_error
 
 
-DEFAULT_DB_PATH = str(Path(__file__).resolve().parent.parent / "data" / "airline" / "db.json")
+DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
 
 TAU2_BENCH_URL = (
     "https://raw.githubusercontent.com/sierra-research/tau2-bench/"
@@ -76,7 +80,7 @@ Always verify identity and reservation details before making changes. Ask for co
 _db: Optional[FlightDB] = None  # Read-only template DB
 _original_db_path: str = ""  # Path to original pristine DB file
 _session_dbs: Dict[str, FlightDB] = {}  # Per-session DB copies
-SESSION_DB_DIR = Path(__file__).parent / "session_dbs"
+SESSION_DB_DIR = Path(__file__).resolve().parent.parent / "session_dbs"
 SESSION_DB_DIR.mkdir(exist_ok=True)
 
 

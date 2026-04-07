@@ -1,7 +1,7 @@
 # Agentic Code Execution — MCP Agent Servers
 
 Two-server MCP architecture for code-execution agents:
-- **tools-server** — domain APIs (retail, airline, stocks, banking, triage)
+- **tools-server** — domain APIs (retail, airline, stocks, banking, triage) in `examples/`
 - **sandbox-server** — `execute_python` with `actions.*` proxy
 
 Designed for Flowise / custom MCP clients.
@@ -17,7 +17,7 @@ Flowise (or other MCP client)
                                                                                              └── retail | airline | stocks | banking | triage
 ```
 
-**tools-server (port 5050)** — Runs one domain at a time. Retail, airline, stocks, and banking domains use per-session DB copies (under `tools-server/session_dbs/`). Internal error hint logic in `tools-server/error_hints.py`.
+**tools-server (port 5050)** — Runs one domain at a time. Retail, airline, stocks, and banking domains use per-session DB copies (under `examples/session_dbs/`). Internal error hint logic in `examples/error_hints.py`.
 
 **sandbox-server (port 5051)** — Exposes `execute_python` and proxies `actions.*` calls to tools-server. Uses session-aware routing (`mcp-session-id`) and stores run hashes in `sandbox-server/session_hashes/`. Starts independently and auto-refreshes tool discovery in the background. Dynamically regenerates `execute_python` description when connected tools change.
 
@@ -42,10 +42,10 @@ You can also set `MCP_DOMAIN` in `.env`.
 Before first run, download the τ-bench databases for **airline** and **retail** (or let the servers auto-download on first startup):
 
 ```bash
-curl -L -o ./data/airline/db.json \
+curl -L -o ./examples/airline/data/db.json \
   https://raw.githubusercontent.com/sierra-research/tau2-bench/main/data/tau2/domains/airline/db.json
 
-curl -L -o ./data/retail/db.json \
+curl -L -o ./examples/retail/data/db.json \
   https://raw.githubusercontent.com/sierra-research/tau2-bench/main/data/tau2/domains/retail/db.json
 ```
 
@@ -55,8 +55,8 @@ The **banking** and **stocks** databases are included in the repository. The **t
 
 ### Docker notes
 
-- Compose mounts `./data` into the tools container at `/data`.
-- Default DB paths: `/data/<domain>/db.json`. Override with `RETAIL_DB_PATH`, `AIRLINE_DB_PATH`, `STOCKS_DB_PATH`, `BANKING_DB_PATH`.
+- Compose builds the tools-server image from `examples/Dockerfile`.
+- Default DB paths are resolved relative to each domain's directory (e.g. `examples/retail/data/db.json`). Override with `RETAIL_DB_PATH`, `AIRLINE_DB_PATH`, `STOCKS_DB_PATH`, `BANKING_DB_PATH`.
 - `NO_PROXY`/`no_proxy` is set for internal service-to-service calls.
 - If `docker compose build` fails behind a proxy, see [Troubleshooting](#docker-build-fails-behind-proxy).
 
@@ -306,7 +306,7 @@ For local development, install dependencies and run servers manually.
 ```bash
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-pip install -r tools-server/requirements.txt
+pip install -r examples/requirements.txt
 pip install -r sandbox-server/requirements.txt
 ```
 
@@ -314,8 +314,8 @@ Run any domain (two terminals):
 
 ```bash
 # Terminal 1 — tools server (pick one domain)
-cd tools-server
-python mcp_retail_server.py --port 5050       # or mcp_airline_server.py, etc.
+cd examples/retail
+python mcp_retail_server.py --port 5050       # or cd ../airline && python mcp_airline_server.py, etc.
 
 # Terminal 2 — sandbox server (same for all domains)
 cd sandbox-server

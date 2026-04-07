@@ -7,13 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
-COPY tools-server/requirements.txt /app/tools-server-requirements.txt
+COPY examples/requirements.txt /app/examples-requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt \
-    && pip install --no-cache-dir -r /app/tools-server-requirements.txt
+    && pip install --no-cache-dir -r /app/examples-requirements.txt
 
-COPY tools-server /app/tools-server
-WORKDIR /app/tools-server
+COPY examples /app/examples
+WORKDIR /app/examples
 
 EXPOSE 5050
 
-CMD ["python", "mcp_retail_server.py", "--host", "0.0.0.0", "--port", "5050"]
+CMD ["python", "retail/mcp_retail_server.py", "--host", "0.0.0.0", "--port", "5050"]

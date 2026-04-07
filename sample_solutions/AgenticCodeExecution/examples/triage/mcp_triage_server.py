@@ -9,14 +9,19 @@ import argparse
 import json
 import socket
 import ssl
+import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
 
 from fastmcp import FastMCP
+
+# Add parent directory to sys.path for shared modules (error_hints)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from error_hints import analyze_execution_error
 

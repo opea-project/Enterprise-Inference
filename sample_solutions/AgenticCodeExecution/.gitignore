@@ -17,8 +17,8 @@ prompt-builder/data/retail/sections/section2_seed.txt
 prompt-builder/data/retail/sections/section3_policy.txt
 
 # tau2-bench database files (downloaded separately, see README)
-data/airline/db.json
-data/retail/db.json
+examples/airline/data/db.json
+examples/retail/data/db.json
 
 # Runtime session data
-tools-server/session_dbs/
+examples/session_dbs/
