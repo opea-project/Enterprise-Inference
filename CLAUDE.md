@@ -100,7 +100,7 @@ helm repo update
 | bitnamilegacy/zookeeper | 3.9.3-debian-12-r8 | docker.io |
 | apache/apisix | 3.9.1-debian | docker.io |
 | ingress-nginx/controller | v1.12.2 | registry.k8s.io |
-| ingress-nginx/kube-webhook-certgen | v1.5.1 | registry.k8s.io |
+| ingress-nginx/kube-webhook-certgen | v1.5.3 | registry.k8s.io |
 | ubuntu | 22.04 | docker.io |
 | library/nginx | 1.25.2-alpine | docker.io |
 | local-path-provisioner | v0.0.24 | docker.io |
@@ -116,6 +116,8 @@ helm repo update
 | calico/cni | v3.28.1 | quay.io |
 | calico/kube-controllers | v3.28.1 | quay.io |
 | calico/pod2daemon-flexvol | v3.28.1 | quay.io |
+| containers/nri-plugins/nri-resource-policy-balloons | v0.12.2 | ghcr.io |
+| containers/nri-plugins/nri-config-manager | v0.12.2 | ghcr.io |
 
 **How to pre-cache an image** (run on VM1 — JFrog fetches and caches from internet):
 ```bash
@@ -134,6 +136,7 @@ docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>
 | clickhouse | 8.0.5 |
 | minio | 14.10.5 |
 | valkey | 2.2.4 |
+| nri-resource-policy-balloons | v0.12.2 |
 
 **PyPI**: ansible, ansible-core, attrs, certifi, cffi, charset-normalizer, cryptography,
 durationpy, idna, jinja2, jmespath, jsonpatch, jsonpointer, jsonschema, kubernetes,
@@ -153,7 +156,7 @@ requests, requests-oauthlib, resolvelib, rpds-py, six, typing-extensions, urllib
 ### 🟡 MEDIUM — Fails at specific steps
 | Item | Issue | Fix |
 |---|---|---|
-| `get-helm-3` script | `setup-bastion.yml` line 132 curls `raw.githubusercontent.com` | Upload to `ei-generic-binaries`, patch playbook |
+| `get-helm-3` script | ~~`setup-bastion.yml` line 132 curls `raw.githubusercontent.com`~~ — **FIXED**: `core/roles/inference-tools/tasks/main.yml` now has dual tasks; airgap task downloads `helm-v3.15.4-linux-amd64.tar.gz` from JFrog `ei-generic-binaries` | ✅ Fixed in code |
 | `BAAI/bge-base-en-v1.5` | Required if TEI embeddings deployed | Download from HuggingFace, upload to `ei-generic-models` |
 | apt packages (15+) | `setup-bastion.yml` runs `apt-get install` — no Debian mirror in JFrog | Add `ei-debian-ubuntu` remote + `ei-debian-virtual` in JFrog |
 
@@ -241,6 +244,17 @@ Pattern used in all 4 playbooks — original task kept with `when: not airgap_en
 Previously `helm dependency update apisix-helm/` ran with no helm repo registered for `apisix`. Fixed by adding dual tasks before the dependency update:
 - Internet: `helm repo add apisix https://charts.apiseven.com --force-update`
 - Airgap: `helm repo add apisix {{ helm_repo_apisix }} --username ... --force-update`
+
+### APISIX subchart dependency — `deploy-keycloak-tls-cert.yml` ✅
+`apisix-helm/Chart.yaml` has `repository: https://charts.apiseven.com` — both `helm dependency update` and `helm dependency build` try to contact this URL directly even in airgap mode (hash-based cache lookup fails because URL is not registered).
+
+Fixed with airgap-specific tasks replacing the single internet `helm dependency update`:
+1. Create `apisix-helm/charts/` dir on remote
+2. `helm pull apisix/apisix --version 2.8.1 --destination .../apisix-helm/charts` (uses registered JFrog repo)
+3. Patch `Chart.yaml` to replace `https://charts.apiseven.com` with `{{ helm_repo_apisix }}` so `helm dependency build` finds the cached index
+4. `helm dependency build` (uses local tarball + JFrog-registered index)
+
+**Note**: `ingress-nginx/kube-webhook-certgen` version used by chart `4.12.2` is `v1.5.3`, not `v1.5.1`. Pre-cache `v1.5.3` on VM1 from `registry.k8s.io`.
 
 ### Keycloak chart install — `deploy-keycloak-tls-cert.yml`
 Previously used `chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak` — helm uses its own HTTP client for OCI pulls, **bypassing containerd mirrors**. Fails in true airgap.
@@ -415,6 +429,34 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 
 **Important**: When copying these files from Windows to Linux via SCP, always run `sed -i 's/\r//' <file>` on VM2 to strip Windows CRLF line endings, otherwise bash function names get `\r` appended and are not found.
 
+### NRI CPU Balloons helm repo — `core/roles/nri_cpu_balloons/tasks/install_nri.yaml` + `install_nri_openshift.yaml` ✅
+`nri_cpu_balloons` role was trying to add `https://containers.github.io/nri-plugins` directly — blocked in airgap. Fixed with dual tasks in both files:
+- Internet: `kubernetes.core.helm_repository` with original URL, `when: not airgap_enabled | default(false) | bool`
+- Airgap: `helm repo add nri-plugins {{ helm_repo_nri_plugins }} --username ... --force-update`, `when: airgap_enabled | default(false) | bool`
+
+Added `helm_repo_nri_plugins` to `inference_common.yml`:
+```yaml
+helm_repo_nri_plugins: "{{ jfrog_url + '/ei-helm-virtual' if airgap_enabled | default(false) | bool else 'https://containers.github.io/nri-plugins' }}"
+```
+
+Added `inference_common.yml` to `vars_files` in `deploy-cpu-optimization.yml` (was missing — `helm_repo_nri_plugins` would have been undefined).
+
+Fixed `core/lib/xeon/ballon-policy.sh` to pass `airgap_enabled jfrog_url jfrog_username jfrog_password` via `--extra-vars`.
+
+Fixed `core/lib/cluster/config/label-nodes.sh` to pass airgap vars via `--extra-vars` (was passing nothing — caused `airgap_enabled is undefined` error in inference-tools role).
+
+Added `| default(false)` to all `airgap_enabled | bool` conditions in `inference-tools/tasks/main.yml` as safety net for callers that omit the variable.
+
+**Chart**: `nri-resource-policy-balloons v0.12.2` uploaded to `ei-helm-local`; index.yaml regenerated.
+**Images**: `ghcr.io/containers/nri-plugins/nri-resource-policy-balloons:v0.12.2` and `nri-config-manager:v0.12.2` pre-cached in JFrog via `ei-docker-ghcr`.
+
+### Helm install — `core/roles/inference-tools/tasks/main.yml` ✅
+Original single task curled `raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3` — blocked in airgap. Replaced with dual tasks:
+- Internet task: original curl script, `when: not airgap_enabled | bool`
+- Airgap task: downloads `helm-v3.15.4-linux-amd64.tar.gz` from `{{ jfrog_url }}/ei-generic-binaries/get.helm.sh/`, extracts and installs to `/usr/local/bin/helm`, idempotent (`if ! command -v helm`)
+
+Also removed duplicate deploy+run task pair that ran the kubernetes SDK `no_proxy` fix twice.
+
 ### Kubespray binary downloads — `offline.yml` ✅
 Kubespray v2.27.0 downloads all Kubernetes binaries during the `download` role. In airgap mode these must come from JFrog. Configuration: set `files_repo` and all download URLs in `offline.yml`, stored at `core/inventory/metadata/offline.yml` and auto-copied to kubespray inventory by `setup-env.sh` when `airgap_enabled=yes`.
 
@@ -463,8 +505,11 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 15. ✅ Fix `prereq-check.sh` and `setup-env.sh` to be airgap-aware (JFrog connectivity check, skip apt update, pip from JFrog PyPI mirror, ansible collections from JFrog, kubespray from JFrog tarball)
 16. ✅ Upload all kubespray binary dependencies to JFrog `ei-generic-binaries` with correct path structure; configure `offline.yml` pointing to JFrog `files_repo`
 17. ✅ Pre-cache missing Kubespray images discovered during first deployment run (see Docker images table): cluster-proportional-autoscaler, coredns/coredns, dns/k8s-dns-node-cache, kube-proxy, calico v3.28.1 (quay.io)
-18. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
-19. Validate all pods reach Running state and LLM endpoint responds
+18. ✅ Fix `core/roles/inference-tools/tasks/main.yml` — helm install now airgap-aware: downloads from JFrog `ei-generic-binaries` instead of curling `raw.githubusercontent.com`
+19. ✅ Fix `nri_cpu_balloons` role — NRI helm repo, label-nodes, ballon-policy all now pass airgap vars; chart + images pre-cached in JFrog
+20. ✅ Fix `deploy-keycloak-tls-cert.yml` APISIX subchart dependency — patch Chart.yaml repo URL + use `helm dependency build` in airgap; pre-cache `kube-webhook-certgen:v1.5.3`
+21. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
+22. Validate all pods reach Running state and LLM endpoint responds
 
 ## Airgap Simulation — Block Internet on VM2
 

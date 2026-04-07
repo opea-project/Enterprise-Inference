@@ -400,11 +400,47 @@
       when: deploy_apisix == "yes"
       changed_when: false
 
-    - name: Synchronize dependencies for APISIX
+    - name: Synchronize dependencies for APISIX (internet)
       ansible.builtin.command: helm dependency update "{{ remote_helm_charts_base }}/apisix-helm/"
       register: helm_dependency_update
       failed_when: helm_dependency_update.rc != 0
-      when: deploy_apisix == "yes"
+      when:
+        - deploy_apisix == "yes"
+        - not airgap_enabled | bool
+
+    - name: Create charts directory for APISIX (airgap)
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/apisix-helm/charts"
+        state: directory
+        mode: '0755'
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+
+    - name: Pull APISIX subchart from JFrog (airgap)
+      ansible.builtin.command: >
+        helm pull apisix/apisix --version 2.8.1
+        --destination "{{ remote_helm_charts_base }}/apisix-helm/charts"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+      changed_when: true
+
+    - name: Patch APISIX Chart.yaml to use JFrog repository (airgap)
+      ansible.builtin.replace:
+        path: "{{ remote_helm_charts_base }}/apisix-helm/Chart.yaml"
+        regexp: 'repository: https://charts\.apiseven\.com'
+        replace: "repository: {{ helm_repo_apisix }}"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+
+    - name: Build APISIX dependencies from local charts (airgap)
+      ansible.builtin.command: helm dependency build "{{ remote_helm_charts_base }}/apisix-helm/"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+      changed_when: true
     - name: Synchronize dependencies for APISIX
       community.kubernetes.helm:
         name: auth-apisix

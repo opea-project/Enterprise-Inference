@@ -61,50 +61,30 @@
   changed_when: _no_proxy_fix.rc == 2
   failed_when: _no_proxy_fix.rc not in [0, 2]
   tags: always
-- name: Deploy fix script for kubernetes SDK no_proxy bug
-  ansible.builtin.copy:
-    dest: /tmp/_fix_k8s_no_proxy.py
-    mode: '0644'
-    content: |
-      import re, sys, os
-      path = sys.argv[1]
-      with open(path, 'r') as f:
-          original = f.read()
-      # Remove the duplicate self.no_proxy = None that appears after the no_proxy
-      # env-loading block (bug introduced in kubernetes SDK >= 34.x by code generator).
-      # Pattern: the env-loading line is followed within 3 lines by a bare self.no_proxy = None
-      fixed = re.sub(
-          r'(if os\.getenv\("no_proxy"\)[^\n]+\n(?:.*\n){1,3}?)(\s+self\.no_proxy = None\n)',
-          r'\1',
-          original
-      )
-      if fixed == original:
-          print("OK: no duplicate no_proxy line found, nothing to do")
-          sys.exit(0)
-      with open(path, 'w') as f:
-          f.write(fixed)
-      print("FIXED: removed duplicate self.no_proxy = None from " + path)
-      sys.exit(2)
-  become: true
-  tags: always
-- name: Fix kubernetes SDK no_proxy bug (duplicate self.no_proxy = None after env-loading block)
-  ansible.builtin.shell: |
-    set -e
-    KUBE_CFG=$(python3 -c "import kubernetes, os; print(os.path.join(os.path.dirname(kubernetes.__file__), 'client', 'configuration.py'))" 2>/dev/null) || exit 0
-    python3 /tmp/_fix_k8s_no_proxy.py "$KUBE_CFG"
-  args:
-    executable: /bin/bash
-  become: true
-  register: _no_proxy_fix
-  changed_when: _no_proxy_fix.rc == 2
-  failed_when: _no_proxy_fix.rc not in [0, 2]
-  tags: always
-- name: Install Deployment Client
+- name: Install Deployment Client (internet)
   ansible.builtin.shell: |
     curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   args:
     executable: /bin/bash
   become: true
+  when: not airgap_enabled | default(false) | bool
+  tags: always
+
+- name: Install Deployment Client (airgap via JFrog)
+  ansible.builtin.shell: |
+    if ! command -v helm &>/dev/null; then
+      curl -sfL -u {{ jfrog_username }}:{{ jfrog_password }} \
+        {{ jfrog_url }}/ei-generic-binaries/get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz \
+        -o /tmp/helm.tar.gz && \
+      tar xzf /tmp/helm.tar.gz -C /tmp && \
+      mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+      chmod +x /usr/local/bin/helm && \
+      rm -f /tmp/helm.tar.gz
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  when: airgap_enabled | default(false) | bool
   tags: always
 - name: Ensure jq is installed
   ansible.builtin.package:

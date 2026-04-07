@@ -61,7 +61,36 @@
       - "Installing NRI support with runtime-specific configuration..."
       - "Runtime patching required: {{ (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false)) }}"
 
-- name: Add NRI plugins Helm repository
+- name: Enable NRI in containerd config
+  ansible.builtin.blockinfile:
+    path: /etc/containerd/config.toml
+    marker: "# {mark} ANSIBLE MANAGED - NRI"
+    block: |
+      [plugins."io.containerd.nri.v1.nri"]
+        disable = false
+  become: true
+  register: containerd_nri_config
+  when: runtime_name == 'containerd'
+
+- name: Restart containerd to apply NRI config
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+  become: true
+  when:
+    - runtime_name == 'containerd'
+    - containerd_nri_config.changed
+
+- name: Wait for containerd to be ready after restart
+  ansible.builtin.wait_for:
+    path: /run/containerd/containerd.sock
+    state: present
+    timeout: 60
+  when:
+    - runtime_name == 'containerd'
+    - containerd_nri_config.changed
+
+- name: Add NRI plugins Helm repository (internet)
   kubernetes.core.helm_repository:
     name: "{{ nri_cpu_balloons.helm.repo_name }}"
     repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
@@ -70,6 +99,15 @@
     HTTP_PROXY: "{{ http_proxy | default(ansible_env.HTTP_PROXY | default('')) }}"
     HTTPS_PROXY: "{{ https_proxy | default(ansible_env.HTTPS_PROXY | default('')) }}"
     NO_PROXY: "{{ no_proxy | default(ansible_env.NO_PROXY | default('')) }}"
+  when: not airgap_enabled | default(false) | bool
+
+- name: Add NRI plugins Helm repository (airgap via JFrog)
+  ansible.builtin.command: >
+    helm repo add {{ nri_cpu_balloons.helm.repo_name }} {{ helm_repo_nri_plugins }}
+    --username {{ jfrog_username }} --password {{ jfrog_password }}
+    --force-update
+  when: airgap_enabled | default(false) | bool
+  changed_when: false
 
 - name: Update Helm repositories for NRI
   ansible.builtin.command: helm repo update
