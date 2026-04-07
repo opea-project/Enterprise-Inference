@@ -102,11 +102,20 @@ helm repo update
 | ingress-nginx/controller | v1.12.2 | registry.k8s.io |
 | ingress-nginx/kube-webhook-certgen | v1.5.1 | registry.k8s.io |
 | ubuntu | 22.04 | docker.io |
-| All Kubernetes components | v1.31.4 | registry.k8s.io |
-| calico (cni, node, kube-controllers) | v3.29.1 | docker.io |
-| coredns | v1.11.3 | registry.k8s.io |
-| pause | 3.10 | registry.k8s.io |
+| library/nginx | 1.25.2-alpine | docker.io |
 | local-path-provisioner | v0.0.24 | docker.io |
+| pause | 3.10 | registry.k8s.io |
+| kube-apiserver | v1.30.4 | registry.k8s.io |
+| kube-controller-manager | v1.30.4 | registry.k8s.io |
+| kube-scheduler | v1.30.4 | registry.k8s.io |
+| kube-proxy | v1.30.4 | registry.k8s.io |
+| coredns/coredns | v1.11.1 | registry.k8s.io |
+| dns/k8s-dns-node-cache | 1.22.28 | registry.k8s.io |
+| cpa/cluster-proportional-autoscaler | v1.8.8 | registry.k8s.io |
+| calico/node | v3.28.1 | quay.io |
+| calico/cni | v3.28.1 | quay.io |
+| calico/kube-controllers | v3.28.1 | quay.io |
+| calico/pod2daemon-flexvol | v3.28.1 | quay.io |
 
 **How to pre-cache an image** (run on VM1 — JFrog fetches and caches from internet):
 ```bash
@@ -147,6 +156,14 @@ requests, requests-oauthlib, resolvelib, rpds-py, six, typing-extensions, urllib
 | `get-helm-3` script | `setup-bastion.yml` line 132 curls `raw.githubusercontent.com` | Upload to `ei-generic-binaries`, patch playbook |
 | `BAAI/bge-base-en-v1.5` | Required if TEI embeddings deployed | Download from HuggingFace, upload to `ei-generic-models` |
 | apt packages (15+) | `setup-bastion.yml` runs `apt-get install` — no Debian mirror in JFrog | Add `ei-debian-ubuntu` remote + `ei-debian-virtual` in JFrog |
+
+**How to find missing images when deployment fails with 404 on JFrog:**
+Image names come from `core/kubespray/roles/kubespray-defaults/defaults/main/download.yml`. The error pattern is:
+```
+trying next host - response was http.StatusNotFound" host="100.67.152.212:8082"
+trying next host" error="...dial tcp...: i/o timeout" host=<registry>
+```
+Fix: on VM1, set the relevant JFrog remote repo to Online, `docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>`, then set back to Offline.
 
 ---
 
@@ -384,11 +401,47 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 - Error message: shows JFrog-specific troubleshooting when JFrog is unreachable in airgap mode
 
 **`setup-env.sh`**:
-- pip installs: when `airgap_enabled=yes`, uses `--index-url http://${jfrog_username}:${jfrog_password}@${jfrog_host}/artifactory/api/pypi/ei-pypi-virtual/simple --trusted-host ${jfrog_host}`
-- kubespray clone: when `airgap_enabled=yes` and `$KUBESPRAYDIR` doesn't exist, downloads `kubespray.tar.gz` from `${jfrog_url}/ei-generic-binaries/kubespray.tar.gz` and extracts to `$(dirname $KUBESPRAYDIR)` instead of git cloning
-- Ansible collections: when `airgap_enabled=yes`, downloads each collection tarball from `${jfrog_url}/ei-generic-binaries/ansible-collections/${coll_file}-latest.tar.gz` and installs via `ansible-galaxy collection install <tarball>`; collections attempted: `kubernetes-core`, `ansible-posix`, `community-kubernetes`, `community-general`
+- pip installs: when `airgap_enabled=yes`, both `pip install --upgrade pip` and `pip install -r requirements.txt` use `--index-url http://${jfrog_username}:${jfrog_password}@${jfrog_host}/artifactory/api/pypi/ei-pypi-virtual/simple --trusted-host ${jfrog_host}`
+- kubespray clone: when `airgap_enabled=yes` and `$KUBESPRAYDIR` doesn't exist, downloads `kubespray.tar.gz` from `${jfrog_url}/ei-generic-binaries/kubespray.tar.gz` and extracts to `$(dirname $KUBESPRAYDIR)` instead of git cloning; must `cd $KUBESPRAYDIR` after extraction so `requirements.txt` is found
+- Ansible collections: when `airgap_enabled=yes`, downloads each collection tarball from `${jfrog_url}/ei-generic-binaries/ansible-collections/${coll_file}-latest.tar.gz` and installs via `ansible-galaxy collection install <tarball> --force`; collections attempted: `kubernetes-core`, `ansible-posix`, `community-kubernetes`, `community-general`; if a tarball is missing in JFrog, it prints a yellow warning and **skips** (does not fail)
+- `offline.yml` copy: when `airgap_enabled=yes`, copies `core/inventory/metadata/offline.yml` to `$KUBESPRAYDIR/inventory/mycluster/group_vars/all/offline.yml` automatically
+
+**`install_ansible_collection` function** (setup-env.sh, called from `keycloak-controller.sh`):
+- This function runs `ansible-galaxy collection install community.general` with **no airgap handling**
+- Safe in practice because `setup_initial_env` already installs `community.general` via JFrog tarball first — ansible-galaxy finds it locally and skips the download
+- If for any reason the collection is missing, this would fail in true airgap (galaxy.ansible.com is unreachable)
+
+**PyPI gap**: `ansible==9.8.0` and transitive deps were not cached in JFrog. Fix: on VM1, `pip download ansible==9.8.0 jmespath==1.0.1 jsonschema==4.23.0 netaddr==1.3.0 -d /tmp/wheels/` then upload each `.whl` to `ei-pypi-local`. The simple index showed the package but the `.whl` returned 404 until the file was physically uploaded.
 
 **Important**: When copying these files from Windows to Linux via SCP, always run `sed -i 's/\r//' <file>` on VM2 to strip Windows CRLF line endings, otherwise bash function names get `\r` appended and are not found.
+
+### Kubespray binary downloads — `offline.yml` ✅
+Kubespray v2.27.0 downloads all Kubernetes binaries during the `download` role. In airgap mode these must come from JFrog. Configuration: set `files_repo` and all download URLs in `offline.yml`, stored at `core/inventory/metadata/offline.yml` and auto-copied to kubespray inventory by `setup-env.sh` when `airgap_enabled=yes`.
+
+**Component versions for kubespray v2.27.0 / k8s v1.30.4:**
+| Component | Version |
+|---|---|
+| kubernetes | v1.30.4 |
+| containerd | 1.7.21 |
+| calico | v3.28.1 |
+| cni-plugins | v1.4.0 |
+| helm | v3.15.4 |
+| etcd | v3.5.12 |
+| crictl | v1.30.0 |
+| runc | v1.1.13 |
+
+**Binaries uploaded to JFrog `ei-generic-binaries` with path structure mirroring original URLs:**
+```
+dl.k8s.io/release/v1.30.4/bin/linux/amd64/{kubeadm,kubectl,kubelet}
+github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz
+github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
+github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz
+github.com/projectcalico/calico/releases/download/v3.28.1/calicoctl-linux-amd64
+github.com/projectcalico/calico/archive/v3.28.1.tar.gz
+get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz
+github.com/containerd/containerd/releases/download/v1.7.21/containerd-1.7.21-linux-amd64.tar.gz
+github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
+```
 
 ---
 
@@ -408,8 +461,10 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 13. ✅ Set `airgap_enabled=on` in `inference-config.cfg` on VM2
 14. ✅ Block internet on VM2 — validated: google.com BLOCKED, JFrog REACHABLE
 15. ✅ Fix `prereq-check.sh` and `setup-env.sh` to be airgap-aware (JFrog connectivity check, skip apt update, pip from JFrog PyPI mirror, ansible collections from JFrog, kubespray from JFrog tarball)
-16. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
-17. Validate all pods reach Running state and LLM endpoint responds
+16. ✅ Upload all kubespray binary dependencies to JFrog `ei-generic-binaries` with correct path structure; configure `offline.yml` pointing to JFrog `files_repo`
+17. ✅ Pre-cache missing Kubespray images discovered during first deployment run (see Docker images table): cluster-proportional-autoscaler, coredns/coredns, dns/k8s-dns-node-cache, kube-proxy, calico v3.28.1 (quay.io)
+18. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
+19. Validate all pods reach Running state and LLM endpoint responds
 
 ## Airgap Simulation — Block Internet on VM2
 

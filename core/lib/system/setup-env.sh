@@ -128,6 +128,9 @@ setup_initial_env() {
     xeon_values_file_path="$REMOTEDIR/vllm/xeon-values.yaml"
     cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml
     cp "$HOMEDIR"/inventory/metadata/all.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/all/all.yml
+    if [[ "$airgap_enabled" == "yes" ]] && [ -f "$HOMEDIR/inventory/metadata/offline.yml" ]; then
+        cp "$HOMEDIR"/inventory/metadata/offline.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/all/offline.yml
+    fi
     cp -r "$HOMEDIR"/roles/* $KUBESPRAYDIR/roles/        
 
     mkdir -p "$KUBESPRAYDIR/config"        
