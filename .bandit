@@ -1,3 +1,0 @@
-[bandit]
-exclude_dirs = tests,test,venv,.venv,.venv-dataset,node_modules
-skips = B101
