@@ -374,6 +374,22 @@ server = "http://100.67.152.212:8082"
 ```
 No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 
+### Shell script airgap fixes — `prereq-check.sh` and `setup-env.sh` ✅
+
+**Root cause**: `read-config-file.sh` converts `on` → `yes` and `off` → `no` for all config vars. So at runtime `airgap_enabled` is `"yes"`, not `"on"`. All airgap checks must use `== "yes"`.
+
+**`prereq-check.sh`**:
+- Connectivity check: when `airgap_enabled=yes`, pings `${jfrog_url}/api/system/ping` instead of google.com/github.com
+- `apt-get update`: skipped entirely when `airgap_enabled=yes` (no Debian mirror in JFrog)
+- Error message: shows JFrog-specific troubleshooting when JFrog is unreachable in airgap mode
+
+**`setup-env.sh`**:
+- pip installs: when `airgap_enabled=yes`, uses `--index-url http://${jfrog_username}:${jfrog_password}@${jfrog_host}/artifactory/api/pypi/ei-pypi-virtual/simple --trusted-host ${jfrog_host}`
+- kubespray clone: when `airgap_enabled=yes` and `$KUBESPRAYDIR` doesn't exist, downloads `kubespray.tar.gz` from `${jfrog_url}/ei-generic-binaries/kubespray.tar.gz` and extracts to `$(dirname $KUBESPRAYDIR)` instead of git cloning
+- Ansible collections: when `airgap_enabled=yes`, downloads each collection tarball from `${jfrog_url}/ei-generic-binaries/ansible-collections/${coll_file}-latest.tar.gz` and installs via `ansible-galaxy collection install <tarball>`; collections attempted: `kubernetes-core`, `ansible-posix`, `community-kubernetes`, `community-general`
+
+**Important**: When copying these files from Windows to Linux via SCP, always run `sed -i 's/\r//' <file>` on VM2 to strip Windows CRLF line endings, otherwise bash function names get `\r` appended and are not found.
+
 ---
 
 ## Next Steps (in order)
@@ -391,8 +407,9 @@ No `skip_verify` — it would force HTTPS-first and break HTTP JFrog.
 12. ✅ Set all JFrog remote repos to Offline in JFrog UI
 13. ✅ Set `airgap_enabled=on` in `inference-config.cfg` on VM2
 14. ✅ Block internet on VM2 — validated: google.com BLOCKED, JFrog REACHABLE
-15. Run full deployment on VM2: `cd ~/Enterprise-Inference && ./inference-stack-deploy.sh`
-16. Validate all pods reach Running state and LLM endpoint responds
+15. ✅ Fix `prereq-check.sh` and `setup-env.sh` to be airgap-aware (JFrog connectivity check, skip apt update, pip from JFrog PyPI mirror, ansible collections from JFrog, kubespray from JFrog tarball)
+16. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
+17. Validate all pods reach Running state and LLM endpoint responds
 
 ## Airgap Simulation — Block Internet on VM2
 

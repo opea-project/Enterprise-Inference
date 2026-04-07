@@ -20,17 +20,38 @@ setup_initial_env() {
         git config --global https.proxy "$https_proxy"
     fi
     if [ ! -d "$KUBESPRAYDIR" ]; then
-        git clone https://github.com/kubernetes-sigs/kubespray.git $KUBESPRAYDIR
-        if [ $? -ne 0 ] || [ ! -d "$KUBESPRAYDIR/.git" ]; then
-            echo -e "${RED}----------------------------------------------------------------------------${NC}"
-            echo -e "${RED}|  NOTICE: Failed to clone Kubespray Repository.                           |${NC}"        
-            echo -e "${RED}|  Unable to proceed with Inference Stack Deployment                        |${NC}"        
-            echo -e "${RED}|  due to missing dependency                                                |${NC}"        
-            echo -e "${RED}----------------------------------------------------------------------------${NC}"            
-            exit 1
+        if [[ "$airgap_enabled" == "yes" ]]; then
+            echo "Downloading kubespray from JFrog Artifactory (airgap mode)..."
+            kubespray_tarball="/tmp/kubespray.tar.gz"
+            if curl -sf -u "${jfrog_username}:${jfrog_password}" \
+                    -o "${kubespray_tarball}" \
+                    "${jfrog_url}/ei-generic-binaries/kubespray.tar.gz"; then
+                tar -xzf "${kubespray_tarball}" -C "$(dirname "$KUBESPRAYDIR")"
+                if [ ! -d "$KUBESPRAYDIR" ]; then
+                    echo -e "${RED}Failed to extract kubespray tarball — expected directory: $KUBESPRAYDIR${NC}"
+                    exit 1
+                fi
+                cd $KUBESPRAYDIR
+            else
+                echo -e "${RED}----------------------------------------------------------------------------${NC}"
+                echo -e "${RED}|  NOTICE: Failed to download Kubespray from JFrog.                        |${NC}"
+                echo -e "${RED}|  Ensure kubespray.tar.gz is uploaded to ei-generic-binaries.             |${NC}"
+                echo -e "${RED}----------------------------------------------------------------------------${NC}"
+                exit 1
+            fi
+        else
+            git clone https://github.com/kubernetes-sigs/kubespray.git $KUBESPRAYDIR
+            if [ $? -ne 0 ] || [ ! -d "$KUBESPRAYDIR/.git" ]; then
+                echo -e "${RED}----------------------------------------------------------------------------${NC}"
+                echo -e "${RED}|  NOTICE: Failed to clone Kubespray Repository.                           |${NC}"
+                echo -e "${RED}|  Unable to proceed with Inference Stack Deployment                        |${NC}"
+                echo -e "${RED}|  due to missing dependency                                                |${NC}"
+                echo -e "${RED}----------------------------------------------------------------------------${NC}"
+                exit 1
+            fi
+            cd $KUBESPRAYDIR
+            git checkout "$kubespray_version"
         fi
-        cd $KUBESPRAYDIR        
-        git checkout "$kubespray_version"
     else
         echo "Kubespray directory already exists, skipping clone."
         cd $KUBESPRAYDIR
