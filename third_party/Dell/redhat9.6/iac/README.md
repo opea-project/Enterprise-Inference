@@ -10,7 +10,70 @@ The script:
 
 ---
 
-## 1. System Requirements
+## 1. Mount RHEL ISO (iDRAC Redfish)
+
+**Script:** [iac/mount-iso.sh](../../ubuntu-22.04/iac/mount-iso.sh)
+
+Mounts the **RHEL 9.6 ISO** via the **iDRAC Redfish Virtual Media API**. Idempotent — skips if already mounted.
+
+### Required Environment Variables
+```bash
+export IDRAC_IP=100.67.x.x
+export IDRAC_USER=root
+export IDRAC_PASS=calvin
+export ISO_URL=https://your-domain.com/rhel-9.6-x86_64-dvd.iso
+```
+
+> **Getting the RHEL 9.6 ISO:**
+> 1. Log in to the [Red Hat Customer Portal](https://access.redhat.com/downloads) (or sign up for a free [Red Hat Developer Account](https://developers.redhat.com))
+> 2. Navigate to **Red Hat Enterprise Linux 9** and download `rhel-9.6-x86_64-dvd.iso`
+> 3. Host the ISO on an internal HTTP/HTTPS server reachable by iDRAC
+> 4. Set `ISO_URL` to that hosted address
+
+### Mount ISO
+```bash
+chmod +x ../../ubuntu-22.04/iac/mount-iso.sh
+../../ubuntu-22.04/iac/mount-iso.sh
+```
+
+---
+
+## 2. Boot RHEL Installer (Terraform + Redfish)
+
+**Script:** [iac/main.tf](../../ubuntu-22.04/iac/main.tf)
+
+Terraform uses the **Dell Redfish provider** to configure a **one-time boot from Virtual Media (CD)** and **force a reboot**.
+
+### Terraform Installation
+
+Install Terraform on your client machine if not already installed: https://developer.hashicorp.com/terraform/install
+
+```bash
+terraform version
+```
+
+### Terraform Variables
+
+Provide the following in [iac/terraform.tfvars](../../ubuntu-22.04/iac/terraform.tfvars). For all available variables and their defaults, see [iac/variables.tf](../../ubuntu-22.04/iac/variables.tf).
+
+```bash
+idrac_endpoint     = "https://100.67.x.x"
+idrac_user         = "root"
+idrac_password     = "calvin"
+idrac_ssl_insecure = true
+```
+
+### Apply Terraform
+```bash
+terraform init
+terraform apply
+```
+
+After `terraform apply`, the machine will reboot and the RHEL installer starts automatically from the mounted ISO. Follow the on-screen prompts to complete the OS installation.
+
+---
+
+## 3. System Requirements
 
 | Requirement | Description |
 |--------------|-------------|
@@ -22,7 +85,7 @@ The script:
 
 ---
 
-## 2. Enterprise Inference Deployment
+## 4. Enterprise Inference Deployment
 
 Once OS is installed, Download the deploy-enterprise-inference.sh script to your machine using either wget or curl.
 

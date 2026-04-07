@@ -36,7 +36,7 @@ jobs:
         run: mkdir -p trivy-reports
       
       - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         continue-on-error: true
         with:
           scan-type: 'fs'
@@ -47,7 +47,7 @@ jobs:
           output: 'trivy-reports/trivy_scan_report.txt'
             
       - name: Run Trivy Image Scan - vllm-cpu
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         continue-on-error: true
         with:
           scan-type: 'image'
