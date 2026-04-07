@@ -70,6 +70,20 @@ spec:
             - name: {{ $key }}
               value: "{{ $value }}"
 {{- end }}
+{{- if .Values.proxy.http_proxy }}
+            - name: http_proxy
+              value: {{ .Values.proxy.http_proxy | quote }}
+            - name: https_proxy
+              value: {{ .Values.proxy.https_proxy | quote }}
+            - name: HTTP_PROXY
+              value: {{ .Values.proxy.http_proxy | quote }}
+            - name: HTTPS_PROXY
+              value: {{ .Values.proxy.https_proxy | quote }}
+            - name: no_proxy
+              value: {{ .Values.proxy.no_proxy | quote }}
+            - name: NO_PROXY
+              value: {{ .Values.proxy.no_proxy | quote }}
+{{- end }}
           args:
             - "--config"
             - "/litellm/proxy_config.yaml"
