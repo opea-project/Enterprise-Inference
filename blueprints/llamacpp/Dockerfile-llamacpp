@@ -1,0 +1,49 @@
+FROM intel/oneapi-basekit:latest
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG LLAMA_CPP_REPO=https://github.com/ggml-org/llama.cpp.git
+ARG LLAMA_CPP_REF=master
+
+SHELL ["/bin/bash", "-lc"]
+
+# Base packages needed for building llama.cpp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    cmake \
+    ninja-build \
+    build-essential \
+    pkg-config \
+    ca-certificates \
+    curl \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt
+
+# Clone source
+RUN git clone --depth 1 --branch "${LLAMA_CPP_REF}" "${LLAMA_CPP_REPO}" llama.cpp
+
+WORKDIR /opt/llama.cpp
+
+# Build with Intel oneAPI compilers + oneMKL BLAS
+RUN source /opt/intel/oneapi/setvars.sh --force && \
+    cmake -S . -B build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_COMPILER=icx \
+      -DCMAKE_CXX_COMPILER=icpx \
+      -DGGML_BLAS=ON \
+      -DGGML_BLAS_VENDOR=Intel10_64lp \
+      -DGGML_NATIVE=ON \
+      -DLLAMA_CURL=ON \
+      -DLLAMA_OPENSSL=ON && \
+    cmake --build build -j"$(nproc)"
+
+# Write startup wrapper inline
+RUN printf '#!/usr/bin/env bash\nset -euo pipefail\nsource /opt/intel/oneapi/setvars.sh --force\nexec "$@"\n' > /usr/local/bin/llama-env && \
+    chmod +x /usr/local/bin/llama-env
+
+ENV PATH="/opt/llama.cpp/build/bin:${PATH}"
+ENV OCL_ICD_FILENAMES=""
+WORKDIR /workspace
+
+ENTRYPOINT ["/bin/bash", "-c", "set +u; source /opt/intel/oneapi/setvars.sh --force; mkdir -p /logs; /opt/llama.cpp/build/bin/llama-server --host 0.0.0.0 -c 8192 -t 6 \"$@\" 2>&1 | tee /logs/llama-server.log", "--"]
