@@ -16,9 +16,19 @@ The script:
 
 Mounts the **RHEL 9.6 ISO** via the **iDRAC Redfish Virtual Media API**. Idempotent — skips if already mounted.
 
-> **Note:** The scripts for Sections 1 and 2 are located in the `third_party/Dell/ubuntu-22.04/iac/` folder of this repository. If you have already cloned the Enterprise-Inference repo, navigate to that folder to run them:
+> **Note:** The scripts for Sections 1 and 2 are located in the `third_party/Dell/ubuntu-22.04/iac/` folder. Use one of the following approaches:
+>
+> **Option 1 — If you have cloned the repo**, navigate to the ubuntu folder:
 > ```bash
 > cd third_party/Dell/ubuntu-22.04/iac
+> ```
+>
+> **Option 2 — Download the scripts using wget:**
+> ```bash
+> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/mount-iso.sh
+> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/main.tf
+> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/variables.tf
+> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/terraform.tfvars
 > ```
 
 ### Required Environment Variables
