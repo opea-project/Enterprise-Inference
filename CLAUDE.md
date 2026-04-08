@@ -118,6 +118,8 @@ helm repo update
 | calico/pod2daemon-flexvol | v3.28.1 | quay.io |
 | containers/nri-plugins/nri-resource-policy-balloons | v0.12.2 | ghcr.io |
 | containers/nri-plugins/nri-config-manager | v0.12.2 | ghcr.io |
+| library/busybox | 1.28 | docker.io |
+| apache/apisix-ingress-controller | 1.8.0 | docker.io |
 
 **How to pre-cache an image** (run on VM1 — JFrog fetches and caches from internet):
 ```bash
@@ -508,8 +510,14 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 18. ✅ Fix `core/roles/inference-tools/tasks/main.yml` — helm install now airgap-aware: downloads from JFrog `ei-generic-binaries` instead of curling `raw.githubusercontent.com`
 19. ✅ Fix `nri_cpu_balloons` role — NRI helm repo, label-nodes, ballon-policy all now pass airgap vars; chart + images pre-cached in JFrog
 20. ✅ Fix `deploy-keycloak-tls-cert.yml` APISIX subchart dependency — patch Chart.yaml repo URL + use `helm dependency build` in airgap; pre-cache `kube-webhook-certgen:v1.5.3`
-21. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
-22. Validate all pods reach Running state and LLM endpoint responds
+21. Pre-cache `busybox:1.28` and `apache/apisix-ingress-controller:1.8.0` in JFrog — APISIX init containers use these; blocked pods: `auth-apisix-*` and `auth-apisix-ingress-controller-*`
+    ```bash
+    # On VM1 — set ei-docker-dockerhub Online, pull, set back Offline
+    docker pull 100.67.152.212:8082/ei-docker-virtual/library/busybox:1.28
+    docker pull 100.67.152.212:8082/ei-docker-virtual/apache/apisix-ingress-controller:1.8.0
+    ```
+22. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
+23. Validate all pods reach Running state and LLM endpoint responds
 
 ## Airgap Simulation — Block Internet on VM2
 
