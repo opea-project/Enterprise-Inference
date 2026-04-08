@@ -16,6 +16,11 @@ The script:
 
 Mounts the **RHEL 9.6 ISO** via the **iDRAC Redfish Virtual Media API**. Idempotent — skips if already mounted.
 
+> **Note:** The scripts for Sections 1 and 2 are located in the `third_party/Dell/ubuntu-22.04/iac/` folder of this repository. If you have already cloned the Enterprise-Inference repo, navigate to that folder to run them:
+> ```bash
+> cd third_party/Dell/ubuntu-22.04/iac
+> ```
+
 ### Required Environment Variables
 ```bash
 export IDRAC_IP=100.67.x.x
@@ -32,8 +37,8 @@ export ISO_URL=https://your-domain.com/rhel-9.6-x86_64-dvd.iso
 
 ### Mount ISO
 ```bash
-chmod +x ../../ubuntu-22.04/iac/mount-iso.sh
-../../ubuntu-22.04/iac/mount-iso.sh
+chmod +x mount-iso.sh
+./mount-iso.sh
 ```
 
 ---
