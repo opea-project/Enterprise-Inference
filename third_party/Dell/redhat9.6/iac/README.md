@@ -59,7 +59,7 @@ Provide the following in [iac/terraform.tfvars](../../ubuntu-22.04/iac/terraform
 ```bash
 idrac_endpoint     = "https://100.67.x.x"
 idrac_user         = "root"
-idrac_password     = "calvin"
+idrac_password     = "your-idrac-password"
 idrac_ssl_insecure = true
 ```
 
