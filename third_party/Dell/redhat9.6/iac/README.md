@@ -20,7 +20,7 @@ Mounts the **RHEL 9.6 ISO** via the **iDRAC Redfish Virtual Media API**. Idempot
 ```bash
 export IDRAC_IP=100.67.x.x
 export IDRAC_USER=root
-export IDRAC_PASS=calvin
+export IDRAC_PASS=your-idrac-password
 export ISO_URL=https://your-domain.com/rhel-9.6-x86_64-dvd.iso
 ```
 
