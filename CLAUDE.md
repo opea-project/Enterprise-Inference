@@ -528,8 +528,11 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 23. ✅ Fix `xeon-values.yaml` — added `tensor_parallel_size: "1"` override (NRI balloon with TP=2 creates asymmetric NUMA split 85 vs 84 cores → PyTorch shm assertion `ptr->thread_num == thread_num` crash)
 24. ✅ Fix `nri_cpu_balloons/tasks/install_nri.yaml` — added pre-check task to skip `blockinfile` if NRI section already exists in containerd config (kubespray already writes `[plugins.'io.containerd.nri.v1.nri'] disable = false`; duplicate key crashes containerd on restart)
 25. ✅ Add `deploy_nri_balloon_policy=no` to `inference-config.cfg` — without this, `parse-user-prompts.sh` auto-enables NRI for all CPU deployments (silent default)
-26. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
-27. Validate all pods reach Running state and LLM endpoint responds
+26. ✅ Fix `ballon-policy.sh` — removed `|| [ "$cpu_or_gpu" == "c" ]` bypass bug
+27. ✅ Fix `deploy-inference-models.yml` — all 7 model install tasks now guard `--set cpu_balloon_annotation` with `{% if enable_cpu_balloons | default(false) | bool %}`
+28. ✅ K8s deployment complete — keycloak, apisix, ingress, genai-gateway all running; `vllm-llama-3-2-3b-cpu` 1/1 Running
+29. Wait for `vllm-llama-8b-cpu` to finish downloading Llama-3.1-8B-Instruct (~16GB) from HuggingFace — clear stale `.locks` if download stalls
+30. Validate LLM endpoint responds for both models
 
 ## NRI Balloon Policy — Root Cause Analysis
 
@@ -544,7 +547,7 @@ fi
 ```
 **Fix**: always add `deploy_nri_balloon_policy=no` to `inference-config.cfg` explicitly.
 
-Also `ballon-policy.sh` has a bug: `if [ "$deploy_nri_balloon_policy" == "yes" ] || [ "$cpu_or_gpu" == "c" ]` — the `|| cpu_or_gpu == c` clause bypasses the flag entirely.
+Also `ballon-policy.sh` had a bug: `if [ "$deploy_nri_balloon_policy" == "yes" ] || [ "$cpu_or_gpu" == "c" ]` — the `|| cpu_or_gpu == c` clause bypassed the flag entirely. **Fixed** — removed `|| [ "$cpu_or_gpu" == "c" ]` so only `deploy_nri_balloon_policy=yes` triggers NRI deployment.
 
 ### Why NRI with TP=2 breaks on VM2 but works on other Xeon machine
 NRI balloon size = `tensor_parallel_size × CPUs_per_NUMA_node`:
@@ -556,16 +559,53 @@ With TP=2 on VM2's 344-CPU node, NRI allocates 336 CPUs per model (entire node),
 ### Current state on VM2
 - NRI uninstalled (`helm uninstall nri-resource-policy-balloons -n kube-system`)
 - `deploy_nri_balloon_policy=no` added to `inference-config.cfg`
-- `tensor_parallel_size: "1"` set in `xeon-values.yaml` (correct for future NRI use: 1 NUMA node = ~168 CPUs per model, two models fit: 168×2=336 < 344)
-- vLLM deployments still have stale `cpu=336` and `cpu_balloon_annotation=vllm-balloon` from NRI run — need helm upgrade with `--set cpu="" --set cpu_balloon_annotation=""` after deleting ingress conflict
+- `tensor_parallel_size: "1"` set in `xeon-values.yaml`
+- `vllm-llama-3-2-3b-cpu` pod: `1/1 Running` ✅
+- `vllm-llama-8b-cpu` pod: `0/1 Running` — downloading `meta-llama/Llama-3.1-8B-Instruct` from HuggingFace Hub (internet accessible from pods via Calico despite host iptables block)
 
 ### How to fix stale NRI values in existing vLLM deployments
+`helm upgrade --set cpu=""` does NOT clear `cpu: 336` — strategic merge patch omits fields instead of removing them. Use JSON patch to explicitly replace the resources field:
 ```bash
 # Delete ingress first (helm upgrade conflicts with modified ingress object)
 kubectl delete ingress <release>-ingress -n auth-apisix
-# Upgrade without -f xeon-values.yaml (it has LLM_MODEL_ID="" which wipes model name)
-helm upgrade <release> ./helm-charts/vllm --reuse-values --set cpu_balloon_annotation="" --set cpu="" --set tensor_parallel_size=1
+# Clear stale NRI resource requests via JSON patch (helm upgrade can't do this)
+kubectl patch deployment <release> -n default --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{}}]'
+# Then upgrade to clean helm values
+helm upgrade <release> ./helm-charts/vllm --reuse-values \
+  --set cpu_balloon_annotation="" --set cpu="" --set tensor_parallel_size=1
 ```
+
+### `deploy-inference-models.yml` — `enable_cpu_balloons` guard ✅
+All 7 occurrences of `--set cpu_balloon_annotation` are now wrapped with `{% if enable_cpu_balloons | default(false) | bool %}`. Without this guard, every model deploy task set `cpu_balloon_annotation=vllm-balloon` and `cpu=336` in the helm release regardless of NRI being disabled — and strategic merge patch can't clear these later.
+
+Pattern applied to all 7 model install tasks:
+```yaml
+{% if cpu_playbook == 'true' %}
+{% if enable_cpu_balloons | default(false) | bool %}
+--set cpu_balloon_annotation="vllm-balloon"
+--set podLabels.name="vllm"
+--set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+--set memory="{{ optimal_memory_gb | default(8) }}Gi"
+--set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+--set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+{% endif %}
+{% endif %}
+```
+
+### PV reclaim policy — patch to Retain
+By default `local-path` PVs use `Delete` reclaim policy. When a PVC is deleted (e.g., during rollout), the PV and all model data on disk is permanently lost. Patch active PVs to `Retain` immediately after pod creation:
+```bash
+kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+```
+A Released PV with Retain can be reused: clear its claimRef, then create a new PVC with `volumeName: <pv-name>` and helm adoption annotations.
+
+### vLLM model download behavior on VM2
+- `HF_HOME=/data` — models cached at `/data/hub/models--<org>--<model>/snapshots/<hash>/`
+- Pods download from HuggingFace Hub directly, NOT from JFrog `ei-generic-models`
+- Pod networking (Calico) bypasses host iptables — pods can reach internet even when VM2 host internet is blocked
+- HuggingFace download stalls silently at ~8.8MB (metadata only) on consecutive restarts — root cause: stale `.lock` files in `/data/hub/.locks/` from previous pod runs; fix: `kubectl exec <pod> -- find /data/hub/.locks -type f -delete`
+- **To truly use JFrog `ei-generic-models`**: set `HF_HUB_OFFLINE=1` and pre-populate `/data/hub/` with model files from JFrog before pod starts (or mount a pre-populated PV)
 
 ---
 
