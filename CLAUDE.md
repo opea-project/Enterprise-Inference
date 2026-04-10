@@ -84,7 +84,7 @@ helm repo update
 **Docker images** (cached in JFrog remote repos via `ei-docker-virtual`):
 | Image | Tag | Registry |
 |---|---|---|
-| vllm-cpu-release-repo | v0.10.2 | public.ecr.aws |
+| q9t5s3a7/vllm-cpu-release-repo | v0.10.2 | public.ecr.aws |
 | text-generation-inference | 2.4.0-intel-cpu | ghcr.io |
 | text-embeddings-inference | cpu-1.7 | ghcr.io |
 | litellm-non_root | main-v1.75.8-stable | ghcr.io |
@@ -118,8 +118,8 @@ helm repo update
 | calico/pod2daemon-flexvol | v3.28.1 | quay.io |
 | containers/nri-plugins/nri-resource-policy-balloons | v0.12.2 | ghcr.io |
 | containers/nri-plugins/nri-config-manager | v0.12.2 | ghcr.io |
-| library/busybox | 1.28 | docker.io |
-| apache/apisix-ingress-controller | 1.8.0 | docker.io |
+| library/busybox | 1.28 (tagged from latest) | docker.io — ei-docker local |
+| apache/apisix-ingress-controller | 1.8.0 | docker.io — ei-docker local |
 
 **How to pre-cache an image** (run on VM1 — JFrog fetches and caches from internet):
 ```bash
@@ -161,6 +161,16 @@ requests, requests-oauthlib, resolvelib, rpds-py, six, typing-extensions, urllib
 | `get-helm-3` script | ~~`setup-bastion.yml` line 132 curls `raw.githubusercontent.com`~~ — **FIXED**: `core/roles/inference-tools/tasks/main.yml` now has dual tasks; airgap task downloads `helm-v3.15.4-linux-amd64.tar.gz` from JFrog `ei-generic-binaries` | ✅ Fixed in code |
 | `BAAI/bge-base-en-v1.5` | Required if TEI embeddings deployed | Download from HuggingFace, upload to `ei-generic-models` |
 | apt packages (15+) | `setup-bastion.yml` runs `apt-get install` — no Debian mirror in JFrog | Add `ei-debian-ubuntu` remote + `ei-debian-virtual` in JFrog |
+
+**When JFrog remote pull fails with "manifest unknown"** (old tags like `busybox:1.28`):
+- Docker Hub drops manifests for very old tags from v2 API — JFrog remote can't fetch them
+- Fix: pull a working equivalent tag, retag as the required version, push to `ei-docker` local:
+  ```bash
+  docker pull 100.67.152.212:8082/ei-docker-virtual/library/busybox:latest
+  docker tag ... 100.67.152.212:8082/ei-docker/library/busybox:1.28
+  docker push 100.67.152.212:8082/ei-docker/library/busybox:1.28
+  ```
+- If Docker Hub rate limit hit: `docker login -u <user> -p <pat>` first; rotate PAT after use
 
 **How to find missing images when deployment fails with 404 on JFrog:**
 Image names come from `core/kubespray/roles/kubespray-defaults/defaults/main/download.yml`. The error pattern is:
@@ -510,14 +520,54 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 18. ✅ Fix `core/roles/inference-tools/tasks/main.yml` — helm install now airgap-aware: downloads from JFrog `ei-generic-binaries` instead of curling `raw.githubusercontent.com`
 19. ✅ Fix `nri_cpu_balloons` role — NRI helm repo, label-nodes, ballon-policy all now pass airgap vars; chart + images pre-cached in JFrog
 20. ✅ Fix `deploy-keycloak-tls-cert.yml` APISIX subchart dependency — patch Chart.yaml repo URL + use `helm dependency build` in airgap; pre-cache `kube-webhook-certgen:v1.5.3`
-21. Pre-cache `busybox:1.28` and `apache/apisix-ingress-controller:1.8.0` in JFrog — APISIX init containers use these; blocked pods: `auth-apisix-*` and `auth-apisix-ingress-controller-*`
-    ```bash
-    # On VM1 — set ei-docker-dockerhub Online, pull, set back Offline
-    docker pull 100.67.152.212:8082/ei-docker-virtual/library/busybox:1.28
-    docker pull 100.67.152.212:8082/ei-docker-virtual/apache/apisix-ingress-controller:1.8.0
-    ```
-22. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
-23. Validate all pods reach Running state and LLM endpoint responds
+21. ✅ Pre-cache `busybox:1.28` and `apache/apisix-ingress-controller:1.8.0` — APISIX init containers
+    - `busybox:1.28` manifest not found via JFrog remote (very old tag, Docker Hub v2 API returns unknown); workaround: pulled `busybox:latest` via JFrog, tagged as `busybox:1.28`, pushed to `ei-docker` local
+    - `apache/apisix-ingress-controller:1.8.0` not cached in JFrog; pulled from Docker Hub with credentials, pushed to `ei-docker` local
+    - Both now served via `ei-docker-virtual` from `ei-docker` local repo
+22. ✅ Fix `install-model.sh` — added `airgap_enabled jfrog_url jfrog_username jfrog_password` to `deploy_inference_llm_models_playbook` ansible-playbook `--extra-vars` (was missing, causing internet helm install task to run)
+23. ✅ Fix `xeon-values.yaml` — added `tensor_parallel_size: "1"` override (NRI balloon with TP=2 creates asymmetric NUMA split 85 vs 84 cores → PyTorch shm assertion `ptr->thread_num == thread_num` crash)
+24. ✅ Fix `nri_cpu_balloons/tasks/install_nri.yaml` — added pre-check task to skip `blockinfile` if NRI section already exists in containerd config (kubespray already writes `[plugins.'io.containerd.nri.v1.nri'] disable = false`; duplicate key crashes containerd on restart)
+25. ✅ Add `deploy_nri_balloon_policy=no` to `inference-config.cfg` — without this, `parse-user-prompts.sh` auto-enables NRI for all CPU deployments (silent default)
+26. Run full deployment on VM2: `cd ~/Enterprise-Inference/core && ./inference-stack-deploy.sh`
+27. Validate all pods reach Running state and LLM endpoint responds
+
+## NRI Balloon Policy — Root Cause Analysis
+
+### Why NRI got auto-enabled on VM2 (but not intended)
+`deploy_nri_balloon_policy` is not in `inference-config.cfg` by default. `parse-user-prompts.sh` silently auto-sets it to `yes` for any CPU deployment:
+```bash
+if [ -z "$deploy_nri_balloon_policy" ]; then
+    if [ "$cpu_or_gpu" == "c" ]; then
+        deploy_nri_balloon_policy="yes"   # ← auto-enables for ALL CPU deployments
+    fi
+fi
+```
+**Fix**: always add `deploy_nri_balloon_policy=no` to `inference-config.cfg` explicitly.
+
+Also `ballon-policy.sh` has a bug: `if [ "$deploy_nri_balloon_policy" == "yes" ] || [ "$cpu_or_gpu" == "c" ]` — the `|| cpu_or_gpu == c` clause bypasses the flag entirely.
+
+### Why NRI with TP=2 breaks on VM2 but works on other Xeon machine
+NRI balloon size = `tensor_parallel_size × CPUs_per_NUMA_node`:
+- VM2 (344 CPUs, 86 cores/socket): TP=2 → balloon = 2 × 172 = **336 CPUs** (whole node) → only 1 model fits
+- Other machine (384 CPUs, 96 cores/socket): TP=1 → balloon = 1 × 192 - reserved = **157 CPUs** → multiple models fit
+
+With TP=2 on VM2's 344-CPU node, NRI allocates 336 CPUs per model (entire node), leaving no room for a second model. The TP=2 crash was: asymmetric NUMA split (85 vs 84 physical cores across 2 NUMA nodes) causing PyTorch OMP thread count assertion failure.
+
+### Current state on VM2
+- NRI uninstalled (`helm uninstall nri-resource-policy-balloons -n kube-system`)
+- `deploy_nri_balloon_policy=no` added to `inference-config.cfg`
+- `tensor_parallel_size: "1"` set in `xeon-values.yaml` (correct for future NRI use: 1 NUMA node = ~168 CPUs per model, two models fit: 168×2=336 < 344)
+- vLLM deployments still have stale `cpu=336` and `cpu_balloon_annotation=vllm-balloon` from NRI run — need helm upgrade with `--set cpu="" --set cpu_balloon_annotation=""` after deleting ingress conflict
+
+### How to fix stale NRI values in existing vLLM deployments
+```bash
+# Delete ingress first (helm upgrade conflicts with modified ingress object)
+kubectl delete ingress <release>-ingress -n auth-apisix
+# Upgrade without -f xeon-values.yaml (it has LLM_MODEL_ID="" which wipes model name)
+helm upgrade <release> ./helm-charts/vllm --reuse-values --set cpu_balloon_annotation="" --set cpu="" --set tensor_parallel_size=1
+```
+
+---
 
 ## Airgap Simulation — Block Internet on VM2
 

@@ -11,6 +11,11 @@ accelDevice: ""
 # CPU Balloon configuration for NRI resource policy
 cpu_balloon_annotation: ""
 
+# Override tensor parallelism to 1 for Xeon — NRI balloon CPU allocation creates
+# asymmetric NUMA splits (85 vs 84 physical cores) when TP=2, causing PyTorch
+# shm assertion failure: ptr->thread_num == thread_num
+tensor_parallel_size: "1"
+
 
 resources:
   requests:

@@ -61,6 +61,13 @@
       - "Installing NRI support with runtime-specific configuration..."
       - "Runtime patching required: {{ (containerd_needs_patch | default(false)) or (crio_needs_patch | default(false)) }}"
 
+- name: Check if NRI plugin section already exists in containerd config
+  ansible.builtin.shell: grep -c "io.containerd.nri.v1.nri" /etc/containerd/config.toml || true
+  become: true
+  register: nri_already_configured
+  changed_when: false
+  when: runtime_name == 'containerd'
+
 - name: Enable NRI in containerd config
   ansible.builtin.blockinfile:
     path: /etc/containerd/config.toml
@@ -70,7 +77,9 @@
         disable = false
   become: true
   register: containerd_nri_config
-  when: runtime_name == 'containerd'
+  when:
+    - runtime_name == 'containerd'
+    - (nri_already_configured.stdout | default('0') | int) == 0
 
 - name: Restart containerd to apply NRI config
   ansible.builtin.systemd:
