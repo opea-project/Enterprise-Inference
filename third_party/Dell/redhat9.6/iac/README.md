@@ -25,10 +25,10 @@ Mounts the **RHEL 9.6 ISO** via the **iDRAC Redfish Virtual Media API**. Idempot
 >
 > **Option 2 — Download the scripts using wget:**
 > ```bash
-> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/mount-iso.sh
-> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/main.tf
-> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/variables.tf
-> wget https://raw.githubusercontent.com/cld2labs/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/terraform.tfvars
+> wget https://raw.githubusercontent.com/opea-project/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/mount-iso.sh
+> wget https://raw.githubusercontent.com/opea-project/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/main.tf
+> wget https://raw.githubusercontent.com/opea-project/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/variables.tf
+> wget https://raw.githubusercontent.com/opea-project/Enterprise-Inference/main/third_party/Dell/ubuntu-22.04/iac/terraform.tfvars
 > ```
 
 ### Required Environment Variables
