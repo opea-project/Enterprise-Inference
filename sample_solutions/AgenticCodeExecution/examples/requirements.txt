@@ -1,4 +1,4 @@
-fastmcp>=2.0.0
-pydantic>=2.0.0
-uvicorn
-starlette
+fastmcp==3.2.3
+pydantic==2.13.0
+uvicorn==0.44.0
+starlette==1.0.0
