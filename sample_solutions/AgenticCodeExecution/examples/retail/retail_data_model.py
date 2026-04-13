@@ -41,8 +41,8 @@ class UserAddress(BaseModel):
     address1: str = Field(description="First line of the address")
     address2: str = Field(description="Second line of the address")
     city: str = Field(description="City")
-    state: str = Field(description="State")
     country: str = Field(description="Country")
+    state: str = Field(description="State")
     zip: str = Field(description="ZIP code")
 
 
@@ -50,9 +50,9 @@ class CreditCard(BaseModel):
     """Credit card payment method"""
 
     source: Literal["credit_card"] = "credit_card"
+    id: str = Field(description="Unique identifier for the credit card")
     brand: str = Field(description="Credit card brand")
     last_four: str = Field(description="Last four digits of the credit card")
-    id: str = Field(description="Unique identifier for the credit card")
 
 
 class PaypalAccount(BaseModel):
@@ -66,8 +66,8 @@ class GiftCard(BaseModel):
     """Gift card payment method"""
 
     source: Literal["gift_card"] = "gift_card"
-    balance: float = Field(description="Balance of the gift card")
     id: str = Field(description="Unique identifier for the gift card")
+    balance: float = Field(description="Balance of the gift card")
 
 
 PaymentMethod = Union[CreditCard, PaypalAccount, GiftCard]

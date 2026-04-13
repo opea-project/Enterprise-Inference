@@ -139,24 +139,28 @@ def get_db(session_id: str = "") -> RetailDB:
 
 
 def _get_data_model_defs() -> Dict[str, dict]:
+    # Order matches tau2-bench: Order first, then related types in discovery order
     model_classes = [
-        Variant,
-        Product,
-        UserName,
-        UserAddress,
-        CreditCard,
-        PaypalAccount,
-        GiftCard,
-        User,
+        Order,
+        OrderFullfilment,
         OrderItem,
         OrderPayment,
-        OrderFullfilment,
-        Order,
+        UserAddress,
+        Product,
+        Variant,
+        CreditCard,
+        GiftCard,
+        PaypalAccount,
+        User,
+        UserName,
     ]
+    # Map class names to tau2-compatible display names
+    name_overrides = {"PaypalAccount": "Paypal"}
     defs: Dict[str, dict] = {}
     for model_cls in model_classes:
         schema = model_cls.model_json_schema(ref_template="#/$defs/{model}")
-        defs[model_cls.__name__] = {
+        display_name = name_overrides.get(model_cls.__name__, model_cls.__name__)
+        defs[display_name] = {
             "description": schema.get("description", ""),
             "properties": schema.get("properties", {}),
         }
@@ -168,10 +172,11 @@ def _get_tool_metadata_payload() -> Dict[str, Any]:
         "calculate",
         "cancel_pending_order",
         "exchange_delivered_order_items",
-        "find_user_id_by_email",
         "find_user_id_by_name_zip",
+        "find_user_id_by_email",
         "get_order_details",
         "get_product_details",
+        "get_item_details",
         "get_user_details",
         "list_all_product_types",
         "modify_pending_order_address",
@@ -185,34 +190,124 @@ def _get_tool_metadata_payload() -> Dict[str, Any]:
     return {
         "ordered_actions": ordered_actions,
         "return_types": {
-            "calculate": "str",
-            "cancel_pending_order": "str (JSON)",
-            "exchange_delivered_order_items": "str (JSON)",
-            "find_user_id_by_email": "str",
-            "find_user_id_by_name_zip": "str",
-            "get_order_details": "str (JSON)",
-            "get_product_details": "str (JSON)",
-            "get_user_details": "str (JSON)",
-            "list_all_product_types": "str (JSON)",
-            "modify_pending_order_address": "str (JSON)",
-            "modify_pending_order_items": "str (JSON)",
-            "modify_pending_order_payment": "str (JSON)",
-            "modify_user_address": "str (JSON)",
-            "return_delivered_order_items": "str (JSON)",
-            "transfer_to_human_agents": "str",
-        },
-        "semantic_types": {
+            "calculate": "string",
             "cancel_pending_order": "Order",
             "exchange_delivered_order_items": "Order",
+            "find_user_id_by_email": "string",
+            "find_user_id_by_name_zip": "string",
             "get_order_details": "Order",
             "get_product_details": "Product",
+            "get_item_details": "Variant",
             "get_user_details": "User",
-            "list_all_product_types": "dict[name, product_id]",
+            "list_all_product_types": "object",
             "modify_pending_order_address": "Order",
             "modify_pending_order_items": "Order",
             "modify_pending_order_payment": "Order",
             "modify_user_address": "User",
             "return_delivered_order_items": "Order",
+            "transfer_to_human_agents": "string",
+        },
+        "short_descriptions": {
+            "calculate": "Calculate the result of a mathematical expression",
+            "cancel_pending_order": "Cancel a pending order. The order must be in 'pending' status",
+            "exchange_delivered_order_items": "Exchange items in a delivered order for new items of the same product type",
+            "find_user_id_by_name_zip": "Find user id by first name, last name, and zip code. ",
+            "find_user_id_by_email": "Find user id by email. Use this first to identify a customer",
+            "get_order_details": "Returns a dict with order info where items is a LIST of {item_id, product_id, price, ...} dicts and status is a string",
+            "get_product_details": "Returns a dict with product info where variants is a DICT {item_id: info} \u2014 use .items() to iterate, NOT a list",
+            "get_item_details": "Get the inventory details of an item. Returns {item_id, options, available, price}. NOTE: does NOT include product_id \u2014 get product_id from order['items'] instead",
+            "get_user_details": "Returns a dict with user info where orders is a list of ID strings and payment_methods is a DICT {pm_id: info} \u2014 use .items()",
+            "list_all_product_types": "Returns a dict {name: product_id} \u2014 use .items() to iterate, NOT a list",
+            "modify_pending_order_address": "Modify the shipping address of a pending order",
+            "modify_pending_order_items": "Modify items in a pending order to new items of the same product type",
+            "modify_pending_order_payment": "Modify the payment method of a pending order",
+            "modify_user_address": "Modify the default address of a user",
+            "return_delivered_order_items": "Return items from a delivered order",
+            "transfer_to_human_agents": "Transfer the customer to a human agent",
+        },
+        "long_descriptions": {
+            "cancel_pending_order": "Ask the customer for confirmation before cancelling.",
+            "exchange_delivered_order_items": "Ask the customer for confirmation before processing.",
+            "find_user_id_by_name_zip": "Use this if the customer cannot remember their email.",
+            "modify_pending_order_address": "Ask for confirmation before modifying.",
+            "modify_pending_order_items": "Can only be done once per order. Ask for confirmation before modifying.",
+            "modify_pending_order_payment": "Ask for confirmation before modifying.",
+            "modify_user_address": "Ask for confirmation before modifying.",
+            "return_delivered_order_items": "Ask the customer for confirmation before processing.",
+            "transfer_to_human_agents": "Only use this if the customer explicitly asks for a human agent, or \nif you cannot solve their issue with the available tools.",
+        },
+        "param_descriptions": {
+            "calculate": {
+                "expression": "The mathematical expression, such as '2 + 2' or '100 * 0.1'",
+            },
+            "cancel_pending_order": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "reason": "Either 'no longer needed' or 'ordered by mistake'",
+            },
+            "exchange_delivered_order_items": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "item_ids": "List of item IDs to exchange, such as ['1008292230']",
+                "new_item_ids": "List of new item IDs to exchange for. Must match positions",
+                "payment_method_id": "Payment method ID for any price difference. MUST be a real ID from get_user_details() \u2192 user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders",
+            },
+            "find_user_id_by_name_zip": {
+                "first_name": "The first name of the customer, such as 'John'",
+                "last_name": "The last name of the customer, such as 'Doe'",
+            },
+            "find_user_id_by_email": {
+                "email": "The email of the user, such as 'something@example.com'",
+            },
+            "get_order_details": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+            },
+            "get_product_details": {
+                "product_id": "The product id (numeric string). Get IDs from list_all_product_types(). Different from item_id",
+            },
+            "get_item_details": {
+                "item_id": "The item id, such as '6086499569'. Be careful the item id is different from the product id",
+            },
+            "get_user_details": {
+                "user_id": "The user id, such as 'sara_doe_496'",
+            },
+            "modify_pending_order_address": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "address1": "First line of address, such as '123 Main St'",
+                "address2": "Second line of address, such as 'Apt 1' or empty string",
+                "city": "City name",
+                "state": "State abbreviation, such as 'CA'",
+                "country": "Country, such as 'USA'",
+            },
+            "modify_pending_order_items": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "item_ids": "List of item IDs to modify, such as ['1008292230']",
+                "new_item_ids": "List of new item IDs. Must match positions and be different items",
+                "payment_method_id": "Payment method ID for any price difference. MUST be a real ID from get_user_details() \u2192 user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders",
+            },
+            "modify_pending_order_payment": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "payment_method_id": "New payment method ID. MUST be a real ID from get_user_details() \u2192 user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders",
+            },
+            "modify_user_address": {
+                "user_id": "The user id, such as 'sara_doe_496'",
+                "address1": "First line of address",
+                "address2": "Second line of address",
+                "city": "City name",
+                "state": "State abbreviation",
+                "country": "Country",
+            },
+            "return_delivered_order_items": {
+                "order_id": "The order id, such as '#W0000000'. Include the '#' symbol",
+                "item_ids": "List of item IDs to return, such as ['1008292230']",
+                "payment_method_id": "Payment method ID for refund. Must be original payment or a gift card. MUST be a real ID from get_user_details() \u2192 user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders",
+            },
+            "transfer_to_human_agents": {
+                "summary": "A summary of the customer's issue",
+            },
+        },
+        "param_display_names": {
+            "find_user_id_by_name_zip": {"zip_code": "zip"},
+            "modify_pending_order_address": {"zip_code": "zip"},
+            "modify_user_address": {"zip_code": "zip"},
         },
         "data_model_defs": _get_data_model_defs(),
     }
@@ -279,18 +374,16 @@ def find_user_id_by_name_zip(first_name: str, last_name: str, zip_code: str, ses
 
 @mcp.tool()
 def get_order_details(order_id: str, session_id: str = "") -> str:
-    """Returns JSON with order info where items is a LIST of {item_id, product_id, price, ...} dicts and status is a string
+    """Returns a dict with order info where items is a LIST of {item_id, product_id, price, ...} dicts and status is a string
 
     Args:
         order_id: The order id, such as '#W0000000'. Include the '#' symbol.
 
     Example:
-        import json
-        order = json.loads(actions.get_order_details("#W1234567"))
-        print(order['status'])  # 'pending', 'delivered', 'cancelled', etc.
-        for item in order['items']:  # list of dicts
-            print(f"Item {item['item_id']}: ${item['price']}")
-        # order['payment_history'] = [{"payment_method_id": "credit_card_123", "amount": 29.99}]
+        order = actions.get_order_details("#W1234567")
+        print(order['status'])
+        for item in order['items']:
+            print(item['item_id'], item['price'])
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -301,17 +394,15 @@ def get_order_details(order_id: str, session_id: str = "") -> str:
 
 @mcp.tool()
 def get_product_details(product_id: str, session_id: str = "") -> str:
-    """Returns JSON with product info where variants is a DICT {item_id: info} — use .items() to iterate, NOT a list
+    """Returns a dict with product info where variants is a DICT {item_id: info} — use .items() to iterate, NOT a list
 
     Args:
         product_id: The product id (numeric string). Get IDs from list_all_product_types(). Different from item_id.
 
     Example:
-        import json
-        product = json.loads(actions.get_product_details(product_id))
+        product = actions.get_product_details(product_id)
         for item_id, variant in product['variants'].items():
-            print(f"{item_id}: ${variant['price']} - {variant['options']} - Available: {variant['available']}")
-        print(f"Total variants: {len(product['variants'])}")
+            print(item_id, variant['price'], variant['options'], variant['available'])
     """
     db = get_db(session_id)
     if product_id not in db.products:
@@ -320,20 +411,33 @@ def get_product_details(product_id: str, session_id: str = "") -> str:
 
 
 @mcp.tool()
+def get_item_details(item_id: str, session_id: str = "") -> str:
+    """Get the inventory details of an item. Returns {item_id, options, available, price}. NOTE: does NOT include product_id — get product_id from order['items'] instead.
+
+    Args:
+        item_id: The item id, such as '6086499569'. Be careful the item id is different from the product id.
+    """
+    db = get_db(session_id)
+    for _, product in db.products.items():
+        if item_id in product.variants:
+            return product.variants[item_id].model_dump_json(indent=2)
+    raise ValueError("Item not found")
+
+
+@mcp.tool()
 def get_user_details(user_id: str, session_id: str = "") -> str:
-    """Returns JSON with user info where orders is a list of ID strings and payment_methods is a DICT {pm_id: info} — use .items()
+    """Returns a dict with user info where orders is a list of ID strings and payment_methods is a DICT {pm_id: info} — use .items()
 
     Args:
         user_id: The user id, such as 'sara_doe_496'.
 
     Example:
-        import json
-        user = json.loads(actions.get_user_details(user_id))
-        print(user['name'])  # {"first_name": "Sara", "last_name": "Doe"}
-        for order_id in user['orders']:  # list of strings like "#W0001"
+        user = actions.get_user_details(user_id)
+        print(user['name'])
+        for order_id in user['orders']:
             print(order_id)
         for pm_id, pm_info in user['payment_methods'].items():
-            print(f"{pm_id}: {pm_info}")
+            print(pm_id, pm_info)
     """
     db = get_db(session_id)
     if user_id not in db.users:
@@ -343,15 +447,12 @@ def get_user_details(user_id: str, session_id: str = "") -> str:
 
 @mcp.tool()
 def list_all_product_types(session_id: str = "") -> str:
-    """Returns JSON dict {name: product_id} — use .items() to iterate, NOT a list
+    """Returns a dict {name: product_id} — use .items() to iterate, NOT a list
 
     Example:
-        import json
-        types = json.loads(actions.list_all_product_types())
-        # types = {"T-Shirt": "1001", "Jeans": "1002", ...}
+        types = actions.list_all_product_types()
         for name, product_id in types.items():
-            print(f"{name}: {product_id}")
-        # To get full details: actions.get_product_details(product_id)
+            print(name, product_id)
     """
     db = get_db(session_id)
     product_dict = {
@@ -428,8 +529,7 @@ def cancel_pending_order(order_id: str, reason: str, session_id: str = "") -> st
         reason: Either 'no longer needed' or 'ordered by mistake'.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details showing cancelled status.
+        A dict with updated order details showing cancelled status.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -489,8 +589,7 @@ def exchange_delivered_order_items(
         payment_method_id: Payment method ID for any price difference. MUST be a real ID from get_user_details() → user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details showing exchange requested status.
+        A dict with updated order details showing exchange requested status.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -565,8 +664,7 @@ def return_delivered_order_items(
         payment_method_id: Payment method ID for refund. Must be original payment or a gift card. MUST be a real ID from get_user_details() → user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details showing return requested status.
+        A dict with updated order details showing return requested status.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -622,8 +720,7 @@ def modify_pending_order_items(
         payment_method_id: Payment method ID for any price difference. MUST be a real ID from get_user_details() → user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details.
+        A dict with updated order details.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -726,8 +823,7 @@ def modify_pending_order_address(
         zip_code: ZIP code, such as '12345'.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details.
+        A dict with updated order details.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -762,8 +858,7 @@ def modify_pending_order_payment(order_id: str, payment_method_id: str, session_
         payment_method_id: New payment method ID. MUST be a real ID from get_user_details() → user['payment_methods'] (e.g., 'credit_card_9513926', 'gift_card_1234567'). NEVER guess or use placeholders.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: order = json.loads(result)
-        Contains updated order details.
+        A dict with updated order details.
     """
     order_id = _normalize_order_id(order_id)
     db = get_db(session_id)
@@ -851,8 +946,7 @@ def modify_user_address(
         zip_code: ZIP code.
         
     Returns:
-        A JSON STRING (not a dict). You MUST parse it: user = json.loads(result)
-        Contains updated user details.
+        A dict with updated user details.
     """
     db = get_db(session_id)
     

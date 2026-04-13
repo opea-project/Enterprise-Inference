@@ -43,10 +43,7 @@ def analyze_execution_error(error_msg: str, code: str = "", domain: str = "gener
         attr_name = attr_match.group(1) if attr_match else ""
         return (
             f"You are accessing '.{attr_name}' on a STRING. "
-            "The actions.* method likely returned a JSON string, not a Python object. "
-            "Parse it first with json.loads():\n"
-            "  import json\n"
-            "  result = json.loads(actions.some_method(arg))\n"
+            "actions.* methods return dicts — use bracket notation, not dot access:\n"
             f"  print(result['{attr_name}'])  # Access as dict key, not attribute\n"
             "Also check: iterating over a dict yields keys (strings), not objects. "
             "Use `.items()` to get (key, value) pairs."
@@ -85,12 +82,10 @@ def analyze_execution_error(error_msg: str, code: str = "", domain: str = "gener
 
         return (
             "You are trying to use string indexing (e.g., x['key']) on a STRING value. Common causes:\n"
-            "1) An actions.* method returned a JSON STRING instead of a dict/list. "
-            "Parse it first: `result = json.loads(actions.some_method(arg))`\n"
-            "2) The data is a DICT, not a list of objects. "
+            "1) The data is a DICT, not a list of objects. "
             "Iterating over a dict yields keys (strings), not objects. "
             "Use `.items()` to get (key, value) pairs, or `.values()` for values only.\n"
-            "3) A field contains ID strings, not objects. "
+            "2) A field contains ID strings, not objects. "
             "Fetch the full object using the appropriate actions.* method.\n"
             "Check the API REFERENCE Usage examples for the correct iteration pattern."
         )

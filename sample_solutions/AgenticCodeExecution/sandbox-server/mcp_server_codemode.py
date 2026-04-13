@@ -37,7 +37,6 @@ warnings.filterwarnings(
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, Dict, List, Mapping, Optional, Tuple
 from uuid import uuid4
-from pydantic import Field
 
 from fastmcp import FastMCP, Context
 from mcp import ClientSession
@@ -499,6 +498,16 @@ class McpToolsClient(CodeModeUtcpClient):
                         result = future.result()
 
                     logger.info(f"Tool call {tool_name_ref} completed")
+
+                    # Auto-parse JSON strings into dicts/lists so user code
+                    # can do direct field access (e.g. order['status'])
+                    # without needing json.loads()
+                    if isinstance(result, str) and result and result[0] in '{[':
+                        try:
+                            result = json.loads(result)
+                        except (json.JSONDecodeError, ValueError):
+                            pass  # Return raw string if not valid JSON
+
                     return result
                 except RuntimeError:
                     # Already a clean error from call_tool — pass through as-is
@@ -690,7 +699,8 @@ def _generate_dynamic_description(
     return_types = parsed["return_types"]
     short_descriptions = parsed["short_descriptions"]
     param_descriptions = parsed["param_descriptions"]
-    semantic_types = (tool_metadata or {}).get("semantic_types", {})
+    long_descriptions = (tool_metadata or {}).get("long_descriptions", {})
+    param_display_names = (tool_metadata or {}).get("param_display_names", {})
 
     # Filter out internal/meta tools that shouldn't be exposed to the agent
     internal_tools = {
@@ -729,51 +739,42 @@ def _generate_dynamic_description(
         if name in internal_tools:
             continue
 
-        # Get parameters from schema (just the names)
+        # Get parameters from schema, applying display name overrides
         params = []
         schema = info.get("parameters", {})
         properties = schema.get("properties", {})
+        tool_name_overrides = param_display_names.get(name, {})
         for param_name in properties:
             if param_name == "session_id":
                 continue  # Hide internal session parameter from LLM
-            params.append(param_name)
+            display_name = tool_name_overrides.get(param_name, param_name)
+            params.append(display_name)
         params_str = ', '.join(params)
 
-        # Get return type
-        ret_type = return_types.get(name, "str")
-        semantic_type = semantic_types.get(name, "")
+        # Get return type (used directly as display type)
+        ret_type = return_types.get(name, "string")
 
         # Get short description (for the signature line)
         short_desc = short_descriptions.get(name, "")
 
         # Format: - actions.name(params) -> Type: First sentence
-        if semantic_type:
-            lines.append(
-                f"- actions.{name}({params_str}) -> {ret_type} (semantic: {semantic_type}): {short_desc}"
-            )
-        else:
-            lines.append(f"- actions.{name}({params_str}) -> {ret_type}: {short_desc}")
+        lines.append(f"- actions.{name}({params_str}) -> {ret_type}: {short_desc}")
 
-        # Append parameter descriptions if available (POC format)
+        # Append parameter descriptions if available
         for param_name, p_desc in param_descriptions.get(name, {}).items():
             lines.append(f"    {param_name}: {p_desc}")
 
-        # Include the FULL description body (everything after the first line)
-        # This preserves Args, Returns, Usage sections exactly as written
-        full_desc = info.get("description", "")
-        if full_desc:
-            desc_lines = full_desc.strip().splitlines()
-            remaining = desc_lines[1:]  # Skip first line (already in signature)
-            if remaining:
-                # Find minimum indentation of non-empty lines to preserve structure
-                non_empty = [l for l in remaining if l.strip()]
-                if non_empty:
-                    min_indent = min(len(l) - len(l.lstrip()) for l in non_empty)
-                    for dline in remaining:
-                        if dline.strip():
-                            # Preserve relative indentation, add 4-space base indent
-                            lines.append(f"    {dline[min_indent:]}")
-                        # Skip blank lines to keep output compact
+        # Append long description if available (guidance notes like
+        # "Ask the customer for confirmation before cancelling.")
+        long_desc = long_descriptions.get(name, "")
+        if long_desc:
+            desc_lines = long_desc.strip().splitlines()
+            non_empty = [l for l in desc_lines if l.strip()]
+            if non_empty:
+                min_indent = min(len(l) - len(l.lstrip()) for l in non_empty)
+                for dline in desc_lines:
+                    if dline.strip():
+                        lines.append(f"    {dline[min_indent:]}")
 
     # Add DATA MODEL REFERENCE section
     # If tool_metadata provides data_model_defs, use them
@@ -1015,58 +1016,36 @@ EXECUTE_PYTHON_BASE_DESCRIPTION = """Executes Python code in a state-less sandbo
 
 PRINCIPLES FOR SUCCESSFUL TOOL USE:
 
-1. STATELESS EXECUTION (CRITICAL):
-   This environment does NOT preserve variables between turns.
-   If you defined `my_var = "123"` in the previous turn, it is GONE.
-   You MUST redefine all variables or use string literals in every single block.
+1. BATCH EVERYTHING (CRITICAL):
+   Put ALL actions you can perform right now into ONE script.
+   If a user has 5 orders, fetch ALL 5 in ONE call with a loop.
+   If you need user + orders + products, get ALL in ONE call.
+   Each separate execute_python call wastes a turn. Minimize total calls.
 
-2. GROUND TRUTH ONLY (NO GUESSING):
-   You must NEVER guess parameters like emails, IDs, or names.
-   Even if the pattern seems obvious, IT WILL BE WRONG.
-   ALWAYS ask the user for information if it is missing.
+2. STATELESS: Variables do NOT persist between calls.
 
-3. PRINT EVERYTHING:
-   This tool only returns what you explicitly `print()`.
-   Assign results to variables and print them immediately.
-   Without prints retrieved information will not be visible to the model.
+3. NO GUESSING: NEVER guess emails, IDs, or names. Ask the user if missing.
 
-4. INPUT BAN (HIGHEST PRIORITY):
-    - Never use `input()`.
-    - Never reference placeholder variables such as `input`, `Input`, `user_input`.
-    - If a value is missing, ask the user in a normal assistant message.
+4. PRINT DATA: print() is the ONLY way to see output. Use bare print(x).
 
-5. LOOKUP FAILURE STOP RULE:
-    - If user/order/product/payment lookup fails, do NOT continue with write actions.
-    - Try one alternative lookup strategy.
-    - If still unresolved, ask the user for corrected identifying information.
+5. NO input(): Never use input() or reference input/Input/user_input.
 
-6. TYPE-SAFE ACCESS RULE:
-    - Before field access/iteration on important values, print type and value:
-      `print(type(x), x)`.
-    - If value is a JSON string, parse once with `json.loads`.
-    - If value is already dict/list/object, do NOT parse again.
+6. DIRECT DICT ACCESS: All actions.* return dicts. No json.loads().
 
-EXAMPLE:
+7. MINIMAL CODE: Zero comments. Short var names. No f-string labels.
+
+EXAMPLE — auth + user + ALL orders in one call:
 ```python
-import json
-result = actions.some_method("arg")
-print(result)
+uid = actions.find_user_id_by_name_zip("First", "Last", "12345")
+u = actions.get_user_details(uid)
+print(u)
+for oid in u['orders']:
+    print(actions.get_order_details(oid))
 ```
-
-SAFE EXECUTION TEMPLATE:
-```python
-import json
-raw = actions.some_method("arg")
-data = json.loads(raw) if isinstance(raw, str) and raw[:1] in '{[' else raw
-print(type(data), data)
-```
-
-IMPORTANT: Read each tool's description carefully to understand its return type.
-Some tools return JSON strings that must be parsed with `json.loads()` before accessing fields.
 
 API REFERENCE:
 The `actions` object is pre-loaded with these methods:
-        """
+"""
 
 EXECUTE_PYTHON_BASE_DESCRIPTION_MONTY = """Executes Python code in a state-less sandbox environment.
 
@@ -1187,7 +1166,7 @@ def _build_execute_python_description() -> str:
         if _execution_engine == "monty"
         else EXECUTE_PYTHON_BASE_DESCRIPTION
     )
-    return base + "\n\n" + actions_desc
+    return base + "\n" + actions_desc
 
 
 def _upsert_execute_python_tool(reason: str = "") -> None:
@@ -1214,6 +1193,20 @@ def _upsert_execute_python_tool(reason: str = "") -> None:
         description=new_desc,
         exclude_args=["ctx"],
     )(execute_python)
+
+    # Inject Pydantic-style title fields into the schema to match tau2-bench
+    # exactly. tau2 uses Pydantic openai_schema which adds "title" fields;
+    # FastMCP strips them by default.
+    try:
+        tool_obj = mcp._tool_manager._tools.get("execute_python")
+        if tool_obj and hasattr(tool_obj, "parameters"):
+            tool_obj.parameters.setdefault("title", "parameters")
+            code_prop = tool_obj.parameters.get("properties", {}).get("code")
+            if code_prop is not None:
+                code_prop.setdefault("title", "Code")
+    except Exception:
+        pass  # Non-critical — only affects template title tags
+
     _current_execute_python_description = new_desc
     logger.info(
         "Registered/updated execute_python tool description (%s, %d chars)",
@@ -1349,17 +1342,7 @@ def get_session_id_from_flowise(sessionId: str = "", chatId: str = "", ctx: Cont
     return json.dumps(payload)
 
 def execute_python(
-    code: Annotated[
-        str,
-        Field(
-            description=(
-                "Python code to execute. Call tools via actions.method_name(...), "
-                "print outputs you need, and do not use input()."
-            ),
-            min_length=1,
-            max_length=20000,
-        ),
-    ],
+    code: str = "",
     ctx: Optional[Context] = None,
 ) -> str:
     """Execute Python code with access to tools via the actions object."""
