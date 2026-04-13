@@ -94,6 +94,35 @@
         client-secret: "{{ finetune_keycloak_backend_client_secret }}"
   run_once: true
 
+- name: Create MinIO Credentials Secret (required by data-prep-backend and celery-worker helm chart secretEnv)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: minio-credentials
+        namespace: "{{ dataprep_namespace }}"
+      type: Opaque
+      stringData:
+        access-key: "{{ finetune_minio_access_key }}"
+        secret-key: "{{ finetune_minio_secret_key }}"
+  run_once: true
+
+- name: Create PostgreSQL Credentials Secret (required by data-prep-backend and celery-worker helm chart secretEnv)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: postgres-credentials
+        namespace: "{{ dataprep_namespace }}"
+      type: Opaque
+      stringData:
+        password: "{{ dataprep_postgres_password }}"
+  run_once: true
+
 - name: Create Data Prep ConfigMap
   kubernetes.core.k8s:
     state: present

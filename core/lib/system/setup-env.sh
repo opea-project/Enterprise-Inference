@@ -129,7 +129,7 @@ setup_initial_env() {
     fi
 
     if [ "$purge_inference_cluster" != "purging" ]; then        
-        if [[ "$deploy_llm_models" == "yes" || "$deploy_keycloak_apisix" == "yes" || "$deploy_genai_gateway" == "yes" || "$deploy_observability" == "yes" || "$deploy_logging" == "yes" || "$deploy_ceph" == "yes" || "$deploy_istio" == "yes" ]]; then
+        if [[ "$deploy_llm_models" == "yes" || "$deploy_keycloak_apisix" == "yes" || "$deploy_genai_gateway" == "yes" || "$deploy_observability" == "yes" || "$deploy_logging" == "yes" || "$deploy_ceph" == "yes" || "$deploy_istio" == "yes" || "$deploy_finetune_plugin" == "yes" ]]; then
             if [ ! -s "$HOMEDIR/inventory/metadata/vault.yml" ]; then                
                 echo -e "${YELLOW}----------------------------------------------------------------------------${NC}"
                 echo -e "${YELLOW}|  NOTICE: inventory/metadata/vault.yml is empty!                           |${NC}"

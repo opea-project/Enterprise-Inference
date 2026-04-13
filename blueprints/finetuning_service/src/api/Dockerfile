@@ -2,6 +2,14 @@
 # Stage 1: Builder - compile dependencies
 FROM python:3.11-slim as builder
 
+# Proxy build args (set only when behind a proxy; passed via --opt=build-arg at build time)
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+ENV http_proxy=${http_proxy} \
+    https_proxy=${https_proxy} \
+    no_proxy=${no_proxy}
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -12,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Set build working directory before any relative COPY (DL3045)
+WORKDIR /build
 
 # Copy and install Python dependencies
 COPY requirements.txt .
@@ -62,3 +73,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Run application with production settings
 # Prefer 1 worker per pod; scale horizontally in Kubernetes.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+

@@ -3,7 +3,7 @@
 Copyright (C) 2024-2025 Intel Corporation
 SPDX-License-Identifier: Apache-2.0
 
-Reference fine-tuning solution for Intel® AI for Enterprise Inference that deploys a complete LLM fine-tuning stack alongside the existing inference cluster.
+This is reference/blueprint fine-tuning solution for Intel® AI for Enterprise Inference that deploys a complete LLM fine-tuning stack alongside the existing inference cluster.
 
 ## What Gets Deployed
 
@@ -17,7 +17,7 @@ Reference fine-tuning solution for Intel® AI for Enterprise Inference that depl
 | Redis (x2) | `dataprep`, `finetuning-api` | Caching and task queuing |
 | MinIO | `dataprep` | Shared object storage for training files |
 
-> **Note — Nvidia GPU Training Engine (Unsloth):** The actual GPU fine-tuning workload runs on a **separate Nvidia GPU machine**, not on the Enterprise Inference cluster. To deploy the Nvidia/Unsloth fine-tuning engine on that machine, follow the instructions in [src/finetuning-engine/README.md](src/finetuning-engine/README.md). Once it is running, set its URL as `finetune_training_backend_url` in `core/inventory/finetune-config.cfg` before deploying this service.
+> **Note — Nvidia GPU Training Engine (Unsloth):** The actual GPU fine-tuning workload runs on a **separate Nvidia GPU machine**, not on the Enterprise Inference cluster. To deploy the Nvidia/Unsloth fine-tuning engine on that machine, follow the instructions in [src/finetuning-engine/README.md](src/finetuning-engine/README.md). Once it is running, set its URL and Keycloak credentials in `blueprints/finetuning_service/finetune-config.cfg` before deploying this service.
 
 ## Directory Structure
 
@@ -54,7 +54,14 @@ Edit `core/inventory/inference-config.cfg`:
 
 ```properties
 deploy_finetune_plugin=on
-finetune_training_backend_url=https://your-nvidia-gpu-server:8443
+```
+
+**`blueprints/finetuning_service/finetune-config.cfg`** — set the Nvidia backend URL and Keycloak credentials:
+```properties
+nvidia_finetune_backend_url: https://your-nvidia-gpu-server:8443
+nvidia_keycloak_token_url: https://your-keycloak-server/realms/finetuning/protocol/openid-connect/token
+nvidia_keycloak_client_id: finetuning-api
+nvidia_keycloak_client_secret: <client-secret-from-nvidia-keycloak>
 ```
 
 ### Step 3: Generate Secrets
@@ -78,16 +85,36 @@ Choose option **1** (Fresh Install) or **3** (Update Cluster).
 After successful deployment:
 
 - **UI**: `https://<cluster-url>/enterprise-ai/ui`
-- **API docs**: `https://<cluster-url>/enterprise-ai/training/api/docs`
+- **API docs**: `https://<cluster-url>/enterprise-ai/api/docs`
 - **Data Prep docs**: `https://<cluster-url>/enterprise-ai/dataprep/docs`
 
 ## Configuration
 
-### Required Settings (`core/inventory/inference-config.cfg`)
+Two configuration files must be set before deployment.
+
+### 1. Enable the plugin (`core/inventory/inference-config.cfg`)
 
 ```properties
+# Enable the fine-tuning service
 deploy_finetune_plugin=on
-finetune_training_backend_url=https://your-nvidia-gpu-server:8443
+```
+
+### 2. Nvidia backend & Keycloak settings (`blueprints/finetuning_service/finetune-config.cfg`)
+
+```properties
+# URL of the Nvidia/Unsloth fine-tuning engine (deployed separately on a GPU machine)
+nvidia_finetune_backend_url: https://your-nvidia-gpu-server:8443
+
+# Keycloak token endpoint on the Nvidia machine's Keycloak
+# Format: https://<keycloak-host>/realms/<realm>/protocol/openid-connect/token
+nvidia_keycloak_token_url: https://your-keycloak-server/realms/finetuning/protocol/openid-connect/token
+
+# OAuth2 client credentials used by the Fine-Tuning API to authenticate with the Nvidia backend
+nvidia_keycloak_client_id: finetuning-api
+nvidia_keycloak_client_secret: <client-secret-from-nvidia-keycloak>
+
+# Set to false only in development with self-signed certificates
+nvidia_keycloak_verify_ssl: true
 ```
 
 ### Advanced Settings (`blueprints/finetuning_service/vars/finetune-plugin-vars.yml`)

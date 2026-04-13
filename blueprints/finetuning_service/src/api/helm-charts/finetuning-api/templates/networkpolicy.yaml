@@ -20,7 +20,7 @@ spec:
     {{- range .Values.networkPolicy.ingress.fromNamespaces }}
     - namespaceSelector:
         matchLabels:
-          name: {{ . }}
+          kubernetes.io/metadata.name: {{ . }}
     {{- end }}
     {{- end }}
     {{- if .Values.networkPolicy.ingress.fromPodLabels }}

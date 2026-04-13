@@ -7,10 +7,13 @@ image:
   pullPolicy: IfNotPresent
 
 # MinIO credentials
+# REQUIRED: supply at deploy-time via --set or a Kubernetes Secret (never commit real values here)
+# kubectl create secret generic minio-credentials \
+#   --from-literal=root-user=<user> --from-literal=root-password=<password> -n dataprep
 auth:
-  rootUser: admin
-  rootPassword: minio123
-  # For production, use a Secret instead
+  existingSecret: ""  # set to a pre-existing secret name to skip auto-creation
+  rootUser: ""  # used when existingSecret is empty; supply via --set at deploy-time
+  rootPassword: ""  # used when existingSecret is empty; supply via --set at deploy-time
 
 service:
   type: ClusterIP

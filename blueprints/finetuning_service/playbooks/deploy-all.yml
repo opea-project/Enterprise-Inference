@@ -3,12 +3,12 @@
 ---
 ###########################################################################
 # Fine-Tuning Plugin - Main Orchestration Playbook
-#
+# 
 # This is a wrapper playbook that orchestrates the deployment of all
 # Fine-Tuning components. Components can also be deployed independently
 # using their respective playbooks:
 #   - deploy-dataprep.yml
-#   - deploy-finetuning-api.yml
+#   - deploy-finetuning-api.yml  
 #   - deploy-ui.yml
 ###########################################################################
 
@@ -178,6 +178,30 @@
     ###########################################################################
     # Build Images
     ###########################################################################
+    # Configure local registry and build images
+    ###########################################################################
+    - name: Ensure containerd certs.d directory exists for local registry
+      ansible.builtin.file:
+        path: /etc/containerd/certs.d/registry.kube-system.svc.cluster.local:5000
+        state: directory
+        mode: '0755'
+      become: true
+      run_once: true
+
+    - name: Configure containerd insecure registry for local image pull
+      ansible.builtin.copy:
+        dest: /etc/containerd/certs.d/registry.kube-system.svc.cluster.local:5000/hosts.toml
+        content: |
+          server = "http://registry.kube-system.svc.cluster.local:5000"
+          [host."http://registry.kube-system.svc.cluster.local:5000"]
+            capabilities = ["pull", "resolve", "push"]
+            skip_verify = true
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
+      run_once: true
+
     - name: Build Container Images
       include_tasks: build-images.yml
       run_once: true

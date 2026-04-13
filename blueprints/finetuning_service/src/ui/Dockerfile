@@ -1,8 +1,22 @@
 # Use the official Node.js image as base
 FROM node:20-alpine AS base
 
+# Proxy build args (set only when behind a proxy; passed via --opt=build-arg at build time)
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+ENV http_proxy=${http_proxy} \
+    https_proxy=${https_proxy} \
+    no_proxy=${no_proxy}
+
 # Build stage
 FROM base AS builder
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+ENV http_proxy=${http_proxy} \
+    https_proxy=${https_proxy} \
+    no_proxy=${no_proxy}
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -40,14 +54,13 @@ ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN mkdir .next && chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

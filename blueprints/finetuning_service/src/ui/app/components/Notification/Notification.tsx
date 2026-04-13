@@ -8,6 +8,7 @@ type NotificationType = IconType;
 
 interface NotificationConfig extends Partial<Omit<ArgsProps, 'type'>> {
   message: ReactNode;
+  title?: ReactNode;
   type?: NotificationType;
 }
 
@@ -21,9 +22,10 @@ export const useNotification = () => {
 const createNotificationMethods = (notificationApi: NotificationInstance) => ({
   // Success notification
   success: (config: NotificationConfig) => {
-    const { message, ...rest } = config;
+    const { message, title, ...rest } = config;
     notificationApi.success({
       message,
+      title: title ?? message,
       placement: 'topRight',
       duration: 4.5,
       ...rest,
@@ -32,9 +34,10 @@ const createNotificationMethods = (notificationApi: NotificationInstance) => ({
 
   // Info notification
   info: (config: NotificationConfig) => {
-    const { message, ...rest } = config;
+    const { message, title, ...rest } = config;
     notificationApi.info({
       message,
+      title: title ?? message,
       placement: 'topRight',
       duration: 4.5,
       ...rest,
@@ -43,9 +46,10 @@ const createNotificationMethods = (notificationApi: NotificationInstance) => ({
 
   // Warning notification
   warning: (config: NotificationConfig) => {
-    const { message, ...rest } = config;
+    const { message, title, ...rest } = config;
     notificationApi.warning({
       message,
+      title: title ?? message,
       placement: 'topRight',
       duration: 4.5,
       ...rest,
@@ -54,9 +58,10 @@ const createNotificationMethods = (notificationApi: NotificationInstance) => ({
 
   // Error notification
   error: (config: NotificationConfig) => {
-    const { message, ...rest } = config;
+    const { message, title, ...rest } = config;
     notificationApi.error({
       message,
+      title: title ?? message,
       placement: 'topRight',
       duration: 0, // Don't auto close error notifications
       ...rest,
@@ -65,9 +70,10 @@ const createNotificationMethods = (notificationApi: NotificationInstance) => ({
 
   // Generic notification
   open: (config: NotificationConfig & { type: NotificationType }) => {
-    const { type, message, ...rest } = config;
+    const { type, message, title, ...rest } = config;
     notificationApi[type]({
       message,
+      title: title ?? message,
       placement: 'topRight',
       duration: type === 'error' ? 0 : 4.5,
       ...rest,
