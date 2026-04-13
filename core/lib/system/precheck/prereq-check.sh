@@ -259,37 +259,82 @@ run_system_prerequisites_check() {
                 
                 # Install pip using system package manager if needed
                 if [ "$pip_needed" = true ]; then
-                    echo "Installing pip using system package manager..."
-                    if command -v dnf &> /dev/null; then
-                        python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-                        if [[ "$python_version" == "3.11" ]]; then
-                            echo "Installing python3.11-pip using dnf (RHEL 9)..."
-                            if ! sudo dnf install -y python3.11-pip; then
-                                echo -e "${RED}Failed to install python3.11-pip using dnf${NC}"
-                                exit 1
+                    if [[ "$airgap_enabled" == "yes" ]]; then
+                        echo "Installing pip in airgap mode using pip wheel from JFrog..."
+                        local pip_whl_url="${jfrog_url}/ei-generic-binaries/pip.whl"
+                        local tmp_pip_whl="/tmp/pip.whl"
+                        if curl -f -s -u "${jfrog_username}:${jfrog_password}" \
+                                -o "$tmp_pip_whl" "$pip_whl_url" 2>/dev/null; then
+                            # Wheel filenames must follow {name}-{version}-{pytag}-{abitag}-{platform}.whl
+                            # The file is stored in JFrog as "pip.whl" (generic name) — rename it
+                            # using the version and tag from the WHEEL metadata inside the zip.
+                            proper_name=$($python3_interpreter -c "
+import zipfile, sys
+try:
+    z = zipfile.ZipFile('$tmp_pip_whl')
+    wf = next(x for x in z.namelist() if x.endswith('.dist-info/WHEEL'))
+    base = wf.split('/')[0].replace('.dist-info', '')
+    meta = {}
+    for line in z.read(wf).decode().splitlines():
+        if ': ' in line:
+            k, v = line.split(': ', 1)
+            meta[k] = v
+    tag = meta.get('Tag', 'py3-none-any')
+    print(f'{base}-{tag}.whl')
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null)
+                            if [ -n "$proper_name" ]; then
+                                mv "$tmp_pip_whl" "/tmp/$proper_name"
+                                tmp_pip_whl="/tmp/$proper_name"
                             fi
-                        elif [[ "$python_version" == "3.12" ]]; then
-                            echo "Installing python3.12-pip using dnf (RHEL 9)..."
-                            if ! sudo dnf install -y python3.12-pip; then
-                                echo -e "${RED}Failed to install python3.12-pip using dnf${NC}"
+                            if sudo PYTHONPATH="$tmp_pip_whl" $python3_interpreter -m pip install \
+                                    --no-index "$tmp_pip_whl"; then
+                                echo -e "${GREEN}pip installed from JFrog${NC}"
+                            else
+                                echo -e "${RED}Failed to install pip from wheel${NC}"
                                 exit 1
                             fi
                         else
-                            echo "Installing python3-pip using dnf (RHEL 9)..."
-                            if ! sudo dnf install -y python3-pip; then
-                                echo -e "${RED}Failed to install python3-pip using dnf${NC}"
-                                exit 1
-                            fi
-                        fi
-                    elif command -v apt &> /dev/null; then
-                        echo "Installing python3-pip using apt (Ubuntu 22/24)..."
-                        if ! sudo apt install -y python3-pip; then
-                            echo -e "${RED}Failed to install python3-pip using apt${NC}"
+                            echo -e "${RED}Failed to download pip wheel from JFrog at ${pip_whl_url}${NC}"
+                            echo -e "${YELLOW}Please upload pip wheel to JFrog ei-generic-binaries:${NC}"
+                            echo -e "${YELLOW}  pip download pip --no-deps -d /tmp/pip-dl/${NC}"
+                            echo -e "${YELLOW}  curl -u admin:password -T /tmp/pip-dl/pip-*.whl ${jfrog_url}/ei-generic-binaries/pip.whl${NC}"
                             exit 1
                         fi
                     else
-                        echo -e "${RED}Unsupported system. This deployment only supports Ubuntu 22/24 and RHEL 9.4${NC}"
-                        exit 1
+                        echo "Installing pip using system package manager..."
+                        if command -v dnf &> /dev/null; then
+                            python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+                            if [[ "$python_version" == "3.11" ]]; then
+                                echo "Installing python3.11-pip using dnf (RHEL 9)..."
+                                if ! sudo dnf install -y python3.11-pip; then
+                                    echo -e "${RED}Failed to install python3.11-pip using dnf${NC}"
+                                    exit 1
+                                fi
+                            elif [[ "$python_version" == "3.12" ]]; then
+                                echo "Installing python3.12-pip using dnf (RHEL 9)..."
+                                if ! sudo dnf install -y python3.12-pip; then
+                                    echo -e "${RED}Failed to install python3.12-pip using dnf${NC}"
+                                    exit 1
+                                fi
+                            else
+                                echo "Installing python3-pip using dnf (RHEL 9)..."
+                                if ! sudo dnf install -y python3-pip; then
+                                    echo -e "${RED}Failed to install python3-pip using dnf${NC}"
+                                    exit 1
+                                fi
+                            fi
+                        elif command -v apt &> /dev/null; then
+                            echo "Installing python3-pip using apt (Ubuntu 22/24)..."
+                            if ! sudo apt install -y python3-pip; then
+                                echo -e "${RED}Failed to install python3-pip using apt${NC}"
+                                exit 1
+                            fi
+                        else
+                            echo -e "${RED}Unsupported system. This deployment only supports Ubuntu 22/24 and RHEL 9.4${NC}"
+                            exit 1
+                        fi
                     fi
                 fi
                 

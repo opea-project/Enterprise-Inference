@@ -2032,6 +2032,10 @@
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
             {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
+            {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
           register: helm_upgrade_install_model_deployment_cpu_llama8b
@@ -2137,6 +2141,10 @@
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
             {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
+            {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
           register: helm_upgrade_install_model_deployment_cpu_deepseek_qwen32b
@@ -2240,6 +2248,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2347,6 +2359,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2460,6 +2476,10 @@
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
             {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
+            {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
           register: helm_upgrade_install_model_deployment_cpu_llama3_2_3b_cpu
@@ -2566,6 +2586,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force

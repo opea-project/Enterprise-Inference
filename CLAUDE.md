@@ -35,7 +35,7 @@ PYPI
   ei-pypi-virtual        virtual  aggregates both
 
 GENERIC
-  ei-generic-binaries    local    kubectl, helm, yq, kubectx, kubens, kubespray, ansible collections
+  ei-generic-binaries    local    kubectl, helm, yq, kubectx, kubens, kubespray, ansible collections, get-pip.py, pip.whl
   ei-generic-models      local    Meta-Llama-3.1-8B-Instruct (~30 GB)
 ```
 
@@ -531,8 +531,31 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 26. ✅ Fix `ballon-policy.sh` — removed `|| [ "$cpu_or_gpu" == "c" ]` bypass bug
 27. ✅ Fix `deploy-inference-models.yml` — all 7 model install tasks now guard `--set cpu_balloon_annotation` with `{% if enable_cpu_balloons | default(false) | bool %}`
 28. ✅ K8s deployment complete — keycloak, apisix, ingress, genai-gateway all running; `vllm-llama-3-2-3b-cpu` 1/1 Running
-29. Wait for `vllm-llama-8b-cpu` to finish downloading Llama-3.1-8B-Instruct (~16GB) from HuggingFace — clear stale `.locks` if download stalls
-30. Validate LLM endpoint responds for both models
+29. ✅ Fix `vllm-llama-8b-cpu` pod stuck at 0/1 — missing `HF_HUB_OFFLINE=1` caused Hub network validation to hang in airgap; fixed by patching configmap and permanently adding `{% if airgap_enabled %}` guard to all 6 CPU model helm tasks in `deploy-inference-models.yml`
+30. ✅ Fix `prereq-check.sh` pip bootstrap in airgap — Ubuntu disables `ensurepip`; apt blocked in airgap; fixed to download `pip.whl` from JFrog `ei-generic-binaries` and install via `PYTHONPATH=<whl> python3 -m pip install --no-index <whl>`
+    - Requires `pip.whl` uploaded to JFrog: `pip download pip --no-deps -d /tmp/pip-dl/ && curl -u admin:password -T /tmp/pip-dl/pip-*.whl http://100.67.152.212:8082/artifactory/ei-generic-binaries/pip.whl`
+
+## Fresh Deployment — VM2 (100.67.153.209) — IN PROGRESS
+
+**Status**: Blocked at prereq-check.sh pip installation.
+
+**Files pending SCP to VM2** (not yet copied — do this before re-running):
+```bash
+scp core/lib/system/precheck/prereq-check.sh user@100.67.153.209:/home/user/Enterprise-Inference/core/lib/system/precheck/prereq-check.sh
+scp core/playbooks/deploy-inference-models.yml user@100.67.153.209:/home/user/Enterprise-Inference/core/playbooks/deploy-inference-models.yml
+```
+After SCP, strip CRLF on VM2:
+```bash
+sed -i 's/\r//' /home/user/Enterprise-Inference/core/lib/system/precheck/prereq-check.sh
+sed -i 's/\r//' /home/user/Enterprise-Inference/core/playbooks/deploy-inference-models.yml
+```
+
+**Pre-flight checklist before re-running deploy:**
+- [ ] Upload `pip.whl` to JFrog `ei-generic-binaries` (see step 30 above)
+- [ ] SCP + CRLF-strip both files above
+- [ ] Re-run `./inference-stack-deploy.sh --cpu-or-gpu "cpu"`
+
+31. Validate LLM endpoint responds for both models after deployment completes
 
 ## NRI Balloon Policy — Root Cause Analysis
 
@@ -611,7 +634,7 @@ A Released PV with Retain can be reused: clear its claimRef, then create a new P
 
 ## Airgap Simulation — Block Internet on VM2
 
-**VM IPs**: VM1 (JFrog) = `100.67.152.212`, VM2 = `100.67.153.208`, SSH client = `100.64.29.144`
+**VM IPs**: VM1 (JFrog) = `100.67.152.212`, VM2 = `100.67.153.209` (rebooted — was .208), SSH client = `100.64.29.144`
 
 ```bash
 # Check SSH source IP first — must be in allowed ranges or you will be locked out

@@ -64,17 +64,62 @@ setup_initial_env() {
     VENVDIR="$KUBESPRAYDIR/venv"
     REMOTEDIR="/tmp/helm-charts"    
     if [ ! -d "$VENVDIR" ]; then                
-        echo "Installing python3-venv package..."
-        if command -v apt &> /dev/null; then            
-            python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")            
-            sudo apt install -y python${python_version}-venv || sudo apt install -y python3-venv        
+        if [[ "$airgap_enabled" != "yes" ]]; then
+            echo "Installing python3-venv package..."
+            if command -v apt &> /dev/null; then
+                python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+                sudo apt install -y python${python_version}-venv || sudo apt install -y python3-venv
+            fi
         fi                
-        if $python3_interpreter -m venv $VENVDIR; then
-            echo "Virtual environment created within Kubespray directory."
+        if [[ "$airgap_enabled" == "yes" ]]; then
+            # In airgap mode ensurepip is unavailable (python3-pip-whl not installed).
+            # Create the venv without pip, then bootstrap pip from the JFrog wheel.
+            if ! $python3_interpreter -m venv --without-pip $VENVDIR; then
+                echo -e "${RED}Failed to create virtual environment.${NC}"
+                exit 1
+            fi
+            echo "Virtual environment created (without-pip). Bootstrapping pip from JFrog..."
+            local pip_whl_url="${jfrog_url}/ei-generic-binaries/pip.whl"
+            local tmp_pip_whl="/tmp/pip-bootstrap.whl"
+            if ! curl -f -s -u "${jfrog_username}:${jfrog_password}" \
+                    -o "$tmp_pip_whl" "$pip_whl_url" 2>/dev/null; then
+                echo -e "${RED}Failed to download pip wheel from JFrog at ${pip_whl_url}${NC}"
+                exit 1
+            fi
+            # Rename to proper wheel filename using metadata inside the zip
+            proper_name=$($python3_interpreter -c "
+import zipfile, sys
+try:
+    z = zipfile.ZipFile('$tmp_pip_whl')
+    wf = next(x for x in z.namelist() if x.endswith('.dist-info/WHEEL'))
+    base = wf.split('/')[0].replace('.dist-info', '')
+    meta = {}
+    for line in z.read(wf).decode().splitlines():
+        if ': ' in line:
+            k, v = line.split(': ', 1)
+            meta[k] = v
+    tag = meta.get('Tag', 'py3-none-any')
+    print(f'{base}-{tag}.whl')
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null)
+            if [ -n "$proper_name" ]; then
+                mv "$tmp_pip_whl" "/tmp/$proper_name"
+                tmp_pip_whl="/tmp/$proper_name"
+            fi
+            if ! PYTHONPATH="$tmp_pip_whl" $VENVDIR/bin/python3 -m pip install \
+                    --no-index "$tmp_pip_whl"; then
+                echo -e "${RED}Failed to bootstrap pip inside virtual environment.${NC}"
+                exit 1
+            fi
+            echo "pip bootstrapped successfully inside virtual environment."
         else
-            echo -e "${RED}Failed to create virtual environment.${NC}"
-            exit 1
+            if ! $python3_interpreter -m venv $VENVDIR; then
+                echo -e "${RED}Failed to create virtual environment.${NC}"
+                exit 1
+            fi
         fi
+        echo "Virtual environment created within Kubespray directory."
     else
         echo "Virtual environment already exists within Kubespray directory, skipping creation."
     fi
