@@ -61,10 +61,6 @@ Create the following repositories via Admin → Repositories → Add Repository:
 
 **Create `ei-docker-local` and add to virtual repo via API** (or use JFrog UI):
 ```bash
-# Create local Docker repo
-curl -s -u admin:password -X PUT "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-local" \
-  -H "Content-Type: application/json" -d '{"rclass":"local","packageType":"docker"}'
-
 # Update virtual repo to include ei-docker-local first (so locally pushed images take precedence)
 curl -s -u admin:password -X POST "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-virtual" \
   -H "Content-Type: application/json" \
@@ -196,23 +192,6 @@ docker pull $JFROG/ei-docker-virtual/kubernetesui/metrics-scraper:v1.0.8
 docker pull $JFROG/ei-docker-virtual/openvino/model_server:latest
 ```
 
-> **Note on `bitnamicharts/*` in the JFrog catalog**: These entries (`bitnamicharts/postgresql`, `bitnamicharts/redis`, etc.) are OCI Helm chart layers stored as Docker artifacts  -  they appear automatically when `helm pull oci://...` is run. They are **not** Docker runtime images and do not need separate `docker pull` commands.
-
-> **Images not yet in JFrog** (needed for full deployment with all features on):
-> - `berriai/litellm-non_root:main-v1.75.8-stable` (ghcr.io)  -  required if `deploy_genai_gateway=on`
-> - `langfuse/langfuse:3.106.1` and `langfuse/langfuse-worker:3.106.1`  -  required if `deploy_observability=on`
-> - `bitnamilegacy/zookeeper:3.9.3-debian-12-r8`  -  required if Zookeeper enabled
-> - `bitnami/mc:2024.12.18` (MinIO client)  -  required if MinIO enabled
->
-> Pre-cache these on VM1 before enabling those features:
-> ```bash
-> docker pull $JFROG/ei-docker-virtual/ghcr.io/berriai/litellm-non_root:main-v1.75.8-stable
-> docker pull $JFROG/ei-docker-virtual/langfuse/langfuse:3.106.1
-> docker pull $JFROG/ei-docker-virtual/langfuse/langfuse-worker:3.106.1
-> docker pull $JFROG/ei-docker-virtual/bitnamilegacy/zookeeper:3.9.3-debian-12-r8
-> docker pull $JFROG/ei-docker-virtual/bitnami/mc:2024.12.18
-> ```
-
 **Images that require manual push to `ei-docker-local`** (old tags or rate-limited images unavailable via JFrog remote):
 
 ```bash
@@ -228,19 +207,6 @@ docker pull docker.io/apache/apisix-ingress-controller:1.8.0
 docker tag apache/apisix-ingress-controller:1.8.0 $JFROG/ei-docker-local/apache/apisix-ingress-controller:1.8.0
 docker push $JFROG/ei-docker-local/apache/apisix-ingress-controller:1.8.0
 ```
-
-Verify both images are present in JFrog:
-```bash
-curl -s -u admin:password http://$JFROG/artifactory/api/docker/ei-docker-virtual/v2/library/busybox/tags/list | jq .
-# Expected: {"name":"library/busybox","tags":["1.28","1.36","latest","sha256__...",...]}
-
-curl -s -u admin:password http://$JFROG/artifactory/api/docker/ei-docker-virtual/v2/apache/apisix-ingress-controller/tags/list | jq .
-# Expected: {"name":"apache/apisix-ingress-controller","tags":["1.8.0"]}
-```
-
-**Ensuring `nginx:1.25.2-alpine` is fully cached** (manifest list alone is not enough):
-
-After a tag pull, JFrog may only cache the multi-arch manifest list  -  not the amd64-specific manifest. containerd on VM2 will then fail with `manifest unknown`. Force full caching by pulling the amd64 digest explicitly:
 
 ```bash
 # Pull by tag first (caches manifest list)
@@ -315,9 +281,6 @@ curl -s -u admin:password "http://100.67.152.212:8082/artifactory/api/storage/ei
 # "/postgresql-16.7.4.tgz"
 # "/redis-21.1.3.tgz"
 # "/valkey-2.2.4.tgz"
-
-helm repo add ei-helm $JFROG_URL/ei-helm-local --force-update
-helm search repo ei-helm
 ```
 
 ### 3c  -  PyPI Packages
@@ -596,7 +559,7 @@ find ~/Enterprise-Inference -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -
 
 ## Step 6  -  Deploy Enterprise Inference
 
-### 6a  -  Configure `inference-config.cfg`
+### Configure `inference-config.cfg`
 
 ```bash
 vi ~/Enterprise-Inference/core/inventory/inference-config.cfg
@@ -638,7 +601,7 @@ jfrog_username=admin
 jfrog_password=password
 ```
 
-### 6b  -  Apply single-node inventory
+### Apply single-node inventory
 
 ```bash
 cp ~/Enterprise-Inference/docs/examples/single-node/hosts.yaml \
@@ -653,7 +616,7 @@ sed -i -E "/^[[:space:]]*master1:/,/^[[:space:]]{2}children:/ \
   ~/Enterprise-Inference/core/inventory/hosts.yaml
 ```
 
-### 6c  -  Generate SSL certificates
+### Generate SSL certificates
 
 ```bash
 mkdir -p ~/certs
@@ -666,13 +629,13 @@ openssl req -x509 -newkey rsa:4096 \
 
 These paths are referenced in `inference-config.cfg` as `cert_file` and `key_file`.
 
-### 6d  -  Add VM2 hosts entry for `api.example.com`
+### Add VM2 hosts entry for `api.example.com`
 
 ```bash
 echo "$(hostname -I | awk '{print $1}') api.example.com" | sudo tee -a /etc/hosts
 ```
 
-### 6e  -  Run the deployment
+### Run the deployment
 
 ```bash
 cd ~/Enterprise-Inference
@@ -686,7 +649,7 @@ The deployment will:
 4. Deploy ingress-nginx, Keycloak, APISIX
 5. Deploy vLLM model pods
 
-### 6f  -  Monitor deployment
+### Monitor deployment
 
 ```bash
 # Watch pods come up
@@ -708,7 +671,7 @@ vllm-llama-8b-cpu-*           1/1 Running
 
 ## Step 7  -  Test Inference
 
-### 7a  -  Generate Keycloak token
+### Generate Keycloak token
 
 The APISIX gateway is exposed on NodePort `32353` (HTTP). Keycloak admin API is accessed via port-forward:
 
@@ -719,14 +682,14 @@ cd ~/Enterprise-Inference/core
 
 ```
 
-### 7b  -  Verify models are available
+### Verify models are available
 
 ```bash
 curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/models \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-### 7c  -  Test inference (completions)
+### Test inference (completions)
 
 ```bash
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions\
