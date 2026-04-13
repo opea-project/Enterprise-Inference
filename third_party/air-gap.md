@@ -51,8 +51,8 @@ Create the following repositories via Admin → Repositories → Add Repository:
 
 | Name | Type | Remote URL | Notes |
 |---|---|---|---|
-| `ei-docker` | Local | — | Manually pushed images |
-| `ei-docker-dockerhub` | Remote | `https://registry-1.docker.io` | Bitnami, Langfuse, etcd |
+| `ei-docker-local` | Local | — | Manually pushed images (old tags, rate-limited, not in any remote) |
+| `ei-docker-dockerhub` | Remote | `https://registry-1.docker.io` | Bitnami, Langfuse, etcd, nginx |
 | `ei-docker-ecr` | Remote | `https://public.ecr.aws` | vLLM CPU image |
 | `ei-docker-ghcr` | Remote | `https://ghcr.io` | TGI, TEI, LiteLLM, NRI plugins |
 | `ei-docker-k8s` | Remote | `https://registry.k8s.io` | Kubernetes components |
@@ -61,14 +61,28 @@ Create the following repositories via Admin → Repositories → Add Repository:
 
 For the virtual repo, add all remote and local repos as members.
 
+**Create `ei-docker-local` and add to virtual repo via API** (or use JFrog UI):
+```bash
+# Create local Docker repo
+curl -s -u admin:password -X PUT "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-local" \
+  -H "Content-Type: application/json" -d '{"rclass":"local","packageType":"docker"}'
+
+# Update virtual repo to include ei-docker-local first (so locally pushed images take precedence)
+curl -s -u admin:password -X POST "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-virtual" \
+  -H "Content-Type: application/json" \
+  -d '{"rclass":"virtual","packageType":"docker","repositories":["ei-docker-local","ei-docker-dockerhub","ei-docker-ecr","ei-docker-ghcr","ei-docker-k8s","ei-docker-quay"]}'
+```
+
 ### Helm Repository
 
-| Name | Type | Notes |
-|---|---|---|
-| `ei-helm-local` | Local (Generic) | Charts uploaded as HTTP tarballs |
-| `ei-helm-virtual` | Virtual | Aggregates `ei-helm-local` |
+| Name | Type | Remote URL | Notes |
+|---|---|---|---|
+| `ei-helm-local` | Local (HelmOCI) | — | Charts uploaded as HTTP tarballs |
+| `ei-helm-ingress-nginx` | Remote (HelmOCI) | `https://kubernetes.github.io/ingress-nginx` | Optional remote proxy |
+| `ei-helm-langfuse` | Remote (HelmOCI) | `https://langfuse.github.io/langfuse-k8s` | Optional remote proxy |
+| `ei-helm-virtual` | Virtual | — | Aggregates `ei-helm-local` + remotes |
 
-> **Important**: Create `ei-helm-local` as **Generic** type (not Helm/HelmOCI). Charts are uploaded via HTTP REST and `index.yaml` is manually generated.
+> **Important**: `ei-helm-local` is **HelmOCI** type in JFrog. Charts are uploaded via HTTP REST API and `index.yaml` must be manually generated and uploaded — JFrog does not auto-generate it for HelmOCI repos.
 
 ### PyPI Repository
 
@@ -78,11 +92,29 @@ For the virtual repo, add all remote and local repos as members.
 | `ei-pypi-remote` | Remote | `https://pypi.org` |
 | `ei-pypi-virtual` | Virtual | Aggregates both |
 
+### Debian Repository
+
+| Name | Type | Remote URL | Notes |
+|---|---|---|---|
+| `ei-debian-ubuntu` | Remote | `http://archive.ubuntu.com/ubuntu` | Ubuntu/Debian apt packages |
+| `ei-debian-virtual` | Virtual | — | Aggregates `ei-debian-ubuntu` |
+
+> Used by `setup-env.sh` to auto-configure `/etc/apt/sources.list` on VM2 in airgap mode. JFrog proxies the package index but **does not serve actual `.deb` files** — see Known Issues.
+
+### HuggingFace Repository
+
+| Name | Type | Notes |
+|---|---|---|
+| `ei-hf-remote` | Remote | Remote proxy → `huggingface.co` |
+| `ei-hf-virtual` | Virtual | Aggregates `ei-hf-remote` |
+
+> Used for caching HuggingFace model files if `HF_ENDPOINT` is pointed at JFrog.
+
 ### Generic Repository
 
 | Name | Type | Contents |
 |---|---|---|
-| `ei-generic-binaries` | Local | kubectl, helm, yq, kubespray, ansible collections, Kubernetes binaries |
+| `ei-generic-binaries` | Local | kubectl, helm, kubespray, ansible collections, Kubernetes binaries, pip.whl, apt-debs/ |
 | `ei-generic-models` | Local | LLM model files (~30 GB) |
 
 ---
@@ -153,24 +185,81 @@ docker pull $JFROG/ei-docker-virtual/containers/nri-plugins/nri-config-manager:v
 
 # Misc
 docker pull $JFROG/ei-docker-virtual/library/nginx:1.25.2-alpine
+docker pull $JFROG/ei-docker-virtual/library/registry:2
 docker pull $JFROG/ei-docker-virtual/bitnamilegacy/etcd:3.5.10-debian-11-r2
 docker pull $JFROG/ei-docker-virtual/ubuntu:22.04
 docker pull $JFROG/ei-docker-virtual/rancher/local-path-provisioner:v0.0.24
+
+# Kubernetes Dashboard (deploy_cluster_dashboard tag)
+docker pull $JFROG/ei-docker-virtual/kubernetesui/dashboard:v2.7.0
+docker pull $JFROG/ei-docker-virtual/kubernetesui/metrics-scraper:v1.0.8
+
+# OpenVINO Model Server (needed if deploy_openvino=on)
+docker pull $JFROG/ei-docker-virtual/openvino/model_server:latest
 ```
 
-**Images that require manual push** (old tags not available via JFrog remote):
+> **Note on `bitnamicharts/*` in the JFrog catalog**: These entries (`bitnamicharts/postgresql`, `bitnamicharts/redis`, etc.) are OCI Helm chart layers stored as Docker artifacts — they appear automatically when `helm pull oci://...` is run. They are **not** Docker runtime images and do not need separate `docker pull` commands.
+
+> **Images not yet in JFrog** (needed for full deployment with all features on):
+> - `berriai/litellm-non_root:main-v1.75.8-stable` (ghcr.io) — required if `deploy_genai_gateway=on`
+> - `langfuse/langfuse:3.106.1` and `langfuse/langfuse-worker:3.106.1` — required if `deploy_observability=on`
+> - `bitnamilegacy/zookeeper:3.9.3-debian-12-r8` — required if Zookeeper enabled
+> - `bitnami/mc:2024.12.18` (MinIO client) — required if MinIO enabled
+>
+> Pre-cache these on VM1 before enabling those features:
+> ```bash
+> docker pull $JFROG/ei-docker-virtual/ghcr.io/berriai/litellm-non_root:main-v1.75.8-stable
+> docker pull $JFROG/ei-docker-virtual/langfuse/langfuse:3.106.1
+> docker pull $JFROG/ei-docker-virtual/langfuse/langfuse-worker:3.106.1
+> docker pull $JFROG/ei-docker-virtual/bitnamilegacy/zookeeper:3.9.3-debian-12-r8
+> docker pull $JFROG/ei-docker-virtual/bitnami/mc:2024.12.18
+> ```
+
+**Images that require manual push to `ei-docker-local`** (old tags or rate-limited images unavailable via JFrog remote):
 
 ```bash
-# busybox:1.28 — Docker Hub v2 API drops very old tags
+# busybox:1.28 — Docker Hub v2 API drops manifests for very old tags; JFrog remote returns "manifest unknown"
+# Pull latest through JFrog (caches latest + 1.36), then retag as 1.28 and push to ei-docker-local
 docker pull $JFROG/ei-docker-virtual/library/busybox:latest
-docker tag <sha> $JFROG/ei-docker/library/busybox:1.28
-docker push $JFROG/ei-docker/library/busybox:1.28
+docker tag $JFROG/ei-docker-virtual/library/busybox:latest $JFROG/ei-docker-local/library/busybox:1.28
+docker push $JFROG/ei-docker-local/library/busybox:1.28
 
-# apisix-ingress-controller:1.8.0 — requires Docker Hub login
+# apisix-ingress-controller:1.8.0 — not cached in any remote; pull directly from Docker Hub
 docker login -u <dockerhub-user> -p <pat>
 docker pull docker.io/apache/apisix-ingress-controller:1.8.0
-docker tag apache/apisix-ingress-controller:1.8.0 $JFROG/ei-docker/apache/apisix-ingress-controller:1.8.0
-docker push $JFROG/ei-docker/apache/apisix-ingress-controller:1.8.0
+docker tag apache/apisix-ingress-controller:1.8.0 $JFROG/ei-docker-local/apache/apisix-ingress-controller:1.8.0
+docker push $JFROG/ei-docker-local/apache/apisix-ingress-controller:1.8.0
+```
+
+Verify both images are present in JFrog:
+```bash
+curl -s -u admin:password http://$JFROG/artifactory/api/docker/ei-docker-virtual/v2/library/busybox/tags/list | jq .
+# Expected: {"name":"library/busybox","tags":["1.28","1.36","latest","sha256__...",...]}
+
+curl -s -u admin:password http://$JFROG/artifactory/api/docker/ei-docker-virtual/v2/apache/apisix-ingress-controller/tags/list | jq .
+# Expected: {"name":"apache/apisix-ingress-controller","tags":["1.8.0"]}
+```
+
+**Ensuring `nginx:1.25.2-alpine` is fully cached** (manifest list alone is not enough):
+
+After a tag pull, JFrog may only cache the multi-arch manifest list — not the amd64-specific manifest. containerd on VM2 will then fail with `manifest unknown`. Force full caching by pulling the amd64 digest explicitly:
+
+```bash
+# Pull by tag first (caches manifest list)
+docker pull --platform linux/amd64 $JFROG/ei-docker-virtual/library/nginx:1.25.2-alpine
+
+# Pull by amd64 digest to force caching of the platform-specific manifest + layers
+docker pull $JFROG/ei-docker-virtual/library/nginx@sha256:fc2d39a0d6565db4bd6c94aa7b5efc2da67734cc97388afb5c72369a24bcfaea
+```
+
+Verify the image is properly cached (plain `curl` returns 404 even when cached — must use Docker Accept headers):
+```bash
+curl -s -u admin:password \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+  -o /dev/null -w "%{http_code}" \
+  "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
+# Must return 200
 ```
 
 ### 3b — Helm Charts
@@ -193,8 +282,9 @@ helm pull ingress-nginx/ingress-nginx --version 4.12.2
 helm pull langfuse/langfuse --version 1.5.1
 helm pull apisix/apisix --version 2.8.1
 helm pull nri-plugins/nri-resource-policy-balloons --version v0.12.2
+# Note: NRI chart downloads as nri-resource-policy-balloons-helm-chart-v0.12.2.tgz (non-standard name)
 
-# Download Keycloak chart (Bitnami OCI)
+# Download Bitnami charts (OCI from Docker Hub)
 helm pull oci://registry-1.docker.io/bitnamicharts/keycloak --version 22.1.0
 helm pull oci://registry-1.docker.io/bitnamicharts/postgresql --version 16.7.4
 helm pull oci://registry-1.docker.io/bitnamicharts/redis --version 21.1.3
@@ -212,8 +302,22 @@ helm repo index . --url $JFROG_URL/ei-helm-local
 curl -u $JFROG_CREDS -T index.yaml "$JFROG_URL/ei-helm-local/index.yaml"
 ```
 
-Verify:
+Verify all 10 charts are present:
 ```bash
+curl -s -u admin:password "http://100.67.152.212:8082/artifactory/api/storage/ei-helm-local" | jq '.children[].uri'
+# Expected (confirmed ✅):
+# "/apisix-2.8.1.tgz"
+# "/clickhouse-8.0.5.tgz"
+# "/index.yaml"
+# "/ingress-nginx-4.12.2.tgz"
+# "/keycloak-22.1.0.tgz"
+# "/langfuse-1.5.1.tgz"
+# "/minio-14.10.5.tgz"
+# "/nri-resource-policy-balloons-helm-chart-v0.12.2.tgz"
+# "/postgresql-16.7.4.tgz"
+# "/redis-21.1.3.tgz"
+# "/valkey-2.2.4.tgz"
+
 helm repo add ei-helm $JFROG_URL/ei-helm-local --force-update
 helm search repo ei-helm
 ```
@@ -221,12 +325,13 @@ helm search repo ei-helm
 ### 3c — PyPI Packages
 
 ```bash
-pip download ansible==9.8.0 ansible-core==2.16.9 \
-  jmespath==1.0.1 jsonschema==4.23.0 netaddr==1.3.0 \
-  kubernetes==31.0.0 pyyaml==6.0.2 cryptography requests \
-  oauthlib requests-oauthlib urllib3 certifi charset-normalizer \
-  idna packaging typing-extensions six python-dateutil \
-  jsonpatch jsonpointer attrs rpds-py referencing \
+pip download ansible==9.8.0 ansible-core==2.16.18 \
+  jinja2 jmespath==1.0.1 jsonschema==4.23.0 jsonschema-specifications \
+  netaddr==1.3.0 kubernetes==35.0.0 pyyaml==6.0.3 \
+  cryptography requests oauthlib requests-oauthlib urllib3 \
+  certifi charset-normalizer idna packaging typing-extensions \
+  six python-dateutil attrs rpds-py referencing resolvelib \
+  durationpy websocket-client cffi pycparser markupsafe \
   -d /tmp/wheels/
 
 # Upload each wheel to JFrog
@@ -235,23 +340,104 @@ for whl in /tmp/wheels/*.whl /tmp/wheels/*.tar.gz; do
 done
 ```
 
-### 3d — Ansible Collections
+**Confirmed packages in `ei-pypi-local`** (verified ✅):
+
+| Package | Version |
+|---|---|
+| ansible | 9.8.0 |
+| ansible-core | 2.16.18 |
+| attrs | 26.1.0 |
+| certifi | 2026.2.25 |
+| cffi | 2.0.0 |
+| charset-normalizer | 3.4.7 |
+| cryptography | 46.0.6 |
+| durationpy | 0.10 |
+| idna | 3.11 |
+| jinja2 | 3.1.6 |
+| jmespath | 1.0.1 |
+| jsonschema | 4.23.0 |
+| jsonschema-specifications | 2025.9.1 |
+| kubernetes | 35.0.0 |
+| markupsafe | 3.0.3 |
+| netaddr | 1.3.0 |
+| oauthlib | 3.3.1 |
+| packaging | 26.0 |
+| pycparser | 3.0 |
+| python-dateutil | 2.9.0.post0 |
+| pyyaml | 6.0.3 |
+| referencing | 0.37.0 |
+| requests | 2.33.1 |
+| requests-oauthlib | 2.0.0 |
+| resolvelib | 1.0.1 |
+| rpds-py | 0.30.0 |
+| six | 1.17.0 |
+| typing-extensions | 4.15.0 |
+| urllib3 | 2.6.3 |
+| websocket-client | 1.9.0 |
+
+> **Not in JFrog** (not required for current deployment scope): `jsonpatch`, `jsonpointer` — add these if Ansible k8s patch operations are needed.
+
+### 3d — pip Bootstrap Wheel
+
+Ubuntu disables `ensurepip` by default, and `python3-pip` cannot be installed via apt in airgap. The deployment bootstraps pip from a wheel downloaded from JFrog:
+
+```bash
+pip download pip --no-deps -d /tmp/pip-dl/
+curl -u $JFROG_CREDS -T /tmp/pip-dl/pip-*.whl "$JFROG_URL/ei-generic-binaries/pip.whl"
+```
+
+> JFrog stores it as `pip.whl` (generic name). The deployment script reads the version/tag from the wheel's WHEEL metadata and renames it to the proper format (e.g. `pip-26.0.1-py3-none-any.whl`) before installing.
+
+### 3e — Ansible Collections
+
+`setup-env.sh` downloads collections from JFrog using the pattern `<namespace>-<name>-latest.tar.gz`. Files **must be uploaded with the `-latest` suffix** or they will be silently skipped.
 
 ```bash
 ansible-galaxy collection download kubernetes.core:6.3.0 \
-  community.kubernetes:2.0.1 community.general:12.5.0 ansible.posix \
+  community.general:12.5.0 ansible.posix \
   -p /tmp/collections/
 
-for tarball in /tmp/collections/*.tar.gz; do
-  fname=$(basename $tarball)
-  # Rename to expected format: <namespace>-<name>-latest.tar.gz
-  curl -u $JFROG_CREDS -T "$tarball" "$JFROG_URL/ei-generic-binaries/ansible-collections/$fname"
-done
+# Upload with -latest suffix (required — setup-env.sh looks for <namespace>-<name>-latest.tar.gz)
+curl -u $JFROG_CREDS -T /tmp/collections/kubernetes-core-6.3.0.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/ansible-collections/kubernetes-core-latest.tar.gz"
+curl -u $JFROG_CREDS -T /tmp/collections/community-general-12.5.0.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/ansible-collections/community-general-latest.tar.gz"
+curl -u $JFROG_CREDS -T /tmp/collections/ansible-posix-*.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/ansible-collections/ansible-posix-latest.tar.gz"
 ```
 
-### 3e — Kubernetes Binaries (for Kubespray)
+> **Warning**: The current JFrog contents have a filename mismatch — `community-general-12.5.0.tar.gz` and `kubernetes-core-6.3.0.tar.gz` use versioned names instead of `-latest`. Only `ansible-posix-latest.tar.gz` matches the expected pattern. The others are silently skipped by `setup-env.sh` (it warns but does not fail). Re-upload with `-latest` suffix if collections are not being installed.
 
-Upload binaries to `ei-generic-binaries` preserving the original URL path structure:
+**Confirmed in `ei-generic-binaries/ansible-collections/`** (✅ verified):
+```
+ansible-posix-latest.tar.gz       ← correct name, will be installed
+community-general-12.5.0.tar.gz   ← wrong name, skipped by setup-env.sh
+community-kubernetes-2.0.1.tar.gz ← deprecated, not needed
+kubernetes-core-6.3.0.tar.gz      ← wrong name, skipped by setup-env.sh
+```
+
+### 3f — apt `.deb` Files for jq
+
+JFrog's Debian remote proxies the package index but **returns 404 for actual `.deb` file downloads**. The `inference-tools` role installs `jq` in airgap by downloading `.deb` files directly from `ei-generic-binaries`. Upload these on VM1:
+
+```bash
+# Download the required debs on VM1
+apt-get download jq libjq1 libonig5
+
+# Upload to JFrog
+curl -u $JFROG_CREDS -T jq_1.6-2.1ubuntu3.1_amd64.deb "$JFROG_URL/ei-generic-binaries/apt-debs/jq_1.6-2.1ubuntu3.1_amd64.deb"
+curl -u $JFROG_CREDS -T libjq1_1.6-2.1ubuntu3.1_amd64.deb "$JFROG_URL/ei-generic-binaries/apt-debs/libjq1_1.6-2.1ubuntu3.1_amd64.deb"
+curl -u $JFROG_CREDS -T libonig5_6.9.7.1-2build1_amd64.deb "$JFROG_URL/ei-generic-binaries/apt-debs/libonig5_6.9.7.1-2build1_amd64.deb"
+```
+
+Verify:
+```bash
+curl -s -u $JFROG_CREDS "$JFROG_URL/ei-generic-binaries/apt-debs/" | grep -o 'jq[^"]*\.deb'
+```
+
+### 3g — Kubernetes Binaries (for Kubespray)
+
+Upload binaries to `ei-generic-binaries` preserving the original URL path structure (Kubespray constructs download URLs that must match exactly):
 
 ```bash
 # Kubernetes binaries
@@ -265,8 +451,68 @@ curl -LO https://github.com/containernetworking/plugins/releases/download/v1.4.0
 curl -u $JFROG_CREDS -T cni-plugins-linux-amd64-v1.4.0.tgz \
   "$JFROG_URL/ei-generic-binaries/github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz"
 
-# containerd, runc, crictl, etcd, helm, calico — same pattern
-# See CLAUDE.md for full list of binary versions and paths
+# crictl
+curl -LO https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz
+curl -u $JFROG_CREDS -T crictl-v1.30.0-linux-amd64.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.0/crictl-v1.30.0-linux-amd64.tar.gz"
+
+# etcd
+curl -LO https://github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz
+curl -u $JFROG_CREDS -T etcd-v3.5.12-linux-amd64.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/github.com/etcd-io/etcd/releases/download/v3.5.12/etcd-v3.5.12-linux-amd64.tar.gz"
+
+# Calico binaries
+curl -LO https://github.com/projectcalico/calico/releases/download/v3.28.1/calicoctl-linux-amd64
+curl -u $JFROG_CREDS -T calicoctl-linux-amd64 \
+  "$JFROG_URL/ei-generic-binaries/github.com/projectcalico/calico/releases/download/v3.28.1/calicoctl-linux-amd64"
+curl -LO https://github.com/projectcalico/calico/archive/v3.28.1.tar.gz
+curl -u $JFROG_CREDS -T v3.28.1.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/github.com/projectcalico/calico/archive/v3.28.1.tar.gz"
+
+# containerd
+curl -LO https://github.com/containerd/containerd/releases/download/v1.7.21/containerd-1.7.21-linux-amd64.tar.gz
+curl -u $JFROG_CREDS -T containerd-1.7.21-linux-amd64.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/github.com/containerd/containerd/releases/download/v1.7.21/containerd-1.7.21-linux-amd64.tar.gz"
+
+# runc
+curl -LO https://github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
+curl -u $JFROG_CREDS -T runc.amd64 \
+  "$JFROG_URL/ei-generic-binaries/github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64"
+
+# helm tarball (for inference-tools role airgap install)
+curl -LO https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz
+curl -u $JFROG_CREDS -T helm-v3.15.4-linux-amd64.tar.gz \
+  "$JFROG_URL/ei-generic-binaries/get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz"
+```
+
+**Additional standalone binaries** (uploaded directly at root of `ei-generic-binaries`):
+```bash
+# kubectl, helm, yq, kubectx, kubens — for use on bastion/control node
+curl -u $JFROG_CREDS -T kubectl "$JFROG_URL/ei-generic-binaries/kubectl"
+curl -u $JFROG_CREDS -T helm "$JFROG_URL/ei-generic-binaries/helm"
+curl -u $JFROG_CREDS -T yq "$JFROG_URL/ei-generic-binaries/yq"
+curl -u $JFROG_CREDS -T kubectx "$JFROG_URL/ei-generic-binaries/kubectx"
+curl -u $JFROG_CREDS -T kubens "$JFROG_URL/ei-generic-binaries/kubens"
+
+# get-pip.py (alternative pip bootstrap — pip.whl is the primary method)
+curl -LO https://bootstrap.pypa.io/get-pip.py
+curl -u $JFROG_CREDS -T get-pip.py "$JFROG_URL/ei-generic-binaries/get-pip.py"
+```
+
+**Confirmed in `ei-generic-binaries/`** (✅ verified):
+```
+ansible-collections/    apt-debs/    dl.k8s.io/    get.helm.sh/    github.com/
+get-pip.py    helm    kubectl    kubectx    kubens    kubespray.tar.gz    pip.whl    yq
+```
+
+**Confirmed in `ei-generic-binaries/dl.k8s.io/release/v1.30.4/bin/linux/amd64/`** (✅ verified):
+```
+kubeadm    kubectl    kubelet
+```
+
+**Confirmed in `ei-generic-binaries/apt-debs/`** (✅ verified):
+```
+jq_1.6-2.1ubuntu3.1_amd64.deb    libjq1_1.6-2.1ubuntu3.1_amd64.deb    libonig5_6.9.7.1-2build1_amd64.deb
 ```
 
 ### 3f — LLM Model Files
@@ -577,11 +823,47 @@ Three compounding bugs caused NRI balloon policy to deploy on all CPU deployment
 
 Docker Hub v2 API drops manifests for tags like `busybox:1.28`. JFrog remote cannot fetch them.
 
-**Fix**: Pull equivalent tag, retag, push to `ei-docker` local:
+**Fix**: Pull equivalent tag, retag, push to `ei-docker-local`:
 ```bash
 docker pull 100.67.152.212:8082/ei-docker-virtual/library/busybox:latest
-docker tag <sha> 100.67.152.212:8082/ei-docker/library/busybox:1.28
-docker push 100.67.152.212:8082/ei-docker/library/busybox:1.28
+docker tag <sha> 100.67.152.212:8082/ei-docker-local/library/busybox:1.28
+docker push 100.67.152.212:8082/ei-docker-local/library/busybox:1.28
+```
+
+### JFrog Debian remote returns 404 for `.deb` file downloads
+
+**Symptom**: `apt-get install jq` (or any package) fails with 404 even though JFrog `ei-debian-ubuntu` remote is configured and `/etc/apt/sources.list` points to JFrog.
+
+**Root cause**: JFrog's Debian remote proxies the package index (`Packages.gz`, `Release`) correctly, but returns 404 when apt tries to download the actual `.deb` pool files. This is a JFrog Debian remote limitation — it requires the packages to be physically present in the repo.
+
+**Fix**: Download the required `.deb` files on an internet-connected machine and upload them to `ei-generic-binaries/apt-debs/`. The `inference-tools` role handles this automatically in airgap mode by curling `.deb` files from that path and installing via `dpkg`. See section 3f above for the specific files.
+
+### `community.kubernetes` Ansible collection not available in airgap
+
+**Symptom**: Playbook fails with `couldn't resolve module/action 'community.kubernetes.k8s'` or similar.
+
+**Root cause**: `community.kubernetes` is deprecated. It is not installed in the airgap collections (galaxy.ansible.com is unreachable). The modern replacement is `kubernetes.core` which is installed via JFrog tarball.
+
+**Fix**: All EI playbooks (`deploy-cluster-config.yml`, `deploy-ingress-controller.yml`, `deploy-keycloak-controller.yml`, `deploy-keycloak-service.yml`, `deploy-keycloak-tls-cert.yml`, `deploy-genai-gateway.yml`) have been updated to use `kubernetes.core.*` module names. If you see this error on a custom playbook, replace `community.kubernetes.` with `kubernetes.core.` throughout.
+
+### nginx image cached as manifest list only — containerd fails with `manifest unknown`
+
+**Symptom**: `docker.io/library/nginx:1.25.2-alpine` shows as cached in JFrog UI, but containerd on VM2 fails with `manifest unknown` during pull.
+
+**Root cause**: JFrog may cache only the multi-arch manifest list when you `docker pull` by tag. The amd64-specific manifest and layer blobs are not cached until explicitly requested.
+
+**Fix**: On VM1, pull by the amd64 platform digest after the tag pull:
+```bash
+docker pull --platform linux/amd64 100.67.152.212:8082/ei-docker-virtual/library/nginx:1.25.2-alpine
+docker pull 100.67.152.212:8082/ei-docker-virtual/library/nginx@sha256:fc2d39a0d6565db4bd6c94aa7b5efc2da67734cc97388afb5c72369a24bcfaea
+```
+Verify with Accept headers (plain curl returns 404 even when cached):
+```bash
+curl -s -u admin:password \
+  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+  -o /dev/null -w "%{http_code}" \
+  "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
+# Must return 200
 ```
 
 ### containerd mirror `skip_verify` breaks HTTP mirrors

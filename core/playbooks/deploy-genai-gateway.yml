@@ -29,7 +29,7 @@
             name: genai-gateway
       run_once: true
     - name: Create TLS secret for GenAI Gateway
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -208,7 +208,7 @@
       run_once: true
                    
     - name: Create TLS secret for GenAI Gateway
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1

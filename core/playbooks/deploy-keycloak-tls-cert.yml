@@ -24,7 +24,7 @@
       debug:
         var: cert_file, key_file, secret_name
     - name: Create TLS secret for Keycloak
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -38,7 +38,7 @@
             tls.key: "{{ lookup('file', key_file) | b64encode }}"
       register: kubectl_output
     - name: Create TLS secret for Keycloak in APISIX namespace
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -215,7 +215,7 @@
                         app: keycloak
                     topologyKey: "kubernetes.io/hostname"
     - name: Verify Keycloak StatefulSet readiness
-      community.kubernetes.k8s_info:
+      kubernetes.core.k8s_info:
         kind: StatefulSet
         namespace: default
         name: keycloak

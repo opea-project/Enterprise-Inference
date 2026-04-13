@@ -7,21 +7,52 @@
     state: present
   become: true
   tags: always
-- name: Install Kubernetes Python SDK
+- name: Install Kubernetes Python SDK (internet)
   ansible.builtin.pip:
     name: kubernetes
     state: present
   become: true
   ignore_errors: true
   register: pip_install_result
+  when: not airgap_enabled | default(false) | bool
   tags: always
-- name: Install Kubernetes Python SDK Fallback
+
+- name: Install Kubernetes Python SDK (airgap via JFrog)
+  ansible.builtin.pip:
+    name: kubernetes
+    state: present
+    extra_args: >-
+      --index-url http://{{ jfrog_username }}:{{ jfrog_password }}@{{ jfrog_url | regex_replace('^https?://', '') }}/api/pypi/ei-pypi-virtual/simple
+      --trusted-host {{ jfrog_url | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}
+  become: true
+  ignore_errors: true
+  register: pip_install_result
+  when: airgap_enabled | default(false) | bool
+  tags: always
+
+- name: Install Kubernetes Python SDK Fallback (internet)
   ansible.builtin.pip:
     name: kubernetes
     state: present
     extra_args: "--break-system-packages"
   become: true
-  when: pip_install_result is failed
+  when:
+    - not airgap_enabled | default(false) | bool
+    - pip_install_result is failed
+  tags: always
+
+- name: Install Kubernetes Python SDK Fallback (airgap via JFrog)
+  ansible.builtin.pip:
+    name: kubernetes
+    state: present
+    extra_args: >-
+      --break-system-packages
+      --index-url http://{{ jfrog_username }}:{{ jfrog_password }}@{{ jfrog_url | regex_replace('^https?://', '') }}/api/pypi/ei-pypi-virtual/simple
+      --trusted-host {{ jfrog_url | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}
+  become: true
+  when:
+    - airgap_enabled | default(false) | bool
+    - pip_install_result is failed
   tags: always
 - name: Deploy fix script for kubernetes SDK no_proxy bug
   ansible.builtin.copy:
@@ -86,9 +117,32 @@
   become: true
   when: airgap_enabled | default(false) | bool
   tags: always
-- name: Ensure jq is installed
+- name: Ensure jq is installed (internet)
   ansible.builtin.package:
     name: jq
     state: present
   become: true
+  when: not airgap_enabled | default(false) | bool
+  tags: always
+
+- name: Ensure jq is installed (airgap via JFrog)
+  ansible.builtin.shell: |
+    if command -v jq &>/dev/null; then exit 0; fi
+    cd /tmp
+    for pkg in libonig5 libjq1 jq; do
+      deb=$(curl -s -u {{ jfrog_username }}:{{ jfrog_password }} \
+        "{{ jfrog_url }}/ei-generic-binaries/apt-debs/" | grep -o "${pkg}[^\"]*\.deb" | head -1)
+      if [ -z "$deb" ]; then
+        echo "ERROR: could not find $pkg deb in JFrog"
+        exit 1
+      fi
+      curl -sfL -u {{ jfrog_username }}:{{ jfrog_password }} \
+        -o "/tmp/${deb}" \
+        "{{ jfrog_url }}/ei-generic-binaries/apt-debs/${deb}"
+      dpkg -i "/tmp/${deb}" || true
+    done
+  args:
+    executable: /bin/bash
+  become: true
+  when: airgap_enabled | default(false) | bool
   tags: always

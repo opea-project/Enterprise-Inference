@@ -16,12 +16,12 @@ VM1 IP: `100.67.152.212:8082` — VM2 pulls everything from JFrog instead of int
 ### JFrog Repos in Use
 ```
 DOCKER
-  ei-docker              local    fallback / manually pushed images
-  ei-docker-dockerhub    remote   → registry-1.docker.io  (Langfuse, Bitnami, etcd)
+  ei-docker-dockerhub    remote   → registry-1.docker.io  (Langfuse, Bitnami, etcd, nginx)
   ei-docker-ecr          remote   → public.ecr.aws         (vLLM CPU)
   ei-docker-ghcr         remote   → ghcr.io                (TGI, TEI, LiteLLM)
-  ei-docker-k8s          remote   → registry.k8s.io        (ingress-nginx controller) ← ADD
-  ei-docker-virtual      virtual  aggregates all remotes + local
+  ei-docker-k8s          remote   → registry.k8s.io        (ingress-nginx controller, pause, kube-*)
+  ei-docker-quay         remote   → quay.io                (calico)
+  ei-docker-virtual      virtual  aggregates all remotes (no local Docker repo — use remote repos to cache)
 
 HELM
   ei-helm-local          local    Helm charts (HTTP upload via curl, NOT helm push OCI)
@@ -160,7 +160,7 @@ requests, requests-oauthlib, resolvelib, rpds-py, six, typing-extensions, urllib
 |---|---|---|
 | `get-helm-3` script | ~~`setup-bastion.yml` line 132 curls `raw.githubusercontent.com`~~ — **FIXED**: `core/roles/inference-tools/tasks/main.yml` now has dual tasks; airgap task downloads `helm-v3.15.4-linux-amd64.tar.gz` from JFrog `ei-generic-binaries` | ✅ Fixed in code |
 | `BAAI/bge-base-en-v1.5` | Required if TEI embeddings deployed | Download from HuggingFace, upload to `ei-generic-models` |
-| apt packages (15+) | `setup-bastion.yml` runs `apt-get install` — no Debian mirror in JFrog | Add `ei-debian-ubuntu` remote + `ei-debian-virtual` in JFrog |
+| apt packages (15+) | ~~no Debian mirror in JFrog~~ — **FIXED**: `ei-debian-ubuntu` remote (→ `archive.ubuntu.com/ubuntu`) and `ei-debian-virtual` virtual created in JFrog; `setup-env.sh` auto-configures `/etc/apt/sources.list` to use JFrog in airgap mode | ✅ Fixed in code + JFrog |
 
 **When JFrog remote pull fails with "manifest unknown"** (old tags like `busybox:1.28`):
 - Docker Hub drops manifests for very old tags from v2 API — JFrog remote can't fetch them
@@ -534,28 +534,83 @@ github.com/opencontainers/runc/releases/download/v1.1.13/runc.amd64
 29. ✅ Fix `vllm-llama-8b-cpu` pod stuck at 0/1 — missing `HF_HUB_OFFLINE=1` caused Hub network validation to hang in airgap; fixed by patching configmap and permanently adding `{% if airgap_enabled %}` guard to all 6 CPU model helm tasks in `deploy-inference-models.yml`
 30. ✅ Fix `prereq-check.sh` pip bootstrap in airgap — Ubuntu disables `ensurepip`; apt blocked in airgap; fixed to download `pip.whl` from JFrog `ei-generic-binaries` and install via `PYTHONPATH=<whl> python3 -m pip install --no-index <whl>`
     - Requires `pip.whl` uploaded to JFrog: `pip download pip --no-deps -d /tmp/pip-dl/ && curl -u admin:password -T /tmp/pip-dl/pip-*.whl http://100.67.152.212:8082/artifactory/ei-generic-binaries/pip.whl`
+31. ✅ Fix `prereq-check.sh` pip.whl rename — JFrog stores wheel as `pip.whl` (generic name) but pip rejects it; fixed by reading version+tag from WHEEL metadata inside the zip and renaming to proper format (e.g. `pip-26.0.1-py3-none-any.whl`) before calling `pip install`
+32. ✅ Fix `setup-env.sh` venv creation in airgap — `python3 -m venv` fails because `python3-pip-whl` / `python3-setuptools-whl` (ensurepip deps) not installed; fixed with two changes:
+    - Skip `apt install python3-venv` when `airgap_enabled=yes` (apt has no Debian mirror in JFrog at that point)
+    - Create venv with `--without-pip`, then bootstrap pip inside venv from JFrog pip wheel using same rename logic
+33. ✅ Fix apt in airgap — Kubespray `kubernetes/preinstall` unconditionally runs `apt update` + `apt install conntrack socat ipset …`; no Debian mirror existed in JFrog → hung 18 min then failed. Fixed:
+    - Created `ei-debian-ubuntu` remote repo in JFrog → `http://archive.ubuntu.com/ubuntu`
+    - Created `ei-debian-virtual` virtual repo aggregating it
+    - `setup-env.sh` now auto-writes `/etc/apt/sources.list` to use JFrog in airgap mode (runs before Kubespray, no manual step needed):
+      ```
+      deb http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy main restricted universe multiverse
+      deb http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy-updates main restricted universe multiverse
+      deb http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy-security main restricted universe multiverse
+      ```
 
-## Fresh Deployment — VM2 (100.67.153.209) — IN PROGRESS
+34. ✅ Fix `docker.io/library/nginx:1.25.2-alpine` not cached in JFrog — root cause and fix:
+    - `ei-docker` local repo referenced in CLAUDE.md did not exist (never created)
+    - `docker pull 100.67.152.212:8082/ei-docker-virtual/library/nginx:1.25.2-alpine` said "manifest unknown" initially because only the manifest list was cached, not the amd64-specific manifest
+    - JFrog v2 API requires proper Docker Accept headers (`application/vnd.docker.distribution.manifest.v2+json`) — plain `curl` without these headers returns 404 even when image is cached
+    - Fix: pull by amd64 digest explicitly to force JFrog to cache the platform-specific manifest and layers:
+      ```bash
+      # On VM1 — get amd64 digest from manifest list, then pull by digest
+      docker pull --platform linux/amd64 100.67.152.212:8082/ei-docker-virtual/library/nginx:1.25.2-alpine
+      # Then pull amd64 digest directly (fc2d39a0... is amd64 digest for 1.25.2-alpine)
+      docker pull 100.67.152.212:8082/ei-docker-virtual/library/nginx@sha256:fc2d39a0d6565db4bd6c94aa7b5efc2da67734cc97388afb5c72369a24bcfaea
+      ```
+    - **How to verify image is properly cached** (must use Accept headers):
+      ```bash
+      curl -s -u admin:password \
+        -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+        -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+        -o /dev/null -w "%{http_code}" \
+        "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
+      # Must return 200
+      ```
+    - **No local Docker repo needed** — use `ei-docker-dockerhub` remote (already in `ei-docker-virtual`) to cache images; just ensure it is Online when pulling
+    - On VM2 before re-running deploy: `sudo crictl rmi docker.io/library/nginx:1.25.2-alpine 2>/dev/null; true && sudo ctr -n k8s.io images rm docker.io/library/nginx:1.25.2-alpine 2>/dev/null; true && sudo systemctl restart containerd`
 
-**Status**: Blocked at prereq-check.sh pip installation.
+35. ✅ Fix `inference-tools` role pip/jq installs in airgap:
+    - `Install Kubernetes Python SDK` tasks had no airgap handling — tried pypi.org (blocked); fixed with dual tasks using JFrog PyPI `--index-url`
+    - `kubernetes` package + all deps (certifi, durationpy, requests, urllib3, websocket-client, etc.) uploaded to `ei-pypi-local`
+    - `Ensure jq is installed` used `apt install` — JFrog Debian remote proxies package index but not actual `.deb` files (returns 404); fixed with airgap task that downloads `.deb` files from `ei-generic-binaries/apt-debs/` and installs via `dpkg`
+    - `jq_1.6-2.1ubuntu3.1_amd64.deb`, `libjq1_1.6-2.1ubuntu3.1_amd64.deb`, `libonig5_6.9.7.1-2build1_amd64.deb` uploaded to `ei-generic-binaries/apt-debs/`
 
-**Files pending SCP to VM2** (not yet copied — do this before re-running):
+36. ✅ Fix `community.kubernetes` → `kubernetes.core` across all active playbooks:
+    - `community.kubernetes` collection not installed in airgap (galaxy.ansible.com blocked); `kubernetes.core` is the modern equivalent and was already installed via JFrog tarball
+    - Replaced all `community.kubernetes.k8s`, `community.kubernetes.helm`, `community.kubernetes.helm_repository`, `community.kubernetes.k8s_info` with `kubernetes.core.*` equivalents in: `deploy-cluster-config.yml`, `deploy-ingress-controller.yml`, `deploy-keycloak-controller.yml`, `deploy-keycloak-service.yml`, `deploy-keycloak-tls-cert.yml`, `deploy-genai-gateway.yml`
+
+37. ✅ Fix `busybox:1.28` and `apache/apisix-ingress-controller:1.8.0` not cached in JFrog:
+    - Created `ei-docker-local` local Docker repo in JFrog; added to `ei-docker-virtual`
+    - `busybox:1.28`: very old tag, Docker Hub v2 API returns "manifest unknown" → JFrog remote can't proxy it; pulled `busybox:latest` through JFrog, tagged as `1.28`, pushed to `ei-docker-local`
+    - `apache/apisix-ingress-controller:1.8.0`: not in any JFrog remote cache; pulled directly from Docker Hub, pushed to `ei-docker-local`
+    - **Create ei-docker-local**:
+      ```bash
+      curl -s -u admin:password -X PUT "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-local" \
+        -H "Content-Type: application/json" -d '{"rclass":"local","packageType":"docker"}'
+      curl -s -u admin:password -X POST "http://100.67.152.212:8082/artifactory/api/repositories/ei-docker-virtual" \
+        -H "Content-Type: application/json" \
+        -d '{"rclass":"virtual","packageType":"docker","repositories":["ei-docker-local","ei-docker-dockerhub","ei-docker-ecr","ei-docker-ghcr","ei-docker-k8s","ei-docker-quay"]}'
+      ```
+
+## Fresh Deployment — VM2 (100.67.153.209) — ✅ COMPLETE
+
+**Status**: Fully deployed and validated. LLM endpoint responding in true airgap (internet BLOCKED).
+
+**Validated**:
 ```bash
-scp core/lib/system/precheck/prereq-check.sh user@100.67.153.209:/home/user/Enterprise-Inference/core/lib/system/precheck/prereq-check.sh
-scp core/playbooks/deploy-inference-models.yml user@100.67.153.209:/home/user/Enterprise-Inference/core/playbooks/deploy-inference-models.yml
-```
-After SCP, strip CRLF on VM2:
-```bash
-sed -i 's/\r//' /home/user/Enterprise-Inference/core/lib/system/precheck/prereq-check.sh
-sed -i 's/\r//' /home/user/Enterprise-Inference/core/playbooks/deploy-inference-models.yml
+curl -k https://api.example.com/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"model":"meta-llama/Llama-3.1-8B-Instruct","prompt":"What is Deep Learning?","max_tokens":25}'
+# Returns valid completions ✅
+curl -s --max-time 5 https://google.com && echo "OPEN" || echo "BLOCKED"
+# BLOCKED ✅ — true airgap confirmed
 ```
 
-**Pre-flight checklist before re-running deploy:**
-- [ ] Upload `pip.whl` to JFrog `ei-generic-binaries` (see step 30 above)
-- [ ] SCP + CRLF-strip both files above
-- [ ] Re-run `./inference-stack-deploy.sh --cpu-or-gpu "cpu"`
+**Why inference works without internet**: Model was downloaded to PV in a prior run. `HF_HUB_OFFLINE=1` (step 29 fix) makes vLLM load from `/data/hub/` cache without any Hub network check. PV persists across pod restarts via local-path provisioner.
 
-31. Validate LLM endpoint responds for both models after deployment completes
+38. Validate second model (`vllm-llama-3-2-3b-cpu`) endpoint if deployed
 
 ## NRI Balloon Policy — Root Cause Analysis
 

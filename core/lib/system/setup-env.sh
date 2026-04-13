@@ -15,6 +15,24 @@ setup_initial_env() {
         echo "Skipping system prerequisites check due to --skip-check argument."
     fi
         
+    # In airgap mode, configure apt to use JFrog as the Debian/Ubuntu mirror
+    # so Kubespray's apt update and apt install steps do not reach the internet.
+    if [[ "$airgap_enabled" == "yes" ]] && command -v apt &> /dev/null; then
+        echo "Configuring apt to use JFrog Artifactory as Debian mirror (airgap mode)..."
+        local jfrog_apt_base="http://${jfrog_username}:${jfrog_password}@${jfrog_url#*://}/ei-debian-virtual"
+        # Strip any trailing /artifactory double-path — jfrog_url already contains /artifactory
+        jfrog_apt_base="http://${jfrog_username}:${jfrog_password}@$(echo "${jfrog_url}" | sed 's|^https\?://||')/ei-debian-virtual"
+        sudo tee /etc/apt/sources.list > /dev/null << EOF
+deb [trusted=yes] ${jfrog_apt_base} jammy main restricted universe multiverse
+deb [trusted=yes] ${jfrog_apt_base} jammy-updates main restricted universe multiverse
+deb [trusted=yes] ${jfrog_apt_base} jammy-security main restricted universe multiverse
+EOF
+        echo -e "${GREEN}apt configured to use JFrog at ${jfrog_url}/ei-debian-virtual${NC}"
+        echo "Refreshing apt package lists from JFrog..."
+        sudo apt-get update -qq
+        echo -e "${GREEN}apt package lists updated from JFrog${NC}"
+    fi
+
     if [[ -n "$https_proxy" ]]; then
         git config --global http.proxy "$https_proxy"
         git config --global https.proxy "$https_proxy"
