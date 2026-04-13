@@ -338,42 +338,21 @@ for whl in /tmp/wheels/*.whl /tmp/wheels/*.tar.gz; do
 done
 ```
 
-**Confirmed packages in `ei-pypi-local`** (verified ):
+**Confirmed packages in `ei-pypi-local`**:
 
-| Package | Version |
-|---|---|
-| ansible | 9.8.0 |
-| ansible-core | 2.16.18 |
-| attrs | 26.1.0 |
-| certifi | 2026.2.25 |
-| cffi | 2.0.0 |
-| charset-normalizer | 3.4.7 |
-| cryptography | 46.0.6 |
-| durationpy | 0.10 |
-| idna | 3.11 |
-| jinja2 | 3.1.6 |
-| jmespath | 1.0.1 |
-| jsonschema | 4.23.0 |
-| jsonschema-specifications | 2025.9.1 |
-| kubernetes | 35.0.0 |
-| markupsafe | 3.0.3 |
-| netaddr | 1.3.0 |
-| oauthlib | 3.3.1 |
-| packaging | 26.0 |
-| pycparser | 3.0 |
-| python-dateutil | 2.9.0.post0 |
-| pyyaml | 6.0.3 |
-| referencing | 0.37.0 |
-| requests | 2.33.1 |
-| requests-oauthlib | 2.0.0 |
-| resolvelib | 1.0.1 |
-| rpds-py | 0.30.0 |
-| six | 1.17.0 |
-| typing-extensions | 4.15.0 |
-| urllib3 | 2.6.3 |
-| websocket-client | 1.9.0 |
+```
+ansible==9.8.0, ansible-core==2.16.18, attrs==26.1.0, certifi==2026.2.25,
+cffi==2.0.0, charset-normalizer==3.4.7, cryptography==46.0.6, durationpy==0.10,
+idna==3.11, jinja2==3.1.6, jmespath==1.0.1, jsonschema==4.23.0,
+jsonschema-specifications==2025.9.1, kubernetes==35.0.0, markupsafe==3.0.3,
+netaddr==1.3.0, oauthlib==3.3.1, packaging==26.0, pycparser==3.0,
+python-dateutil==2.9.0.post0, pyyaml==6.0.3, referencing==0.37.0,
+requests==2.33.1, requests-oauthlib==2.0.0, resolvelib==1.0.1,
+rpds-py==0.30.0, six==1.17.0, typing-extensions==4.15.0,
+urllib3==2.6.3, websocket-client==1.9.0
+```
 
-> **Not in JFrog** (not required for current deployment scope): `jsonpatch`, `jsonpointer`  -  add these if Ansible k8s patch operations are needed.
+> **Not in JFrog** (not required for current deployment scope): `jsonpatch`, `jsonpointer` - add these if Ansible k8s patch operations are needed.
 
 ### 3d  -  pip Bootstrap Wheel
 
@@ -600,10 +579,6 @@ curl -s --max-time 5 http://100.67.152.212:8082/artifactory/api/system/ping && e
 From a machine with access to both the repo and VM2:
 
 ```bash
-# Clone the repo
-git clone <repo-url> Enterprise-Inference
-cd Enterprise-Inference
-
 # SCP to VM2
 scp -r Enterprise-Inference user@<VM2-IP>:~/
 ```
@@ -625,6 +600,8 @@ find ~/Enterprise-Inference -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -
 
 ```bash
 vi ~/Enterprise-Inference/core/inventory/inference-config.cfg
+```
+
 ```
 cluster_url=api.example.com
 cert_file=~/certs/cert.pem
@@ -724,7 +701,6 @@ kubectl logs <vllm-pod-name> --tail=20 | grep -v "OMP tid"
 ```
 keycloak-0                    1/1 Running
 keycloak-postgresql-0         1/1 Running
-vllm-llama-3-2-3b-cpu-*       1/1 Running
 vllm-llama-8b-cpu-*           1/1 Running
 ```
 
@@ -737,22 +713,15 @@ vllm-llama-8b-cpu-*           1/1 Running
 The APISIX gateway is exposed on NodePort `32353` (HTTP). Keycloak admin API is accessed via port-forward:
 
 ```bash
-# Start port-forward to Keycloak admin API (run in background)
-kubectl port-forward svc/keycloak 8080:80 &
-
 # Source the token script
 cd ~/Enterprise-Inference/core
 . scripts/generate-token.sh
 
-echo "TOKEN=$TOKEN"
 ```
 
 ### 7b  -  Verify models are available
 
 ```bash
-curl -s http://api.example.com:32353/Llama-3.2-3B-Instruct-vllmcpu/v1/models \
-  -H "Authorization: Bearer $TOKEN" | jq .
-
 curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/models \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
@@ -760,29 +729,16 @@ curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/models \
 ### 7c  -  Test inference (completions)
 
 ```bash
-curl -s http://api.example.com:32353/Llama-3.2-3B-Instruct-vllmcpu/v1/completions \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "model": "meta-llama/Llama-3.2-3B-Instruct",
-    "prompt": "What is Deep Learning?",
-    "max_tokens": 100,
-    "temperature": 0
-  }' | jq .choices[0].text
-```
-
-```bash
-curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions\
+  -X POST\
+  -H "Content-Type: application/json"\
+  -H "Authorization: Bearer $TOKEN"\
   -d '{
     "model": "meta-llama/Llama-3.1-8B-Instruct",
     "prompt": "What is Deep Learning?",
-    "max_tokens": 100,
+    "max_tokens": 25,
     "temperature": 0
-  }' | jq .choices[0].text
+  }'
 ```
 
 ---
