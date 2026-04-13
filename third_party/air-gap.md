@@ -626,30 +626,39 @@ find ~/Enterprise-Inference -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -
 ```bash
 vi ~/Enterprise-Inference/core/inventory/inference-config.cfg
 ```
-
-Key settings for airgap:
-
-```ini
 cluster_url=api.example.com
 cert_file=~/certs/cert.pem
 key_file=~/certs/key.pem
 keycloak_client_id=my-client-id
 keycloak_admin_user=your-keycloak-admin-user
 keycloak_admin_password=changeme
-hugging_face_token=hf_...
-models=meta-llama/Llama-3.1-8B-Instruct
+hugging_face_token=hf_your_token_here
+hugging_face_token_falcon3=your_hugging_face_token
+models=
 cpu_or_gpu=cpu
+vault_pass_code=place-holder-123
+deploy_kubernetes_fresh=on
+deploy_ingress_controller=on
+deploy_keycloak_apisix=on
+deploy_genai_gateway=off
+deploy_observability=off
+deploy_llm_models=on
+deploy_ceph=off
+deploy_istio=off
+uninstall_ceph=off
+deploy_nri_balloon_policy=no
+# Agentic AI Plugin
+deploy_agenticai_plugin=off
 
-# Airgap settings  -  must be set to on
+# ---------------------------------------------------------------------------
+# Airgap Configuration
+# Set airgap_enabled=on to route all Helm repos through JFrog on VM1.
+# Set airgap_enabled=off for standard internet-connected deployments.
+# ---------------------------------------------------------------------------
 airgap_enabled=on
 jfrog_url=http://100.67.152.212:8082/artifactory
 jfrog_username=admin
 jfrog_password=password
-
-# Note: deploy_nri_balloon_policy=no does NOT reliably suppress NRI.
-# ballon-policy.sh had a bypass bug (|| cpu_or_gpu == "c") that triggered NRI
-# for all CPU deployments regardless of this variable.
-# The real fix is the code change in core/lib/xeon/ballon-policy.sh  -  see Known Issues.
 ```
 
 ### 6b  -  Apply single-node inventory
@@ -778,92 +787,4 @@ curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/completion
 
 ---
 
-## Known Issues and Fixes
-
-### vLLM pods stuck at 0/1 in airgap (HuggingFace network timeout)
-
-**Symptom**: Pod is `0/1 Running`, logs stop after OMP thread binding, no model files open.
-
-**Root cause**: `HF_HUB_OFFLINE` is not set. HuggingFace Hub library attempts network calls to `huggingface.co` to validate cached model files. In airgap these calls hang silently.
-
-**Fix**: Add to the model's ConfigMap:
-```bash
-kubectl patch configmap <model>-config --type=merge \
-  -p '{"data":{"HF_HUB_OFFLINE":"1","TRANSFORMERS_OFFLINE":"1"}}'
-kubectl rollout restart deployment <model>
-```
-
-**Permanent fix**: Add to `core/helm-charts/vllm/xeon-values.yaml` under `defaultModelConfigs.configMapValues`.
-
-### Model files not in HuggingFace Hub cache format
-
-If model files were manually downloaded (not via `snapshot_download()`), the Hub cache metadata is incomplete and vLLM cannot find the files even with `HF_HUB_OFFLINE=1`.
-
-**Proper fix**: Pre-populate PVCs using `huggingface_hub.snapshot_download()` via an init container or Ansible task before vLLM starts, pointing `HF_ENDPOINT` to JFrog `ei-generic-models`.
-
-### NRI Balloon Policy auto-enabled for CPU deployments (3 bugs)
-
-Three compounding bugs caused NRI balloon policy to deploy on all CPU deployments regardless of config:
-
-1. **`parse-user-prompts.sh`**  -  silently auto-sets `deploy_nri_balloon_policy="yes"` for any CPU deployment when the variable is unset
-2. **`core/lib/xeon/ballon-policy.sh`**  -  contained `|| [ "$cpu_or_gpu" == "c" ]` bypass that triggered NRI deployment for all CPU regardless of `deploy_nri_balloon_policy` value  -  **setting `deploy_nri_balloon_policy=no` in config never suppressed this**
-3. **`deploy-inference-models.yml`**  -  all 7 model install tasks unconditionally passed `--set cpu_balloon_annotation` to helm
-
-**Fix (code changes required)**:
-- `ballon-policy.sh`: remove the `|| [ "$cpu_or_gpu" == "c" ]` clause from the condition
-- `deploy-inference-models.yml`: guard `--set cpu_balloon_annotation` with `{% if enable_cpu_balloons | default(false) | bool %}` in all 7 model tasks
-
-### Docker Hub rate limits when pre-caching images
-
-**Fix**: `docker login -u <user> -p <pat>` before pulling; rotate PAT after use.
-
-### JFrog "manifest unknown" for very old image tags
-
-Docker Hub v2 API drops manifests for tags like `busybox:1.28`. JFrog remote cannot fetch them.
-
-**Fix**: Pull equivalent tag, retag, push to `ei-docker-local`:
-```bash
-docker pull 100.67.152.212:8082/ei-docker-virtual/library/busybox:latest
-docker tag <sha> 100.67.152.212:8082/ei-docker-local/library/busybox:1.28
-docker push 100.67.152.212:8082/ei-docker-local/library/busybox:1.28
-```
-
-### JFrog Debian remote returns 404 for `.deb` file downloads
-
-**Symptom**: `apt-get install jq` (or any package) fails with 404 even though JFrog `ei-debian-ubuntu` remote is configured and `/etc/apt/sources.list` points to JFrog.
-
-**Root cause**: JFrog's Debian remote proxies the package index (`Packages.gz`, `Release`) correctly, but returns 404 when apt tries to download the actual `.deb` pool files. This is a JFrog Debian remote limitation  -  it requires the packages to be physically present in the repo.
-
-**Fix**: Download the required `.deb` files on an internet-connected machine and upload them to `ei-generic-binaries/apt-debs/`. The `inference-tools` role handles this automatically in airgap mode by curling `.deb` files from that path and installing via `dpkg`. See section 3f above for the specific files.
-
-### `community.kubernetes` Ansible collection not available in airgap
-
-**Symptom**: Playbook fails with `couldn't resolve module/action 'community.kubernetes.k8s'` or similar.
-
-**Root cause**: `community.kubernetes` is deprecated. It is not installed in the airgap collections (galaxy.ansible.com is unreachable). The modern replacement is `kubernetes.core` which is installed via JFrog tarball.
-
-**Fix**: All EI playbooks (`deploy-cluster-config.yml`, `deploy-ingress-controller.yml`, `deploy-keycloak-controller.yml`, `deploy-keycloak-service.yml`, `deploy-keycloak-tls-cert.yml`, `deploy-genai-gateway.yml`) have been updated to use `kubernetes.core.*` module names. If you see this error on a custom playbook, replace `community.kubernetes.` with `kubernetes.core.` throughout.
-
-### nginx image cached as manifest list only  -  containerd fails with `manifest unknown`
-
-**Symptom**: `docker.io/library/nginx:1.25.2-alpine` shows as cached in JFrog UI, but containerd on VM2 fails with `manifest unknown` during pull.
-
-**Root cause**: JFrog may cache only the multi-arch manifest list when you `docker pull` by tag. The amd64-specific manifest and layer blobs are not cached until explicitly requested.
-
-**Fix**: On VM1, pull by the amd64 platform digest after the tag pull:
-```bash
-docker pull --platform linux/amd64 100.67.152.212:8082/ei-docker-virtual/library/nginx:1.25.2-alpine
-docker pull 100.67.152.212:8082/ei-docker-virtual/library/nginx@sha256:fc2d39a0d6565db4bd6c94aa7b5efc2da67734cc97388afb5c72369a24bcfaea
-```
-Verify with Accept headers (plain curl returns 404 even when cached):
-```bash
-curl -s -u admin:password \
-  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-  -o /dev/null -w "%{http_code}" \
-  "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
-# Must return 200
-```
-
-### containerd mirror `skip_verify` breaks HTTP mirrors
-
-Do NOT set `skip_verify: false` in `hosts.toml`  -  any presence of `skip_verify` triggers containerd's HTTPS-first behavior which fails for HTTP JFrog.
+For troubleshooting common failures, see [air-gap-troubleshooting.md](air-gap-troubleshooting.md).
