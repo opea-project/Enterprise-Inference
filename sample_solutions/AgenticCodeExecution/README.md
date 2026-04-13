@@ -86,7 +86,7 @@ huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct
 
 ### Option A: Enterprise Inference (Kubernetes)
 
-Deploy vLLM via the EI Helm charts. `Qwen/Qwen3-Coder-30B-A3B-Instruct` is not in the EI pre-validated model menu, but vLLM supports it natively.
+Deploy vLLM via the [Enterprise Inference](../../docs/README.md) Helm charts. `Qwen/Qwen3-Coder-30B-A3B-Instruct` is not in the EI pre-validated model menu, but vLLM supports it natively. See the [EI deployment guide](../../docs/README.md) for prerequisites and cluster setup.
 
 #### TP=1 (recommended for simplicity)
 
