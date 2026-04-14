@@ -202,7 +202,7 @@ def execute_finetuning(
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"Dataset file not found: {data_path}")
 
-        dataset = load_dataset("json", data_files=data_path, split="train")
+        dataset = load_dataset("json", data_files=data_path, split="train")  # nosec B615 - loading local file, not HF Hub dataset; revision pinning not applicable
         logger.info(f"Dataset loaded: {len(dataset)} examples")
 
         EOS_TOKEN = tokenizer.eos_token # Must add EOS_TOKEN
