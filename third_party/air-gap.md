@@ -39,7 +39,7 @@ Access the UI at `http://<VM1-IP>:8082`. Default credentials: `admin` / `passwor
 
 **Enable anonymous read access** (required so VM2 can pull without credentials for Docker mirrors):
 - Admin → Security → Settings → Enable "Allow Anonymous Access"
-- Set Read permission on `ei-docker` and `ei-docker-virtual` for anonymous users
+- Set Read permission on `ei-docker-local` and `ei-docker-virtual` for anonymous users
 
 ---
 
@@ -100,7 +100,7 @@ curl -s -u admin:password -X POST "http://100.67.152.212:8082/artifactory/api/re
 | Name | Type | Notes |
 |---|---|---|
 | `ei-hf-remote` | Remote | Remote proxy → `huggingface.co` |
-| `ei-hf-virtual` | Virtual | - | Members: `ei-hf-remote` |
+| `ei-hf-virtual` | Virtual | Members: `ei-hf-remote` |
 
 > Used for caching HuggingFace model files if `HF_ENDPOINT` is pointed at JFrog.
 
@@ -128,9 +128,9 @@ JFROG=100.67.152.212:8082
 docker pull $JFROG/ei-docker-virtual/q9t5s3a7/vllm-cpu-release-repo:v0.10.2
 
 # GenAI Gateway (TGI, TEI, LiteLLM)  -  needed if deploy_genai_gateway=on
-docker pull $JFROG/ei-docker-virtual/ghcr.io/huggingface/text-generation-inference:2.4.0-intel-cpu
-docker pull $JFROG/ei-docker-virtual/ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
-docker pull $JFROG/ei-docker-virtual/ghcr.io/berriai/litellm-non_root:main-v1.75.8-stable
+docker pull $JFROG/ei-docker-virtual/huggingface/text-generation-inference:2.4.0-intel-cpu
+docker pull $JFROG/ei-docker-virtual/huggingface/text-embeddings-inference:cpu-1.7
+docker pull $JFROG/ei-docker-virtual/berriai/litellm-non_root:main-v1.75.8-stable
 
 # Langfuse (observability)  -  needed if deploy_observability=on
 docker pull $JFROG/ei-docker-virtual/langfuse/langfuse:3.106.1
@@ -455,7 +455,7 @@ kubeadm    kubectl    kubelet
 jq_1.6-2.1ubuntu3.1_amd64.deb    libjq1_1.6-2.1ubuntu3.1_amd64.deb    libonig5_6.9.7.1-2build1_amd64.deb
 ```
 
-### 3f  -  LLM Model Files
+### 3h  -  LLM Model Files
 
 ```bash
 # Download model from HuggingFace (requires HF token)
@@ -476,7 +476,7 @@ find /tmp/Llama-3.1-8B-Instruct -type f | while read f; do
 done
 ```
 
-### 3g  -  Kubespray and Binaries
+### 3i  -  Kubespray
 
 ```bash
 # kubespray tarball
@@ -484,14 +484,9 @@ git clone https://github.com/kubernetes-sigs/kubespray
 cd kubespray && git checkout v2.27.0 && cd ..
 tar -czf kubespray.tar.gz kubespray/
 curl -u $JFROG_CREDS -T kubespray.tar.gz "$JFROG_URL/ei-generic-binaries/kubespray.tar.gz"
-
-# helm binary
-curl -LO https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz
-curl -u $JFROG_CREDS -T helm-v3.15.4-linux-amd64.tar.gz \
-  "$JFROG_URL/ei-generic-binaries/get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz"
 ```
 
-### 3h  -  Set JFrog Repos to Offline
+### 3j  -  Set JFrog Repos to Offline
 
 Once all assets are cached, set all remote repos to **Offline** in JFrog UI:
 - Admin → Repositories → Edit each remote repo → Advanced → Set to Offline
@@ -515,13 +510,18 @@ curl -s --max-time 5 https://huggingface.co && echo "HAS INTERNET" || echo "NO I
 # Install iptables-persistent so rules survive reboots
 sudo apt-get install -y iptables-persistent
 
+# Check your SSH client IP first - must be in one of the allowed ranges below
+echo $SSH_CLIENT
+
 # Allow loopback, LAN, and JFrog VM1
 sudo iptables -F OUTPUT
-sudo iptables -I OUTPUT 1 -o lo -j ACCEPT
-sudo iptables -I OUTPUT 2 -d 127.0.0.0/8 -j ACCEPT
-sudo iptables -I OUTPUT 3 -d 10.0.0.0/8 -j ACCEPT
-sudo iptables -I OUTPUT 4 -d 100.67.0.0/16 -j ACCEPT   # LAN subnet
-sudo iptables -I OUTPUT 5 -d 192.168.0.0/16 -j ACCEPT
+sudo iptables -I OUTPUT 1 -m state --state ESTABLISHED,RELATED -j ACCEPT  # keep active SSH sessions alive
+sudo iptables -I OUTPUT 2 -o lo -j ACCEPT
+sudo iptables -I OUTPUT 3 -d 127.0.0.0/8 -j ACCEPT
+sudo iptables -I OUTPUT 4 -d 10.0.0.0/8 -j ACCEPT
+sudo iptables -I OUTPUT 5 -d 100.67.0.0/16 -j ACCEPT   # LAN subnet (VM1 + VM2)
+sudo iptables -I OUTPUT 6 -d 100.64.0.0/10 -j ACCEPT   # SSH client subnet - adjust if your client IP differs
+sudo iptables -I OUTPUT 7 -d 192.168.0.0/16 -j ACCEPT
 sudo iptables -A OUTPUT -j DROP
 
 # Save rules so they persist across reboots
