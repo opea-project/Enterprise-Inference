@@ -1,0 +1,125 @@
+{{- if .Values.apisix.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ .Release.Name }}-apisixroute
+  namespace: {{ .Release.Namespace }}
+spec:
+  http:
+  - name: {{ .Release.Name }}-files-route
+    priority: 100
+    match:
+      hosts:
+      - {{ .Values.apisix.domain  }}
+      paths:
+      - /enterprise-ai/v1/files*
+    backends:
+    - serviceName: {{ .Release.Name }}
+      servicePort: {{ .Values.service.port }}
+    plugins:
+    {{- if .Values.apisix.cors.enabled }}
+    - name: cors
+      enable: true
+      config:
+        allow_origins: {{ .Values.apisix.cors.allow_origins | quote }}
+        allow_methods: {{ .Values.apisix.cors.allow_methods | quote }}
+        allow_headers: {{ .Values.apisix.cors.allow_headers | quote }}
+        expose_headers: {{ .Values.apisix.cors.expose_headers | quote }}
+        allow_credentials: {{ .Values.apisix.cors.allow_credentials }}
+        max_age: {{ .Values.apisix.cors.max_age }}
+    {{- end }}
+    {{- if .Values.apisix.oidc.enabled }}
+    - name: openid-connect
+      enable: true
+      config:
+        bearer_only: {{ .Values.apisix.oidc.bearer_only | default true }}
+        discovery: {{ .Values.apisix.oidc.discovery | quote }}
+        introspection_endpoint: {{ .Values.apisix.oidc.introspection_endpoint | quote }}
+        introspection_endpoint_auth_method: {{ .Values.apisix.oidc.introspection_endpoint_auth_method | quote }}
+        realm: {{ .Values.apisix.oidc.realm | quote }}
+        scope: {{ .Values.apisix.oidc.scope | quote }}
+      secretRef: {{ .Values.apisix.oidc.secret_ref | quote }}
+    {{- end }}
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^/enterprise-ai(/v1/files.*)
+          - $1
+  - name: {{ .Release.Name }}-dataprep-route
+    priority: 100
+    match:
+      hosts:
+      - {{ .Values.apisix.domain  }}
+      paths:
+      - /enterprise-ai/v1/dataprep*
+    backends:
+    - serviceName: {{ .Release.Name }}
+      servicePort: {{ .Values.service.port }}
+    plugins:
+    {{- if .Values.apisix.cors.enabled }}
+    - name: cors
+      enable: true
+      config:
+        allow_origins: {{ .Values.apisix.cors.allow_origins | quote }}
+        allow_methods: {{ .Values.apisix.cors.allow_methods | quote }}
+        allow_headers: {{ .Values.apisix.cors.allow_headers | quote }}
+        expose_headers: {{ .Values.apisix.cors.expose_headers | quote }}
+        allow_credentials: {{ .Values.apisix.cors.allow_credentials }}
+        max_age: {{ .Values.apisix.cors.max_age }}
+    {{- end }}
+    {{- if .Values.apisix.oidc.enabled }}
+    - name: openid-connect
+      enable: true
+      config:
+        bearer_only: {{ .Values.apisix.oidc.bearer_only | default true }}
+        discovery: {{ .Values.apisix.oidc.discovery | quote }}
+        introspection_endpoint: {{ .Values.apisix.oidc.introspection_endpoint | quote }}
+        introspection_endpoint_auth_method: {{ .Values.apisix.oidc.introspection_endpoint_auth_method | quote }}
+        realm: {{ .Values.apisix.oidc.realm | quote }}
+        scope: {{ .Values.apisix.oidc.scope | quote }}
+      secretRef: {{ .Values.apisix.oidc.secret_ref | quote }}
+    {{- end }}
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^/enterprise-ai(/v1/dataprep.*)
+          - $1
+  - name: {{ .Release.Name }}-dataprep-health-route
+    priority: 90
+    match:
+      hosts:
+      - {{ .Values.apisix.domain  }}
+      paths:
+      - /enterprise-ai/dataprep/health
+    backends:
+    - serviceName: {{ .Release.Name }}
+      servicePort: {{ .Values.service.port }}
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^/enterprise-ai/dataprep(/health)
+          - $1
+  - name: {{ .Release.Name }}-dataprep-docs-route
+    priority: 90
+    match:
+      hosts:
+      - {{ .Values.apisix.domain  }}
+      paths:
+      - /enterprise-ai/dataprep/docs*
+      - /enterprise-ai/dataprep/openapi.json
+      - /enterprise-ai/dataprep/redoc*
+    backends:
+    - serviceName: {{ .Release.Name }}
+      servicePort: {{ .Values.service.port }}
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^/enterprise-ai/dataprep(.*)
+          - $1
+{{- end }}

@@ -1,0 +1,37 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# FastAPI and server (needed for models/schemas)
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.22  # CVE-2024-53981 fix (was 0.0.18)
+
+# MinIO/S3 storage
+minio==7.2.12
+
+# Data validation
+pydantic
+
+# Environment management
+python-dotenv==1.0.1
+
+# Authentication - Keycloak JWT validation
+python-keycloak==7.0.0
+
+# Celery and Redis
+celery[redis]==5.5.0
+redis==5.2.1
+
+# PostgreSQL and ORM
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic
+
+# Document processing - ONLY needed by Celery workers
+docling==2.68.0
+docling-core==2.59.0
+rapidocr-onnxruntime==1.4.4
+
+# LLM and AI processing - ONLY needed by Celery workers
+llama-index==0.14.12
+llama-index-llms-openai-like==0.5.3
+spacy

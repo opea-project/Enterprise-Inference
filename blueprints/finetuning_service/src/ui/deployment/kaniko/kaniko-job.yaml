@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kaniko-frontend
+  namespace: finetuning-ui
+spec:
+  template:
+    spec:
+      # Kaniko requires root to manipulate container filesystem layers during image builds
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:latest
+          args:
+            - "--dockerfile=Dockerfile"
+            - "--context=dir:///workspace"
+            - "--destination=${REGISTRY_URL}/finetuning-ui:latest"
+            - "--build-arg=NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL}"
+            - "--build-arg=NEXT_PUBLIC_FILES_BASE_URL=${NEXT_PUBLIC_FILES_BASE_URL}"
+            - "--build-arg=NEXT_PUBLIC_DATAPREP_BASE_URL=${NEXT_PUBLIC_DATAPREP_BASE_URL}"
+            - "--build-arg=NEXT_PUBLIC_FINETUNING_API_URL=${NEXT_PUBLIC_FINETUNING_API_URL}"
+            - "--build-arg=NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}"
+          env:
+            - name: NEXT_PUBLIC_AUTH_URL
+              value: "$NEXT_PUBLIC_AUTH_URL" 
+            - name: NEXT_PUBLIC_FILES_BASE_URL
+              value: "$NEXT_PUBLIC_FILES_BASE_URL"              
+            - name: NEXT_PUBLIC_DATAPREP_BASE_URL
+              value: "$NEXT_PUBLIC_DATAPREP_BASE_URL"
+            - name: NEXT_PUBLIC_FINETUNING_API_URL
+              value: "$NEXT_PUBLIC_FINETUNING_API_URL"
+            - name: NEXT_TELEMETRY_DISABLED
+              value: "$NEXT_TELEMETRY_DISABLED"
+            - name: NEXT_PUBLIC_BASE_PATH
+              value: "$NEXT_PUBLIC_BASE_PATH"
+          # Kaniko requires root and write access to build container images
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # Required: kaniko writes filesystem layers during build
+            privileged: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: build-context
+              mountPath: /workspace
+      restartPolicy: Never
+      volumes:
+        - name: build-context
+          hostPath:
+            path: $BUILD_CONTEXT
+            type: Directory

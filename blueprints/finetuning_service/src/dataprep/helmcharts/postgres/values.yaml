@@ -1,0 +1,28 @@
+replicaCount: 1
+
+image:
+  repository: postgres
+  tag: "15"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5432
+
+postgresql:
+  username: postgres
+  password: postgres
+  database: postgres
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+
+resources: {}
+# limits:
+#   cpu: 500m
+#   memory: 512Mi
+# requests:
+#   cpu: 250m
+#   memory: 256Mi

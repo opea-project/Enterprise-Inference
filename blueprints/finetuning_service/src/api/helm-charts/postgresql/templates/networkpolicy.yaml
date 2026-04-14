@@ -1,0 +1,36 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "postgres.fullname" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "postgres.name" . }}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from finetuning-service only
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: finetuning-service
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS queries
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+{{- end }}

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  finetuning-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:8000/api/auth}
+      - NEXT_PUBLIC_FILES_BASE_URL=${NEXT_PUBLIC_FILES_BASE_URL:-http://localhost:8001/api/files}
+      - NEXT_PUBLIC_DATAPREP_BASE_URL=${NEXT_PUBLIC_DATAPREP_BASE_URL:-http://localhost:8002/api/dataprep}
+      - NEXT_PUBLIC_FINETUNING_API_URL=${NEXT_PUBLIC_FINETUNING_API_URL:-http://localhost:8003/api/finetuning}
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Example services that the UI connects to (uncomment and configure as needed)
+  # auth-service:
+  #   image: your-auth-service:latest
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://user:pass@db:5432/auth
+
+  # files-service:
+  #   image: your-files-service:latest
+  #   ports:
+  #     - "8001:8001"
+  #   volumes:
+  #     - ./uploads:/app/uploads
+
+  # dataprep-service:
+  #   image: your-dataprep-service:latest
+  #   ports:
+  #     - "8002:8002"
+
+  # finetuning-service:
+  #   image: your-finetuning-service:latest
+  #   ports:
+  #     - "8003:8003"
+
+networks:
+  default:
+    name: finetuning-network

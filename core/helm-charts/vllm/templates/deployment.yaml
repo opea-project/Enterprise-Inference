@@ -19,13 +19,13 @@ spec:
     metadata:
       annotations:
         {{- if not .Values.accelDevice }}
-        {{- if .Values.cpu_balloon_annotation }}
+        {{- if and .Values.cpu_balloon_annotation (not .Values.finetune.enabled) }}
         balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
         {{- end }}
         {{- end }}
       labels:
         {{- include "vllm.selectorLabels" . | nindent 8 }}
-        {{- if not .Values.accelDevice }}
+        {{- if and (not .Values.accelDevice) (not .Values.finetune.enabled) }}
         name: vllm
         {{- end }}
     spec:
@@ -37,6 +37,77 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # runtimeClassName: habana
+      {{- if .Values.finetune.enabled }}
+      initContainers:
+      - name: fetch-finetuned-model
+        image: "{{ .Values.finetune.images.minioMc.repository }}:{{ .Values.finetune.images.minioMc.tag }}"
+        imagePullPolicy: {{ .Values.finetune.images.minioMc.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            echo "[finetune-init] Starting model download for fileId: {{ .Values.finetune.fileId }}"
+
+            # Install minio client and tar (alpine doesn't have them by default)
+            apk add --no-cache curl tar
+            curl -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+            chmod +x /usr/local/bin/mc
+
+            # Configure MinIO client
+            mc alias set minio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
+
+            # Download model tarball
+            MODEL_PATH="dataprep/{{ .Values.finetune.fileId }}/{{ .Values.finetune.fileId }}.tar.gz"
+            echo "[finetune-init] Downloading from bucket: ${MODEL_PATH}"
+            mc cp "minio/${MODEL_PATH}" /tmp/model.tar.gz
+
+            # Validate tarball (check for malicious content)
+            echo "[finetune-init] Validating tarball contents..."
+            tar -tzf /tmp/model.tar.gz > /tmp/tar-contents.txt
+
+            # Block dangerous file types and path traversal
+            if grep -qE '\.(sh|py|exe|so|dylib)$|\.\.\/'' /tmp/tar-contents.txt; then
+              echo "[finetune-init] ERROR: Tarball contains prohibited file types or path traversal"
+              cat /tmp/tar-contents.txt
+              exit 1
+            fi
+
+            # Extract to /data (model-volume mount)
+            echo "[finetune-init] Extracting model to /data/{{ .Values.finetune.fileId }}"
+            mkdir -p /data/{{ .Values.finetune.fileId }}
+            tar -xzf /tmp/model.tar.gz -C /data/{{ .Values.finetune.fileId }}
+
+            # Verify model files exist (search in subdirectories)
+            CONFIG_FILE=$(find /data/{{ .Values.finetune.fileId }} -name "config.json" -type f | head -1)
+            if [ -z "$CONFIG_FILE" ]; then
+              echo "[finetune-init] ERROR: config.json not found after extraction"
+              ls -laR /data/{{ .Values.finetune.fileId }}
+              exit 1
+            fi
+
+            # Get the actual model directory
+            MODEL_DIR=$(dirname "$CONFIG_FILE")
+            echo "[finetune-init] Model successfully fetched and validated"
+            echo "[finetune-init] Model located at: $MODEL_DIR"
+            ls -lh "$MODEL_DIR"
+
+            # Print the final model path that should be used
+            echo "[finetune-init] vLLM should use model path: $MODEL_DIR"
+        env:
+          - name: MC_CONFIG_DIR
+            value: "/tmp/.mc"
+        envFrom:
+          - secretRef:
+              name: {{ .Values.finetune.minioCredentialsSecret }}
+        volumeMounts:
+          - name: model-volume
+            mountPath: /data
+          - name: tmp
+            mountPath: /tmp
+        securityContext:
+          runAsUser: 0
+          readOnlyRootFilesystem: false
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           envFrom:
@@ -75,6 +146,11 @@ spec:
             - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
             - "--pipeline-parallel-size"
             - {{ .Values.pipeline_parallel_size | default (index .Values.modelConfigs $modelName | default dict).pipeline_parallel_size | default .Values.defaultModelConfigs.pipeline_parallel_size | quote}}
+            {{- end }}
+            {{- if .Values.finetune.enabled }}
+            - "--trust-remote-code"
+            - "--tokenizer-mode"
+            - "slow"
             {{- end }}
             - "--model"
             - {{ .Values.LLM_MODEL_ID | quote }}

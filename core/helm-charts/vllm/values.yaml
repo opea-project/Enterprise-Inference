@@ -207,3 +207,15 @@ global:
 
   # Prometheus Helm install release name for serviceMonitor
   prometheusRelease: observability
+# Fine-tuning integration: when enabled, an init container fetches the fine-tuned
+# model tarball from MinIO before vLLM starts, and extra args are passed to vLLM.
+finetune:
+  enabled: false
+  fileId: ""
+  extractPath: "/models"
+  images:
+    minioMc:
+      repository: "alpine"
+      tag: "latest"
+      pullPolicy: "IfNotPresent"
+  minioCredentialsSecret: "minio-internal-creds"

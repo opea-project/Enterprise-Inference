@@ -1,0 +1,170 @@
+---
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+##############################################################################
+# Fine-Tune Plugin - Internal Variables
+##############################################################################
+# These are internal implementation variables for the Fine-Tune plugin.
+# Users should not need to modify these values directly.
+# The plugin deploys three components:
+#   1. Fine-Tuning API (middleware)
+#   2. Data Preparation Service (dataprep)
+#   3. Fine-Tuning UI (frontend)
+##############################################################################
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+# Plugin path for scripts
+finetune_plugin_path: "{{ lookup('env', 'PWD') }}/../../blueprints/finetuning_service"
+
+# Each component deploys to its own namespace
+finetune_api_namespace: finetuning-api
+dataprep_namespace: dataprep
+finetune_ui_namespace: finetuning-ui
+
+finetune_ingress_class: nginx
+finetune_tls_enabled: true
+finetune_persistence_storage_class: local-path
+
+# =============================================================================
+# Fine-Tuning API Configuration
+# =============================================================================
+finetune_api_name: finetuning-service
+finetune_api_replica_count: 1
+finetune_api_image_repository: registry.kube-system.svc.cluster.local:5000/finetuning-service
+finetune_api_image_tag: latest
+finetune_api_image_pull_policy: Always
+finetune_api_service_port: "8000"
+finetune_api_base_path: /enterprise-ai
+
+# API Resources
+finetune_api_cpu_request: 500m
+finetune_api_memory_request: 512Mi
+finetune_api_cpu_limit: 2
+finetune_api_memory_limit: 2Gi
+
+# API PostgreSQL Configuration
+finetune_api_postgres_enabled: true
+finetune_api_postgres_port: "5432"
+finetune_api_postgres_database: finetuning
+finetune_api_postgres_username: finetuning
+finetune_api_postgres_storage_size: 10Gi
+finetune_api_postgres_version: "15"
+
+# =============================================================================
+# Data Preparation Service Configuration
+# =============================================================================
+dataprep_name: data-prep-backend
+dataprep_replica_count: 1
+dataprep_image_repository: registry.kube-system.svc.cluster.local:5000/data-prep-backend
+dataprep_image_tag: latest
+dataprep_image_pull_policy: Always
+dataprep_service_port: "8000"
+dataprep_base_path: /enterprise-ai
+
+# Data Prep Resources
+dataprep_cpu_request: 500m
+dataprep_memory_request: 1Gi
+dataprep_cpu_limit: 2
+dataprep_memory_limit: 4Gi
+
+# Data Prep PostgreSQL Configuration
+dataprep_postgres_enabled: true
+dataprep_postgres_port: "5432"
+dataprep_postgres_database: dataprep
+dataprep_postgres_username: dataprep
+dataprep_postgres_storage_size: 10Gi
+dataprep_postgres_version: "15"
+
+# Data Prep Redis Configuration
+dataprep_redis_enabled: true
+dataprep_redis_port: "6379"
+dataprep_redis_storage_size: 2Gi
+
+# Data Prep MinIO Configuration
+dataprep_minio_bucket: dataprep
+
+# Celery Worker Configuration
+dataprep_celery_enabled: true
+dataprep_celery_replica_count: 1
+dataprep_celery_image_repository: registry.kube-system.svc.cluster.local:5000/celery-worker
+dataprep_celery_image_tag: latest
+dataprep_celery_cpu_request: 500m
+dataprep_celery_memory_request: 2Gi
+dataprep_celery_cpu_limit: 2
+dataprep_celery_memory_limit: 8Gi
+
+# =============================================================================
+# Fine-Tuning UI Configuration
+# =============================================================================
+finetune_ui_name: finetuning-ui
+finetune_ui_replica_count: 1
+finetune_ui_image_repository: registry.kube-system.svc.cluster.local:5000/finetuning-ui
+finetune_ui_image_tag: latest
+finetune_ui_image_pull_policy: Always
+finetune_ui_service_port: "3000"
+finetune_ui_base_path: /enterprise-ai/ui
+
+# UI Resources
+finetune_ui_cpu_request: 250m
+finetune_ui_memory_request: 512Mi
+finetune_ui_cpu_limit: 1
+finetune_ui_memory_limit: 2Gi
+
+# =============================================================================
+# Shared MinIO Configuration
+# =============================================================================
+finetune_minio_enabled: "true"
+finetune_minio_service_name: minio
+finetune_minio_port: "9000"
+finetune_minio_console_port: 9001
+finetune_minio_storage_size: 50Gi
+finetune_minio_access_key: admin
+finetune_minio_secret_key: minio123
+finetune_minio_region: us-west-2
+finetune_minio_secure: "false"
+
+# =============================================================================
+# Keycloak Integration (Mandatory Authentication)
+# =============================================================================
+# Keycloak realm and clients are auto-created by setup-keycloak-finetuning.sh
+# - Realm: finetuning
+# - Backend Client: finetuning-backend (confidential) - for API/DataPrep token verification
+# - UI Client: finetuning-ui (public) - for user authentication via NextAuth
+#
+# These variables are set at runtime by deploy-all.yml after Keycloak setup
+# finetune_keycloak_enabled: "true"  # Set dynamically
+# finetune_keycloak_url: "http://keycloak.default.svc.cluster.local:80"  # Set dynamically
+# finetune_keycloak_realm: "finetuning"  # Set dynamically
+# finetune_keycloak_backend_client_id: "finetuning-backend"  # Set dynamically
+# finetune_keycloak_backend_client_secret: "<generated>"  # Extracted from setup script
+# finetune_keycloak_ui_client_id: "finetuning-ui"  # Set dynamically
+# finetune_nextauth_secret: "<generated>"  # Set dynamically
+
+# Default values (overridden at runtime)
+finetune_keycloak_realm: finetuning
+finetune_keycloak_backend_client_id: finetuning-backend
+finetune_keycloak_ui_client_id: finetuning-ui
+
+# =============================================================================
+# Build Configuration (for Kaniko builds)
+# =============================================================================
+finetune_build_enabled: false
+finetune_kaniko_image: gcr.io/kaniko-project/executor:latest
+finetune_registry_insecure: true
+
+# Source code paths (within plugin directory - auto-copied during deployment)
+finetune_api_source_path: "{{ playbook_dir }}/../src/api"
+dataprep_source_path: "{{ playbook_dir }}/../src/dataprep"
+finetune_ui_source_path: "{{ playbook_dir }}/../src/ui"
+
+# =============================================================================
+# Autoscaling (disabled by default)
+# =============================================================================
+finetune_autoscaling_enabled: false
+finetune_autoscaling_min_replicas: 1
+finetune_autoscaling_max_replicas: 5
+finetune_autoscaling_target_cpu: 80
+finetune_autoscaling_target_memory: 80

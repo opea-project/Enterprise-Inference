@@ -1,0 +1,3 @@
+"""
+Resource adapter implementations
+"""

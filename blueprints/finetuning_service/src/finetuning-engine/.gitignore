@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+
+# Secrets / environment files — never commit these
+.env
+*.env
+
+# TLS certificates and private keys
+certs/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Runtime artefacts
+.venv/
+temp_data/
+finetuned_models/
+logs/
+models/
+jobs/
+*.log

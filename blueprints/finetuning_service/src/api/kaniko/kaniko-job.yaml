@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kaniko-finetuning-service
+  namespace: ${NAMESPACE}
+  labels:
+    app: finetuning-service
+    component: builder
+    managed-by: kaniko
+spec:
+  ttlSecondsAfterFinished: 3600  # Auto-cleanup after 1 hour
+  backoffLimit: 2  # Retry up to 2 times on failure
+  template:
+    metadata:
+      labels:
+        app: finetuning-service
+        component: builder
+    spec:
+      restartPolicy: Never
+      # Security Context: Kaniko requires root (UID 0) to build container images
+      # This is industry standard - all container image builders need root privileges
+      # Reference: https://github.com/GoogleContainerTools/kaniko#security
+      securityContext:
+        runAsUser: 0  # Required: Kaniko needs root to manipulate filesystem
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2  # Pinned version for reproducibility
+          args:
+            - "--dockerfile=/workspace/Dockerfile"
+            - "--context=dir:///workspace"
+            - "--destination=${REGISTRY_URL}/finetuning-service:${IMAGE_TAG}"
+            - "--insecure"  # Required for internal registry
+            - "--skip-tls-verify"  # Required for internal registry
+            # Production caching configuration for fast builds
+            - "--cache=true"  # Enable layer caching
+            - "--cache-ttl=168h"  # 7 days cache (balance freshness vs speed)
+            - "--cache-dir=/cache"  # Use separate cache volume
+            - "--compressed-caching=false"  # Faster but uses more disk
+            - "--snapshot-mode=redo"  # Balance speed vs accuracy
+            - "--use-new-run"  # Better caching with RUN commands
+            - "--push-retry=3"  # Retry pushes 3 times
+            # Build optimization
+            - "--single-snapshot"  # Faster snapshots, single layer at end
+            - "--cleanup"  # Clean up intermediate layers
+            # Logging
+            - "--log-format=text"
+            - "--verbosity=info"
+          env:
+            - name: REGISTRY_URL
+              value: "$REGISTRY_URL"
+            - name: IMAGE_TAG
+              value: "$IMAGE_TAG"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          # Container-level security: Minimal restrictions for Kaniko
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            privileged: false
+          volumeMounts:
+            - name: build-context
+              mountPath: /workspace
+              readOnly: true
+            - name: kaniko-cache
+              mountPath: /cache  # Persistent cache for faster builds
+      volumes:
+        - name: build-context
+          hostPath:
+            path: ${BUILD_CONTEXT}
+            type: Directory
+        - name: kaniko-cache
+          hostPath:
+            path: /var/lib/kaniko-cache  # Persistent cache location
+            type: DirectoryOrCreate  # Create if doesn't exist

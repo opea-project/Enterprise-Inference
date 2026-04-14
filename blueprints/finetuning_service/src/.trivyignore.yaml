@@ -1,0 +1,51 @@
+# Trivy ignore file for known, non-fixable exceptions
+# Format: .trivyignore.yaml (supported in trivy >= 0.41)
+# Each entry documents WHY the finding cannot be fixed without breaking functionality.
+
+misconfigurations:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # KSV-0014: readOnlyRootFilesystem must remain false for Kaniko image builds.
+  # Kaniko works by unpacking base images and writing modified filesystem layers
+  # into the root filesystem before pushing the final image to the registry.
+  # Setting readOnlyRootFilesystem=true causes kaniko to fail immediately.
+  # Reference: https://github.com/GoogleContainerTools/kaniko#security
+  # ──────────────────────────────────────────────────────────────────────────────
+  - id: AVD-KSV-0014
+    paths:
+      - "api/kaniko/kaniko-job.yaml"
+      - "dataprep/kaniko/celery/kaniko-job.yaml"
+      - "dataprep/kaniko/data-prep/kaniko-job.yaml"
+      - "ui/deployment/kaniko/kaniko-job.yaml"
+    statement: >
+      Kaniko requires write access to the root filesystem to unpack and
+      manipulate container image layers during builds. readOnlyRootFilesystem=true
+      breaks all CI/CD image builds. Industry-standard exception documented by Google.
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # KSV-0009: hostNetwork=true is required for the registry-proxy DaemonSet.
+  # The DaemonSet's sole purpose is to forward localhost:5000 on every node to
+  # the in-cluster registry service so that kaniko jobs (which run on arbitrary
+  # nodes) can push built images. Without hostNetwork there is no way for kaniko
+  # to reach localhost:5000 on the node it is scheduled on.
+  # ──────────────────────────────────────────────────────────────────────────────
+  - id: AVD-KSV-0009
+    paths:
+      - "dataprep/kaniko/registry-proxy-daemonset.yaml"
+    statement: >
+      hostNetwork is a functional requirement for the registry-proxy DaemonSet.
+      It binds socat to the node's loopback interface so that kaniko jobs can
+      push images to localhost:5000 regardless of which node they run on.
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # KSV-0024: hostPort 5000 is required by the registry-proxy DaemonSet.
+  # Exposing port 5000 on the host is the mechanism that makes localhost:5000
+  # available on every node, which kaniko uses to push images to the cluster
+  # registry. Removing hostPort makes the proxy unreachable from kaniko jobs.
+  # ──────────────────────────────────────────────────────────────────────────────
+  - id: AVD-KSV-0024
+    paths:
+      - "dataprep/kaniko/registry-proxy-daemonset.yaml"
+    statement: >
+      hostPort 5000 is required so that the socat proxy is reachable at
+      localhost:5000 on each node. Kaniko jobs depend on this to push built
+      images to the in-cluster registry.

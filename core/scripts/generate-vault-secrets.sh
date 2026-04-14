@@ -36,6 +36,12 @@ GRAFANA_ADMIN_PASSWORD=$(generate_password 20)
 AGENTICAI_POSTGRES_PASSWORD=$(generate_password 20)
 AGENTICAI_REDIS_PASSWORD=$(generate_password 20)
 
+# Fine-Tuning Plugin Credentials (Auto-generated database passwords only)
+FINETUNE_API_POSTGRES_PASSWORD=$(generate_password 20)
+FINETUNE_API_REDIS_PASSWORD=$(generate_password 20)
+DATAPREP_POSTGRES_PASSWORD=$(generate_password 20)
+DATAPREP_REDIS_PASSWORD=$(generate_password 20)
+
 # Generate connection strings
 DATABASE_URL="postgresql://admin:${POSTGRESQL_PASSWORD}@genai-gateway-postgresql:5432/litellm"
 CLICKHOUSE_REDIS_URL="redis://default:${CLICKHOUSE_PASSWORD}@genai-gateway-trace-valkey-primary:6379/0"
@@ -71,6 +77,12 @@ postgres_password: "$POSTGRES_PASSWORD"
 grafana_admin_password: "$GRAFANA_ADMIN_PASSWORD"
 agenticai_postgres_password: "$AGENTICAI_POSTGRES_PASSWORD"
 agenticai_redis_password: "$AGENTICAI_REDIS_PASSWORD"
+
+# Fine-Tuning Plugin Secrets
+finetune_api_postgres_password: "$FINETUNE_API_POSTGRES_PASSWORD"
+finetune_api_redis_password: "$FINETUNE_API_REDIS_PASSWORD"
+dataprep_postgres_password: "$DATAPREP_POSTGRES_PASSWORD"
+dataprep_redis_password: "$DATAPREP_REDIS_PASSWORD"
 EOF
 
 # Set appropriate permissions

@@ -1,0 +1,106 @@
+replicaCount: 1
+
+image:
+  repository: localhost:5000/data-prep-backend
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  host: example.com
+  path: /
+
+apisix:
+  enabled: true
+  domain: example.com
+  cors:
+    enabled: true
+    allow_origins: "https://example.com,http://localhost:3000"
+    allow_methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+    allow_headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    expose_headers: "Content-Length,Content-Range"
+    allow_credentials: true
+    max_age: 3600
+  oidc:
+    enabled: true
+    realm: finetuning
+    discovery: https://example.com/realms/finetuning/.well-known/openid-configuration
+    introspection_endpoint: https://example.com/realms/finetuning/protocol/openid-connect/token/introspect
+    introspection_endpoint_auth_method: client_secret_basic
+    scope: openid profile email
+    bearer_only: true
+    secret_ref: finetuning-backend-secret
+
+env:
+  - name: HOST
+    value: "0.0.0.0"
+  - name: PORT
+    value: "8000"
+  - name: API_BASE_PATH
+    value: "/enterprise-ai/dataprep"
+  - name: ROOT_PATH
+    value: "/enterprise-ai/dataprep"
+  - name: MINIO_ENDPOINT
+    value: "minio.dataprep.svc.cluster.local:9000"
+  - name: MINIO_BUCKET_NAME
+    value: "dataprep"
+  - name: MINIO_SECURE
+    value: "false"
+  - name: MINIO_REGION
+    value: "us-west-2"
+  - name: MINIO_CERT_VERIFY
+    value: "false"
+  - name: DB_HOST
+    value: "postgres.dataprep.svc.cluster.local"
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: "dataprep"
+  - name: DB_USER
+    value: "postgres"
+  - name: DB_POOL_SIZE
+    value: "5"
+  - name: DB_MAX_OVERFLOW
+    value: "10"
+  - name: DB_POOL_RECYCLE
+    value: "3600"
+  - name: KEYCLOAK_ENABLED
+    value: "false"
+  - name: KEYCLOAK_URL
+    value: ""
+  - name: KEYCLOAK_REALM
+    value: "finetuning"
+  - name: KEYCLOAK_CLIENT_ID
+    value: ""
+  - name: KEYCLOAK_VERIFY_SSL
+    value: "false"
+  - name: ALLOWED_ORIGINS
+    value: "http://localhost:3000,http://localhost:8080"
+
+# Sensitive credentials sourced from a Kubernetes Secret (never store real values here).
+# Create the required secrets before deploying:
+#   kubectl create secret generic keycloak-client-secret \
+#     --from-literal=client-secret=<your-actual-secret> -n dataprep
+#   kubectl create secret generic minio-credentials \
+#     --from-literal=access-key=<your-minio-access-key> \
+#     --from-literal=secret-key=<your-minio-secret-key> -n dataprep
+#   kubectl create secret generic postgres-credentials \
+#     --from-literal=password=<your-postgres-password> -n dataprep
+secretEnv:
+  - name: KEYCLOAK_CLIENT_SECRET
+    secretName: keycloak-client-secret
+    secretKey: client-secret
+  - name: MINIO_ACCESS_KEY
+    secretName: minio-credentials
+    secretKey: access-key
+  - name: MINIO_SECRET_KEY
+    secretName: minio-credentials
+    secretKey: secret-key
+  - name: DB_PASSWORD
+    secretName: postgres-credentials
+    secretKey: password

@@ -1,0 +1,38 @@
+{{- if .Values.apisix.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "finetuning-service.fullname" . }}-apisix-ingress
+  namespace: auth-apisix
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/proxy-pass-headers: "Content-Type, Authorization"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20g"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "24k"
+  labels:
+    {{- include "finetuning-service.labels" . | nindent 4 }}
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.ingress.baseDomain }}
+      secretName: {{ .Values.ingress.baseDomain }}
+  rules:
+    - host: {{ .Values.ingress.baseDomain }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.basePath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-apisix-gateway
+                port:
+                  number: 80
+{{- end }}

@@ -1,0 +1,35 @@
+# Fine-Tuning Service Dependencies
+# Pinned versions for reproducible builds and security
+# Last updated: 2026-02-06 - Security vulnerabilities patched
+
+# FastAPI Framework - Latest stable versions
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.22  # Updated from 0.0.12 - fixes CVE-2024-53981
+
+# Database
+asyncpg==0.29.0
+
+# HTTP Client
+httpx==0.27.2
+
+# Security & Authentication (Keycloak OIDC)
+PyJWT[crypto]==2.12.0  # Updated from 2.9.0 - latest stable version
+cryptography==46.0.5  # Updated from 46.0.4 - fixes CVE-2026-26007 (subgroup attack on SECT curves)
+
+# Data Validation
+pydantic==2.9.2
+pydantic-settings==2.6.1
+
+# Rate Limiting & Security
+slowapi==0.1.9
+python-jose[cryptography]==3.5.0  # Updated from 3.3.0 - fixes CVE-2024-33663, CVE-2024-33664
+
+# Utilities
+python-dotenv==1.0.1
+
+# Observability - Lightweight monitoring (optional, configurable)
+structlog==24.4.0  # Structured JSON logging
+prometheus-client==0.21.0  # Already installed, pinned for metrics
+psutil==6.1.1  # System metrics (CPU, memory)
+
