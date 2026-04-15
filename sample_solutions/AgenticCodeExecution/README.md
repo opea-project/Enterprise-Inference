@@ -299,6 +299,24 @@ Click **Save**, give it a name, and start chatting.
 
 ---
 
+## Example Conversation (Retail)
+
+Below is a sample exchange with the retail agent. This is just one example use case — once the workload is set up, you can have your own conversations and explore the full range of agent capabilities.
+
+> **User:** Hi, I have a couple of questions. First, can you tell me exactly how many t-shirt options are available in your online store right now? Also, I have some pending t-shirt orders and I'd like to change all of them to purple, size small, v-neck, and preferably polyester.
+>
+> **User:** Sure, my name is Yusuf Rossi and my zip code is 19122.
+>
+> **User:** I actually don't remember the orders, can you look them up for me?
+>
+> **User:** Yes, please modify both of these orders
+>
+> **User:** I confirm
+>
+> **User:** Now retrieve all my orders and list them with their details
+
+---
+
 ## Development (without Docker)
 
 For local development, install dependencies and run servers manually.
