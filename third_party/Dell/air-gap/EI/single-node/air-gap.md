@@ -23,19 +23,69 @@ VM1 (internet-connected)          VM2 (airgapped)
 
 VM1 must have internet access and be reachable from VM2 over LAN.
 
-### Install via Docker
+### Get a Pro Trial License Key
+
+1. Go to `https://jfrog.com/start-free/`
+2. Click **14-day free trial** (not Platform Tour)
+3. Select **Self-Hosted**
+4. Fill in the registration form:
+   - Company name
+   - Phone number with country code (e.g. `+1 555 123 4567`)
+5. Click **Confirm and Start**
+6. Check your email - license key arrives within a few minutes
+7. Copy the license key from the email - you will need it during post-install
+
+### Pre-install - Fix inotify limits
+
+Required before installation to avoid "Too many open files" errors:
+
+Update package list and install requierd tools
+```bash
+sudo apt update
+
+```
+verify jq installation
 
 ```bash
-# Pull and run JFrog Artifactory OSS
-docker run -d \
-  --name artifactory \
-  -p 8082:8082 \
-  -p 8081:8081 \
-  -v artifactory-data:/var/opt/jfrog/artifactory \
-  releases-docker.jfrog.io/jfrog/artifactory-oss:latest
+jq --version
 ```
 
-Access the UI at `http://<VM1-IP>:8082`. Default credentials: `admin` / `password`.
+```bash
+sudo sysctl fs.inotify.max_user_instances=512
+
+echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### Install
+
+```bash
+# 1. Download the installer (auto-resolves [RELEASE] to latest version)
+wget -O jfrog-deb-installer.tar.gz \
+  "https://releases.jfrog.io/artifactory/jfrog-prox/org/artifactory/pro/deb/jfrog-platform-trial-prox/[RELEASE]/jfrog-platform-trial-prox-[RELEASE]-deb.tar.gz"
+
+# 2. Extract
+tar -xvzf jfrog-deb-installer.tar.gz
+
+# 3. Navigate to Directory and run installer
+cd jfrog-platform-trial-pro*
+sudo ./install.sh
+
+# 4. Start services
+sudo systemctl start artifactory.service
+sudo systemctl start xray.service
+
+# 5. Verify both are running
+sudo systemctl status artifactory.service
+sudo systemctl status xray.service
+```
+
+### Post-install
+
+Access the UI at `http://<VM1-IP>:8082`. Default credentials: `admin` / `password` (you will be prompted to change on first login).
+
+**Activate the license:**
+- Admin → Artifactory License → paste the trial license key → Save
 
 **Enable anonymous read access** (required so VM2 can pull without credentials for Docker mirrors):
 - Admin → Security → Settings → Enable "Allow Anonymous Access"
