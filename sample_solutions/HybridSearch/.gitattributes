@@ -1,0 +1,15 @@
+# Git attributes for hybrid-search project
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+.env* text eol=lf
+*.pkl binary
+*.bin binary
+*.db binary
+*.pdf binary

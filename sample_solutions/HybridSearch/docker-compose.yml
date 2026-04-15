@@ -1,0 +1,223 @@
+services:
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: hybrid-search-ui
+    ports:
+      - "${UI_PORT:-8501}:8501"
+    environment:
+      - GATEWAY_SERVICE_URL=http://gateway:${GATEWAY_PORT:-8000}
+      - INGESTION_SERVICE_URL=http://ingestion:${INGESTION_PORT:-8004}
+      - RETRIEVAL_SERVICE_URL=http://retrieval:${RETRIEVAL_PORT:-8002}
+      - UI_TITLE=${UI_TITLE:-InsightMapper Lite}
+      - UI_PAGE_ICON=${UI_PAGE_ICON:-📚}
+    depends_on:
+      - gateway
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('gateway', 8000))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gateway:
+    build:
+      context: ./api/gateway
+      dockerfile: Dockerfile
+    container_name: hybrid-search-gateway
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    environment:
+      - DEPLOYMENT_PHASE=${DEPLOYMENT_PHASE:-development}
+      - GATEWAY_PORT=8000
+      - GATEWAY_LOG_LEVEL=${GATEWAY_LOG_LEVEL:-INFO}
+      - SYSTEM_MODE=${SYSTEM_MODE:-document}
+      - EMBEDDING_SERVICE_URL=http://embedding:8001
+      - RETRIEVAL_SERVICE_URL=http://retrieval:8002
+      - LLM_SERVICE_URL=http://llm:8003
+      - INGESTION_SERVICE_URL=http://ingestion:8004
+      - VERIFY_SSL=${VERIFY_SSL:-true}
+    depends_on:
+      - embedding
+      - retrieval
+      - llm
+      - ingestion
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  embedding:
+    build:
+      context: ./api/embedding
+      dockerfile: Dockerfile
+    container_name: hybrid-search-embedding
+    ports:
+      - "${EMBEDDING_PORT:-8001}:8001"
+    environment:
+      - DEPLOYMENT_PHASE=${DEPLOYMENT_PHASE:-development}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
+      - OPENAI_EMBEDDING_DIMENSIONS=${OPENAI_EMBEDDING_DIMENSIONS:-768}
+      - EMBEDDING_PORT=8001
+      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
+      - EMBEDDING_MAX_LENGTH=${EMBEDDING_MAX_LENGTH:-512}
+      - SYSTEM_MODE=${SYSTEM_MODE:-document}
+      - EMBEDDING_MODEL_ENDPOINT=${EMBEDDING_MODEL_ENDPOINT:-BAAI/bge-base-en-v1.5}
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-BAAI/bge-base-en-v1.5}
+      # GenAI Gateway / APISIX Configuration
+      - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
+      - GENAI_API_KEY=${GENAI_API_KEY}
+      - EMBEDDING_API_ENDPOINT=${EMBEDDING_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
+      - VERIFY_SSL=${VERIFY_SSL:-true}
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  retrieval:
+    build:
+      context: ./api/retrieval
+      dockerfile: Dockerfile
+    container_name: hybrid-search-retrieval
+    ports:
+      - "${RETRIEVAL_PORT:-8002}:8002"
+    volumes:
+      - index_data:/data/indexes
+    environment:
+      - DEPLOYMENT_PHASE=${DEPLOYMENT_PHASE:-development}
+      - RETRIEVAL_PORT=8002
+      - SYSTEM_MODE=${SYSTEM_MODE:-document}
+      - FAISS_INDEX_PATH=${FAISS_INDEX_PATH:-/data/indexes/faiss_index.bin}
+      - BM25_INDEX_PATH=${BM25_INDEX_PATH:-/data/indexes/bm25_index.pkl}
+      - METADATA_INDEX_PATH=${METADATA_INDEX_PATH:-/data/indexes/metadata.pkl}
+      - TOP_K_DENSE=${TOP_K_DENSE:-100}
+      - TOP_K_SPARSE=${TOP_K_SPARSE:-100}
+      - TOP_K_FUSION=${TOP_K_FUSION:-50}
+      - TOP_K_RERANK=${TOP_K_RERANK:-10}
+      - USE_RERANKING=${USE_RERANKING:-false}
+      - RRF_K=${RRF_K:-60}
+      - EMBEDDING_SERVICE_URL=http://embedding:8001
+      - RERANKER_MODEL_ENDPOINT=${RERANKER_MODEL_ENDPOINT:-BAAI/bge-reranker-base}
+      - RERANKER_MODEL_NAME=${RERANKER_MODEL_NAME:-BAAI/bge-reranker-base}
+      - RERANKER_MAX_BATCH_SIZE=${RERANKER_MAX_BATCH_SIZE:-32}
+      # GenAI Gateway / APISIX Configuration
+      - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
+      - GENAI_API_KEY=${GENAI_API_KEY}
+      - RERANKER_API_ENDPOINT=${RERANKER_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
+      - VERIFY_SSL=${VERIFY_SSL:-true}
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
+    depends_on:
+      - embedding
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  llm:
+    build:
+      context: ./api/llm
+      dockerfile: Dockerfile
+    container_name: hybrid-search-llm
+    ports:
+      - "${LLM_PORT:-8003}:8003"
+    environment:
+      - DEPLOYMENT_PHASE=${DEPLOYMENT_PHASE:-development}
+      - LLM_PORT=8003
+      - SYSTEM_MODE=${SYSTEM_MODE:-document}
+      - MAX_TOKENS_SIMPLE=${MAX_TOKENS_SIMPLE:-512}
+      - MAX_TOKENS_COMPLEX=${MAX_TOKENS_COMPLEX:-1024}
+      - TEMPERATURE_SIMPLE=${TEMPERATURE_SIMPLE:-0.1}
+      - TEMPERATURE_COMPLEX=${TEMPERATURE_COMPLEX:-0.3}
+      - INFERENCE_MODEL_ENDPOINT_SIMPLE=${LLM_MODEL_ENDPOINT:-Qwen/Qwen3-4B-Instruct-2507}
+      - INFERENCE_MODEL_NAME_SIMPLE=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
+      - INFERENCE_MODEL_ENDPOINT_COMPLEX=${LLM_MODEL_ENDPOINT:-Qwen/Qwen3-4B-Instruct-2507}
+      - INFERENCE_MODEL_NAME_COMPLEX=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
+      - LLM_MODEL_ENDPOINT=${LLM_MODEL_ENDPOINT:-Qwen/Qwen3-4B-Instruct-2507}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-Qwen/Qwen3-4B-Instruct-2507}
+      # GenAI Gateway / APISIX Configuration
+      - GENAI_GATEWAY_URL=${GENAI_GATEWAY_URL}
+      - GENAI_API_KEY=${GENAI_API_KEY}
+      - LLM_API_ENDPOINT=${LLM_API_ENDPOINT:-}
+      - INFERENCE_BACKEND=${INFERENCE_BACKEND:-vllm}
+      - VERIFY_SSL=${VERIFY_SSL:-true}
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  ingestion:
+    build:
+      context: ./api/ingestion
+      dockerfile: Dockerfile
+    container_name: hybrid-search-ingestion
+    ports:
+      - "${INGESTION_PORT:-8004}:8004"
+    volumes:
+      - ./data/documents:/data/documents
+      - index_data:/data/indexes
+      - db_data:/data/db
+    environment:
+      - DEPLOYMENT_PHASE=${DEPLOYMENT_PHASE:-development}
+      - INGESTION_PORT=8004
+      - SYSTEM_MODE=${SYSTEM_MODE:-document}
+      - EMBEDDING_SERVICE_URL=http://embedding:8001
+      - DOCUMENT_STORAGE_PATH=/data/documents
+      - INDEX_STORAGE_PATH=/data/indexes
+      - METADATA_DB_PATH=/data/db/metadata.db
+      - CHUNK_SIZE=256
+      - CHUNK_OVERLAP=25
+      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-100}
+      - SUPPORTED_FORMATS=${SUPPORTED_FORMATS:-pdf,docx,xlsx,ppt,txt}
+      - 'EMBEDDING_FIELD_TEMPLATE=${EMBEDDING_FIELD_TEMPLATE:-"{name}. {description}. Category: {category}. Brand: {brand}"}'
+      - EMBEDDING_DIM=${EMBEDDING_DIMENSIONS:-768}
+      - MAX_PRODUCTS_PER_CATALOG=${MAX_PRODUCTS_PER_CATALOG:-50000}
+    depends_on:
+      - embedding
+    networks:
+      - hybrid-search-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  hybrid-search-network:
+    driver: bridge
+
+volumes:
+  document_storage:
+  index_data:
+  db_data:
+
