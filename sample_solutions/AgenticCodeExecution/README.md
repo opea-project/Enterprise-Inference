@@ -27,26 +27,26 @@ Flowise (or other MCP client)
 docker compose up --build
 ```
 
-This starts tools-server on `http://localhost:5050/sse` and sandbox-server on `http://localhost:5051/sse`. Default domain is **retail**.
+This starts the **retail** domain by default:
+- tools-server on `http://localhost:5050/sse`
+- sandbox-server on `http://localhost:5051/sse`
 
-To switch domains:
-
-```bash
-MCP_DOMAIN=airline docker compose up --build    # or stocks, banking, triage
-```
-
-You can also set `MCP_DOMAIN` in `.env`.
+> Other domains are also available (airline, stocks, banking, triage):
+> ```bash
+> MCP_DOMAIN=airline docker compose up --build
+> ```
+> You can also set `MCP_DOMAIN` in `.env`.
 
 ### Database files
 
-Before first run, download the τ-bench databases for **airline** and **retail** (or let the servers auto-download on first startup):
+Before first run, download the τ-bench databases for **retail** and **airline** (or let the servers auto-download on first startup):
 
 ```bash
-curl -L -o ./examples/airline/data/db.json \
-  https://raw.githubusercontent.com/sierra-research/tau2-bench/main/data/tau2/domains/airline/db.json
-
 curl -L -o ./examples/retail/data/db.json \
   https://raw.githubusercontent.com/sierra-research/tau2-bench/main/data/tau2/domains/retail/db.json
+
+curl -L -o ./examples/airline/data/db.json \
+  https://raw.githubusercontent.com/sierra-research/tau2-bench/main/data/tau2/domains/airline/db.json
 ```
 
 > Behind a corporate proxy? Add `-x http://<proxy>:<port>` to the `curl` commands.
@@ -235,16 +235,6 @@ curl -s http://localhost:8000/v1/models
 
 Flowise is deployed separately via the **Enterprise Inference agenticai plugin**. See [plugins/agenticai/docs/agenticai-quickstart.md](../../plugins/agenticai/docs/agenticai-quickstart.md) for deployment instructions.
 
-**Quick summary:**
-
-1. Enable in `core/inventory/inference-config.cfg`:
-   ```properties
-   deploy_agenticai_plugin=on
-   ```
-2. Deploy: `cd core && bash inference-stack-deploy.sh` → select *Provision Enterprise Inference Cluster*
-3. Verify: `kubectl get pods -n flowise`
-4. Access: `https://flowise-<your-domain>`
-
 Once Flowise is running:
 
 ### a. Add credential
@@ -314,6 +304,17 @@ Below is a sample exchange with the retail agent. This is just one example use c
 > **User:** I confirm
 >
 > **User:** Now retrieve all my orders and list them with their details
+
+### Try it yourself
+
+The retail database contains 500 synthetic users. Here are two more you can use to start a conversation:
+
+| Authentication method | Value |
+|---|---|
+| Email | `mia.garcia2723@example.com` |
+| Name + Zip | Aarav Anderson, 19031 |
+
+Try asking the agent about their orders, requesting a return on a delivered item, or cancelling a pending order.
 
 ---
 
