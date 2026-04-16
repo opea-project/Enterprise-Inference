@@ -104,17 +104,21 @@ escape_sed_replacement() {
 # Hugging Face token checks for selected model numbers
 check_hf_token_access() {
     log_info "Validating Hugging Face token..."
+
     local response http_code body
     response=$(curl -sS -w $'\n%{http_code}' \
         -H "Authorization: Bearer ${HF_TOKEN}" \
-        "https://huggingface.co/api/whoami-v2")
+        https://huggingface.co/api/whoami-v2)
+
     http_code="${response##*$'\n'}"
     body="${response%$'\n'*}"
+
     if [[ "$http_code" != "200" ]]; then
         log_error "Hugging Face token validation failed (HTTP ${http_code})"
         echo "$body"
         exit 1
     fi
+
     log_success "Hugging Face token is valid"
 
     if [[ -z "${MODELS:-}" ]]; then
@@ -124,45 +128,60 @@ check_hf_token_access() {
 
     IFS=',' read -r -a model_numbers <<< "${MODELS}"
     local model_ids=()
+
     for num in "${model_numbers[@]}"; do
         num="$(echo "$num" | xargs)"
         if [[ -z "$num" ]]; then
             continue
         fi
         if [[ -z "${MODEL_MAP[$num]:-}" ]]; then
-            log_warn "Unknown model number '${num}' (no mapping found)"
-            continue
+            log_error "Unknown model number '${num}'"
+            exit 1
         fi
         model_ids+=("${MODEL_MAP[$num]}")
     done
 
-    if [[ ${#model_ids[@]} -eq 0 ]]; then
-        log_warn "No valid model numbers found; skipping model access checks"
-        return 0
-    fi
+    log_info "Checking model access..."
 
-    log_info "Checking model access for selected numbers..."
-    local seen_ids=()
     for model_id in "${model_ids[@]}"; do
-        if [[ " ${seen_ids[*]} " == *" ${model_id} "* ]]; then
-            continue
-        fi
-        seen_ids+=("${model_id}")
         log_info "Model: ${model_id}"
-        local model_code
-        model_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+
+        # Step 1: Check metadata
+        metadata=$(curl -sS \
             -H "Authorization: Bearer ${HF_TOKEN}" \
             "https://huggingface.co/api/models/${model_id}")
-        if [[ "$model_code" == "200" ]]; then
-            log_success "Access confirmed for ${model_id}"
-            continue
-        fi
-        if [[ "$model_code" == "401" || "$model_code" == "403" ]]; then
-            log_error "Model is gated or token lacks access: ${model_id} (HTTP ${model_code})"
+
+        metadata_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${HF_TOKEN}" \
+            "https://huggingface.co/api/models/${model_id}")
+
+        if [[ "$metadata_code" != "200" ]]; then
+            log_error "Model metadata not accessible (HTTP ${metadata_code})"
             exit 1
         fi
-        log_error "Unable to access model '${model_id}' (HTTP ${model_code})"
-        exit 1
+
+        # Detect gated/private
+        if echo "$metadata" | grep -q '"gated":true'; then
+            log_error "Model '${model_id}' is gated. Token must have accepted license."
+            exit 1
+        fi
+
+        if echo "$metadata" | grep -q '"private":true'; then
+            log_error "Model '${model_id}' is private and token lacks permission."
+            exit 1
+        fi
+
+        # Step 2: Verify real file download access (CRITICAL CHECK)
+        download_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${HF_TOKEN}" \
+            "https://huggingface.co/${model_id}/resolve/main/config.json")
+
+        if [[ "$download_code" != "200" ]]; then
+            log_error "Token does NOT have download access for ${model_id} (HTTP ${download_code})"
+            exit 1
+        fi
+
+        log_success "Access confirmed for ${model_id}"
     done
 }
 
