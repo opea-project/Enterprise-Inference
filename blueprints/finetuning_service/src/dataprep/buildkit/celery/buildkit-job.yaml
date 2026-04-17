@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: buildkit-celery-worker
+  namespace: dataprep
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: buildkit
+          image: moby/buildkit:latest
+          env:
+            - name: http_proxy
+              value: "${http_proxy}"
+            - name: https_proxy
+              value: "${https_proxy}"
+            - name: no_proxy
+              value: "${no_proxy}"
+            - name: REGISTRY_URL
+              value: "$REGISTRY_URL"
+            - name: MINIO_ENDPOINT
+              value: "$MINIO_ENDPOINT"
+            - name: MINIO_ACCESS_KEY
+              value: "$MINIO_ACCESS_KEY"
+            - name: MINIO_SECRET_KEY
+              value: "$MINIO_SECRET_KEY"
+            - name: MINIO_BUCKET_NAME
+              value: "$MINIO_BUCKET_NAME"
+            - name: MINIO_SECURE
+              value: "$MINIO_SECURE"
+            - name: MINIO_REGION
+              value: "$MINIO_REGION"
+            - name: MINIO_CERT_VERIFY
+              value: "$MINIO_CERT_VERIFY"
+            - name: DB_HOST
+              value: "$DB_HOST"
+            - name: DB_PORT
+              value: "$DB_PORT"
+            - name: DB_NAME
+              value: "$DB_NAME"
+            - name: DB_USER
+              value: "$DB_USER"
+            - name: DB_PASSWORD
+              value: "$DB_PASSWORD"
+            - name: DB_POOL_SIZE
+              value: "$DB_POOL_SIZE"
+            - name: DB_MAX_OVERFLOW
+              value: "$DB_MAX_OVERFLOW"
+          command:
+            - buildctl-daemonless.sh
+          args:
+            - build
+            - "--frontend=dockerfile.v0"
+            - "--local=context=/workspace"
+            - "--local=dockerfile=/workspace/buildkit/celery"
+            - "--opt=build-arg:http_proxy=${http_proxy}"
+            - "--opt=build-arg:https_proxy=${https_proxy}"
+            - "--opt=build-arg:no_proxy=${no_proxy}"
+            - "--output=type=image,name=${REGISTRY_URL}/celery-worker:latest,push=true,registry.insecure=true"
+            - "--opt=cache-from=type=registry,ref=${REGISTRY_URL}/celery-worker:buildcache,registry.insecure=true"
+            - "--opt=cache-to=type=registry,ref=${REGISTRY_URL}/celery-worker:buildcache,mode=max,registry.insecure=true"
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            readOnlyRootFilesystem: false
+            privileged: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          volumeMounts:
+            - name: build-context
+              mountPath: /workspace
+              readOnly: true
+            - name: buildkit-tmp
+              mountPath: /tmp
+      volumes:
+        - name: build-context
+          hostPath:
+            path: $BUILD_CONTEXT
+            type: Directory
+        - name: buildkit-tmp
+          emptyDir: {}

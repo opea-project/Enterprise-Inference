@@ -1,0 +1,35 @@
+# Retrieval Service Requirements
+# API Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Vector Search
+faiss-cpu==1.7.4
+numpy==1.24.3
+
+# Sparse Search
+rank-bm25==0.2.2
+
+# HTTP Client (for calling embedding service and GenAI Gateway APIs)
+httpx==0.25.1
+requests>=2.32.0
+
+# OpenAI SDK (used as client for OpenAI-compatible enterprise APIs)
+openai>=1.35.0
+
+# Logging
+python-json-logger==2.0.7
+
+# Environment
+python-dotenv==1.0.0
+
+# Utilities
+python-multipart>=0.0.22
+
+# Production Phase Dependencies (will be used later)
+# sentence-transformers==2.2.2  # For reranking
+# torch==2.1.0
+# transformers==4.35.0
+

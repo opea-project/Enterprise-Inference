@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: registry-proxy
+  namespace: kube-system
+  labels:
+    app: registry-proxy
+spec:
+  selector:
+    matchLabels:
+      app: registry-proxy
+  template:
+    metadata:
+      labels:
+        app: registry-proxy
+    spec:
+      # hostNetwork required: enables socat to listen on the node's network interface
+      # so that localhost:5000 on each node routes to the cluster registry service (KSV-0009 exception)
+      hostNetwork: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: socat
+        image: alpine/socat:1.7.4.4-r0
+        args:
+          - tcp-listen:5000,fork,reuseaddr
+          - tcp-connect:registry.kube-system.svc.cluster.local:5000
+        ports:
+        - name: registry
+          containerPort: 5000
+          # hostPort required: binds port 5000 on each node for BuildKit to push images (KSV-0024 exception)
+          hostPort: 5000
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          privileged: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL

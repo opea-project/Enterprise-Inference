@@ -1,0 +1,123 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+###########################################################################
+# Deploy Fine-Tuning UI
+###########################################################################
+- name: Validate Required UI Variables
+  fail:
+    msg: |
+      ERROR: {{ item.name }} is not defined!
+      When running this playbook independently, provide the required Keycloak/UI variables,
+      or run via deploy-all.yml.
+  when: vars[item.var] is not defined or vars[item.var] | length == 0
+  loop:
+    - { var: 'cluster_url', name: 'Cluster URL' }
+    - { var: 'finetune_keycloak_ui_client_id', name: 'Keycloak UI Client ID' }
+    - { var: 'finetune_keycloak_url', name: 'Keycloak URL' }
+    - { var: 'finetune_keycloak_realm', name: 'Keycloak Realm' }
+    - { var: 'finetune_nextauth_secret', name: 'NextAuth Secret' }
+  run_once: true
+
+- name: Check Fine-Tuning UI Helm release status
+  shell: |
+    helm list -n {{ finetune_ui_namespace }} -a --filter '^{{ finetune_ui_name }}$' -o json
+  register: finetune_ui_release_list
+  changed_when: false
+  failed_when: false
+  run_once: true
+
+- name: Parse Fine-Tuning UI Helm release status
+  set_fact:
+    finetune_ui_release_status: "{{ (finetune_ui_release_list.stdout | default('[]') | from_json)[0].status if ((finetune_ui_release_list.stdout | default('[]') | from_json) | length > 0) else 'absent' }}"
+  run_once: true
+
+- name: Remove failed or partial Fine-Tuning UI Helm release
+  shell: |
+    timeout 60s helm uninstall {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} --wait || true
+  when: finetune_ui_release_status != 'absent' and finetune_ui_release_status != 'deployed'
+  changed_when: false
+  failed_when: false
+  run_once: true
+
+- name: Remove stale Fine-Tuning UI resources when release is not deployed
+  shell: |
+    kubectl delete deployment {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} \
+      --ignore-not-found=true --force --grace-period=0 || true
+    kubectl delete replicaset -n {{ finetune_ui_namespace }} \
+      -l app.kubernetes.io/name={{ finetune_ui_name }} --ignore-not-found=true --force --grace-period=0 || true
+    kubectl delete pods -n {{ finetune_ui_namespace }} \
+      -l app.kubernetes.io/name={{ finetune_ui_name }} --ignore-not-found=true --force --grace-period=0 || true
+    kubectl delete service {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} --ignore-not-found=true || true
+    kubectl delete horizontalpodautoscaler {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} --ignore-not-found=true || true
+    kubectl delete apisixroute {{ finetune_ui_name }}-apisixroute -n {{ finetune_ui_namespace }} --ignore-not-found=true || true
+    kubectl delete ingress {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} --ignore-not-found=true || true
+  when: finetune_ui_release_status != 'deployed'
+  failed_when: false
+  run_once: true
+
+- name: Wait for stale Fine-Tuning UI deployment to be fully deleted
+  shell: |
+    for i in $(seq 1 30); do
+      if ! kubectl get deployment {{ finetune_ui_name }} -n {{ finetune_ui_namespace }} >/dev/null 2>&1; then
+        echo "Deployment gone after ${i}s"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "WARNING: deployment still present after 30s, proceeding anyway"
+    exit 0
+  when: finetune_ui_release_status != 'deployed'
+  changed_when: false
+  failed_when: false
+  run_once: true
+
+- name: Build Fine-Tuning UI Helm env overrides
+  set_fact:
+    finetune_ui_env:
+      - { name: "NEXT_PUBLIC_AUTH_URL", value: "{{ finetune_keycloak_url + '/realms/' + finetune_keycloak_realm }}" }
+      - { name: "NEXT_PUBLIC_FILES_BASE_URL", value: "{{ 'https://' + cluster_url + '/enterprise-ai' }}" }
+      - { name: "NEXT_PUBLIC_DATAPREP_BASE_URL", value: "{{ 'https://' + cluster_url + '/enterprise-ai' }}" }
+      - { name: "NEXT_PUBLIC_FINETUNING_API_URL", value: "{{ 'https://' + cluster_url + '/enterprise-ai' }}" }
+      - { name: "NEXT_TELEMETRY_DISABLED", value: "1" }
+      - { name: "NEXT_PUBLIC_BASE_PATH", value: "/enterprise-ai/ui" }
+      - { name: "NEXTAUTH_URL", value: "{{ 'https://' + cluster_url + '/enterprise-ai/ui/api/auth' }}" }
+      - { name: "NEXTAUTH_SECRET", value: "{{ finetune_nextauth_secret }}" }
+      - { name: "KEYCLOAK_CLIENT_ID", value: "{{ finetune_keycloak_ui_client_id }}" }
+      - { name: "KEYCLOAK_CLIENT_SECRET", value: "{{ finetune_keycloak_backend_client_secret }}" }
+      - { name: "KEYCLOAK_ISSUER", value: "{{ 'https://' + cluster_url + '/realms/' + finetune_keycloak_realm }}" }
+  run_once: true
+
+- name: Deploy Fine-Tuning UI Helm Chart (includes APISIX Route)
+  shell: |
+    helm upgrade --install {{ finetune_ui_name }} {{ finetune_ui_source_path }}/deployment/helmcharts/finetuning-ui-chart \
+      --namespace {{ finetune_ui_namespace }} \
+      --set replicaCount={{ finetune_ui_replica_count | int }} \
+      --set image.repository={{ finetune_ui_image_repository }} \
+      --set image.tag={{ finetune_ui_image_tag }} \
+      --set image.pullPolicy={{ finetune_ui_image_pull_policy }} \
+      --set service.port={{ finetune_ui_service_port | int }} \
+      --set service.targetPort={{ finetune_ui_service_port | int }} \
+      --set app.port={{ finetune_ui_service_port | int }} \
+      --set resources.requests.cpu={{ finetune_ui_cpu_request }} \
+      --set resources.requests.memory={{ finetune_ui_memory_request }} \
+      --set resources.limits.cpu={{ finetune_ui_cpu_limit }} \
+      --set resources.limits.memory={{ finetune_ui_memory_limit }} \
+      --set ingress.enabled=false \
+      --set apisixRoute.enabled=true \
+      --set apisixRoute.proxyRewrite.enabled=false \
+      --set-string apisixRoute.hosts[0]={{ cluster_url | quote }} \
+      --set-json app.env='{{ finetune_ui_env | to_json }}' \
+      --force --wait --timeout 5m
+  register: finetune_ui_helm_result
+  failed_when:
+    - finetune_ui_helm_result.rc != 0
+    - "'already exists' not in finetune_ui_helm_result.stderr"
+  run_once: true
+
+- name: Wait for Fine-Tuning UI to be Ready
+  shell: |
+    kubectl rollout status deployment/{{ finetune_ui_name }} \
+      --namespace={{ finetune_ui_namespace }} \
+      --timeout=120s
+  run_once: true

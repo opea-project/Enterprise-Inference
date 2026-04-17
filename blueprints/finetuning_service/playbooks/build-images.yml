@@ -1,0 +1,93 @@
+# Copyright (C) 2024-2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+###########################################################################
+# Build Container Images using BuildKit (rootless)
+###########################################################################
+- name: Display Build Message
+  debug:
+    msg:
+      - "=============================================="
+      - "Building container images with BuildKit (rootless)..."
+      - "This will take several minutes."
+      - "Build Order: DataPrep → API → UI"
+      - "=============================================="
+  run_once: true
+
+- name: Ensure BuildKit scripts are executable
+  shell: |
+    chmod +x {{ dataprep_source_path }}/buildkit/data-prep/deploy-dataprep.sh
+    chmod +x {{ dataprep_source_path }}/buildkit/celery/deploy-celery.sh
+    chmod +x {{ finetune_api_source_path }}/buildkit/deploy-finetuning.sh
+    chmod +x {{ finetune_ui_source_path }}/deployment/buildkit/deploy-frontend.sh
+  run_once: true
+
+- name: Set proxy build args for BuildKit
+  set_fact:
+    buildkit_proxy_args: >-
+      {% if env_proxy is defined and env_proxy.http_proxy | default('') != '' %}
+      HTTP_PROXY={{ env_proxy.http_proxy }}
+      http_proxy={{ env_proxy.http_proxy }}
+      {% if env_proxy.https_proxy | default('') != '' %}
+      HTTPS_PROXY={{ env_proxy.https_proxy }}
+      https_proxy={{ env_proxy.https_proxy }}
+      {% endif %}
+      {% if env_proxy.no_proxy | default('') != '' %}
+      NO_PROXY={{ env_proxy.no_proxy }}
+      no_proxy={{ env_proxy.no_proxy }}
+      {% endif %}
+      {% else %}
+      {% endif %}
+  run_once: true
+
+- name: Build Data Prep Backend Image with BuildKit
+  shell: |
+    kubectl delete job buildkit-data-prep-backend -n {{ dataprep_namespace }} --ignore-not-found=true 2>/dev/null || true
+    cd {{ dataprep_source_path }}/buildkit/data-prep && \
+    NAMESPACE={{ dataprep_namespace }} {{ buildkit_proxy_args | trim }} ./deploy-dataprep.sh
+  run_once: true
+
+###########################################################################
+# Build Data Prep Celery Worker Image with BuildKit
+###########################################################################
+- name: Build Celery Worker Image with BuildKit
+  shell: |
+    kubectl delete job buildkit-celery-worker -n {{ dataprep_namespace }} --ignore-not-found=true 2>/dev/null || true
+    cd {{ dataprep_source_path }}/buildkit/celery && \
+    NAMESPACE={{ dataprep_namespace }} {{ buildkit_proxy_args | trim }} ./deploy-celery.sh
+    kubectl wait --for=condition=complete --timeout=600s job/buildkit-celery-worker -n {{ dataprep_namespace }}
+  run_once: true
+
+###########################################################################
+# Build Fine-Tuning API Image with BuildKit (SECOND - uses MinIO from DataPrep)
+###########################################################################
+- name: Build Fine-Tuning API Image with BuildKit
+  shell: |
+    cd {{ finetune_api_source_path }}/buildkit && \
+    NAMESPACE={{ finetune_api_namespace }} {{ buildkit_proxy_args | trim }} ./deploy-finetuning.sh
+  run_once: true
+
+###########################################################################
+# Build Fine-Tuning UI Image with BuildKit (THIRD)
+###########################################################################
+- name: Build Fine-Tuning UI Image with BuildKit
+  shell: |
+    cd {{ finetune_ui_source_path }}/deployment/buildkit && \
+    NAMESPACE={{ finetune_ui_namespace }} \
+    {{ buildkit_proxy_args | trim }} \
+    NEXT_PUBLIC_BASE_PATH=/enterprise-ai/ui \
+    NEXT_PUBLIC_AUTH_URL={{ ('https://' + cluster_url + '/realms/' + finetune_keycloak_realm) | quote }} \
+    NEXT_PUBLIC_FILES_BASE_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_PUBLIC_DATAPREP_BASE_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_PUBLIC_FINETUNING_API_URL={{ ('https://' + cluster_url + '/enterprise-ai') | quote }} \
+    NEXT_TELEMETRY_DISABLED=1 \
+    ./deploy-frontend.sh
+  run_once: true
+
+- name: Display Build Complete Message
+  debug:
+    msg:
+      - "=============================================="
+      - "Container images built successfully!"
+      - "=============================================="
+  run_once: true

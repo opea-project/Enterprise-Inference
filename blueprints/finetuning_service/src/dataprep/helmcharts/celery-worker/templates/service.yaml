@@ -1,0 +1,19 @@
+{{- if .Values.flower.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "celery.fullname" . }}-flower
+  labels:
+    app: {{ include "celery.name" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.flower.service.type }}
+  ports:
+    - port: {{ .Values.flower.service.port }}
+      targetPort: 5555
+      protocol: TCP
+      name: flower
+  selector:
+    app: {{ include "celery.name" . }}
+    release: {{ .Release.Name }}
+{{- end }}

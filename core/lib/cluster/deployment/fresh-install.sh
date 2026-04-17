@@ -19,7 +19,7 @@ fresh_installation() {
 
     echo "Deployment configuration: $deploy_kubernetes_fresh"
 
-    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" && "$deploy_agenticai_plugin" == "no" ]]; then
+    if [[ "$deploy_kubernetes_fresh" == "no" && "$deploy_habana_ai_operator" == "no" && "$deploy_ingress_controller" == "no" && "$deploy_keycloak" == "no" && "$deploy_apisix" == "no" && "$deploy_llm_models" == "no" && "$deploy_observability" == "no" && "$deploy_genai_gateway" == "no" && "$deploy_istio" == "no" && "$deploy_ceph" == "no" && "$uninstall_ceph" == "no"  && "$deploy_nri_balloon_policy" == "no" && "$deploy_agenticai_plugin" == "no" && "$deploy_finetune_plugin" == "no" ]]; then
 
     # Check if all deployment steps are set to "no" after getting user input
         echo "No installation or deployment steps selected. Skipping setup_initial_env..."
@@ -147,6 +147,24 @@ fresh_installation() {
                 fi
             else
                 echo "Skipping Agentic AI Plugin deployment..."
+            fi
+
+            if [[ "$deploy_finetune_plugin" == "yes" ]]; then
+                echo "Deploying Fine-Tuning Plugin..."
+                ansible-playbook -i "${INVENTORY_PATH}" ../../blueprints/finetuning_service/playbooks/deploy-all.yml \
+                    --extra-vars "cluster_url=${cluster_url} \
+                                  cert_file=${cert_file} \
+                                  key_file=${key_file} \
+                                  kubernetes_platform=${kubernetes_platform}" \
+                    --vault-password-file "$vault_pass_file"
+                if [ $? -eq 0 ]; then
+                    echo "Fine-Tuning Plugin deployed successfully."
+                else
+                    echo "Failed to deploy Fine-Tuning Plugin. Exiting!."
+                    exit 1
+                fi
+            else
+                echo "Skipping Fine-Tuning Plugin deployment..."
             fi
             
             if [[ "$deploy_istio" == "yes" ]]; then
