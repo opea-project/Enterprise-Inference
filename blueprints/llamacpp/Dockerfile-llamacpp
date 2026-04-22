@@ -2,7 +2,7 @@ FROM intel/oneapi-basekit:latest
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG LLAMA_CPP_REPO=https://github.com/ggml-org/llama.cpp.git
-ARG LLAMA_CPP_REF=master
+ARG LLAMA_CPP_REF=b8750
 
 SHELL ["/bin/bash", "-lc"]
 
