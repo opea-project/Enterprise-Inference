@@ -6,6 +6,8 @@ Two-server MCP architecture for code-execution agents:
 
 Designed for Flowise / custom MCP clients.
 
+> **Disclaimer:** This is a reference application intended for demonstration and evaluation purposes only. The `execute_python` tool allows the LLM agent to generate and execute Python code in a sandboxed environment. Review and harden the sandbox security configuration before any production use.
+
 ## Architecture
 
 ```
@@ -76,158 +78,19 @@ docker compose down -v                 # stop + remove session volumes
 
 You need a running vLLM endpoint serving `Qwen/Qwen3-Coder-30B-A3B-Instruct` (or a compatible tool-calling model).
 
-### Pre-download model (recommended)
+### Enterprise Inference (Kubernetes)
 
-```bash
-pip install huggingface_hub
-huggingface-cli login
-huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct
-```
-
-### Option A: Enterprise Inference (Kubernetes)
-
-Deploy vLLM via the [Enterprise Inference](../../docs/README.md) Helm charts. `Qwen/Qwen3-Coder-30B-A3B-Instruct` is not in the EI pre-validated model menu, but vLLM supports it natively. See the [EI deployment guide](../../docs/README.md) for prerequisites and cluster setup.
-
-#### TP=1 (recommended for simplicity)
-
-Single worker, OS-managed scheduling. Best starting point — avoids NUMA binding complexity.
+Deploy the model using [Enterprise Inference](../../docs/README.md). EI handles model download, CPU pinning, NUMA binding, and proxy configuration automatically.
 
 ```bash
 cd /path/to/Enterprise-Inference
 helm install vllm-qwen3-coder ./core/helm-charts/vllm \
   -n default \
   -f ./core/helm-charts/vllm/xeon-values.yaml \
-  --set LLM_MODEL_ID="Qwen/Qwen3-Coder-30B-A3B-Instruct" \
-  --set shmSize="4Gi" \
-  --set tensor_parallel_size="1" \
-  --set pipeline_parallel_size="1" \
-  --set-string configMapOverrides.VLLM_CPU_OMP_THREADS_BIND="all" \
-  --set-string configMapOverrides.VLLM_CPU_KVCACHE_SPACE="10" \
-  --set-string configMapOverrides.VLLM_CPU_NUM_OF_RESERVED_CPU="0"
+  --set LLM_MODEL_ID="Qwen/Qwen3-Coder-30B-A3B-Instruct"
 ```
 
-| Parameter | Value | Why |
-|---|---|---|
-| `tensor_parallel_size` | `1` | Single worker — no multi-process coordination |
-| `VLLM_CPU_OMP_THREADS_BIND` | `all` | Skips manual binding — avoids NRI/NUMA conflicts |
-| `VLLM_CPU_KVCACHE_SPACE` | `10` GB | Sufficient for `max-num-seqs=8` |
-| `VLLM_CPU_NUM_OF_RESERVED_CPU` | `0` | Must be 0 — value of 1 causes binding to NRI-reserved core 0 |
-
-#### TP=2 (better throughput, requires NUMA-aware binding)
-
-Splits the model across 2 workers, each bound to specific NUMA nodes. You **must** provide explicit `VLLM_CPU_OMP_THREADS_BIND` ranges.
-
-First, find your NUMA topology and NRI reserved cores:
-
-```bash
-lscpu | grep -E "NUMA node[0-9]"
-kubectl get configmap -n kube-system nri-resource-policy-balloons-config -o yaml | grep -A5 reservedResources
-```
-
-Build per-worker bind ranges that **exclude** NRI-reserved cores. Format: `<worker0-cores>|<worker1-cores>`.
-
-Example for a 4-NUMA-node machine where NRI reserves cores 0, 43, 86, 129, 172, 215, 258, 301:
-
-```bash
-helm install vllm-qwen3-coder ./core/helm-charts/vllm \
-  -n default \
-  -f ./core/helm-charts/vllm/xeon-values.yaml \
-  --set LLM_MODEL_ID="Qwen/Qwen3-Coder-30B-A3B-Instruct" \
-  --set shmSize="4Gi" \
-  --set tensor_parallel_size="2" \
-  --set pipeline_parallel_size="1" \
-  --set-string configMapOverrides.VLLM_CPU_OMP_THREADS_BIND="1-42\,173-214\,87-128\,259-300|44-85\,216-257\,130-171\,302-343" \
-  --set-string configMapOverrides.VLLM_CPU_KVCACHE_SPACE="20" \
-  --set-string configMapOverrides.VLLM_CPU_NUM_OF_RESERVED_CPU="0"
-```
-
-> **Warning:** The bind ranges above are machine-specific. Adapt them to your NUMA layout and NRI reserved cores. Incorrect ranges cause `sched_setaffinity errno: 22` crashes.
-
-#### Post-install verification
-
-```bash
-kubectl get pods -n default | grep vllm
-kubectl logs -n default -l app.kubernetes.io/instance=vllm-qwen3-coder -f
-
-curl -s --noproxy '*' http://$(kubectl get svc vllm-qwen3-coder-service -n default -o jsonpath='{.spec.clusterIP}')/v1/models
-```
-
-Your vLLM endpoint for Flowise:
-```
-http://vllm-qwen3-coder-service.default.svc.cluster.local/v1
-```
-
-> The K8s service listens on port **80** (not 8000). Use the URL above without a port number.
-
-#### vLLM v0.16.0: LOGNAME fix
-
-The v0.16.0 image runs as UID 1001 without a `/etc/passwd` entry, causing `getpwuid()` errors. Fix:
-
-```bash
-kubectl patch configmap vllm-qwen3-coder-config -n default --type=merge -p='{"data":{"LOGNAME":"vllm"}}'
-kubectl rollout restart deployment/vllm-qwen3-coder -n default
-```
-
-#### Behind a corporate proxy
-
-If the vLLM pod can't reach HuggingFace, set the proxy:
-
-```bash
-kubectl patch configmap vllm-qwen3-coder-config -n default --type=merge \
-  -p='{"data":{"http_proxy":"http://your-proxy:port","https_proxy":"http://your-proxy:port","no_proxy":"localhost,127.0.0.1,.svc,.svc.cluster.local,10.0.0.0/8"}}'
-kubectl rollout restart deployment/vllm-qwen3-coder -n default
-```
-
-If the model weights are already cached and you want to skip network access:
-
-```bash
-kubectl patch configmap vllm-qwen3-coder-config -n default --type=merge -p='{"data":{"HF_HUB_OFFLINE":"1"}}'
-kubectl rollout restart deployment/vllm-qwen3-coder -n default
-```
-
-### Option B: Standalone Docker
-
-Run vLLM in Docker on a CPU machine (**~80 GB free RAM** required).
-
-```bash
-export HF_TOKEN="hf_your_token_here"
-
-docker run -d --name vllm-qwen3-coder \
-  -p 8000:8000 \
-  --ipc=host \
-  --security-opt seccomp=unconfined \
-  -e HF_TOKEN=${HF_TOKEN} \
-  -e VLLM_CPU_KVCACHE_SPACE=10 \
-  -e VLLM_CPU_NUM_OF_RESERVED_CPU=0 \
-  -e LOGNAME=vllm \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.16.0 \
-    --model Qwen/Qwen3-Coder-30B-A3B-Instruct \
-    --dtype bfloat16 \
-    --max-model-len 32768 \
-    --max-num-seqs 8 \
-    --enable-auto-tool-choice \
-    --tool-call-parser qwen3_coder \
-    --port 8000
-```
-
-| Parameter | Value | Notes |
-|---|---|---|
-| `--ipc=host` | — | Required for shared memory |
-| `--security-opt seccomp=unconfined` | — | Required for `sched_setaffinity` |
-| `VLLM_CPU_KVCACHE_SPACE` | `10` | 10 GB KV cache |
-| `VLLM_CPU_NUM_OF_RESERVED_CPU` | `0` | Avoids binding to reserved cores |
-| `--tool-call-parser` | `qwen3_coder` | Required for Qwen3 tool calling |
-| `LOGNAME` | `vllm` | Fixes `getpwuid()` in v0.16.0 |
-
-Model loading takes **3-10 minutes** on CPU:
-
-```bash
-docker logs -f vllm-qwen3-coder
-curl -s http://localhost:8000/v1/models
-```
-
-> If `public.ecr.aws` is blocked, pull from a machine with access and transfer via `docker save`/`docker load`.
+See the [EI deployment guide](../../docs/README.md) for full instructions, proxy setup, and troubleshooting.
 
 ---
 
@@ -265,9 +128,8 @@ Once Flowise is running:
 
 | Deployment | Base Path |
 |---|---|
-| Option A (EI, in-cluster) | `http://vllm-qwen3-coder-service.default.svc.cluster.local/v1` |
-| Option A (EI, external) | `http://<node-ip>:<nodeport>/v1` |
-| Option B (Docker) | `http://<host-ip>:8000/v1` |
+| EI (in-cluster) | `http://vllm-qwen3-coder-service.default.svc.cluster.local/v1` |
+| EI (external) | `http://<node-ip>:<nodeport>/v1` |
 
 > Find your host IP: `hostname -I | awk '{print $1}'`
 
@@ -355,11 +217,7 @@ docker compose down -v         # + remove session volumes
 vLLM cleanup:
 
 ```bash
-# Option A (EI)
 helm uninstall vllm-qwen3-coder -n default
-
-# Option B (Docker)
-docker stop vllm-qwen3-coder && docker rm vllm-qwen3-coder
 ```
 
 ---
@@ -368,8 +226,7 @@ docker stop vllm-qwen3-coder && docker rm vllm-qwen3-coder
 
 | Service | URL | Notes |
 |---|---|---|
-| vLLM (Option A) | `http://vllm-qwen3-coder-service.default.svc.cluster.local/v1` | K8s internal, port 80 |
-| vLLM (Option B) | `http://localhost:8000/v1` | Docker, port 8000 |
+| vLLM (EI) | `http://vllm-qwen3-coder-service.default.svc.cluster.local/v1` | K8s internal, port 80 |
 | tools-server | `http://localhost:5050/sse` | Internal — used by sandbox |
 | sandbox-server | `http://localhost:5051/sse` | Flowise connects here |
 
@@ -436,30 +293,12 @@ If it shows a version newer than `3.0.12`, update the image tag in `plugins/agen
 - URL must use host IP: `http://<host-ip>:5051/sse`
 - Check logs: `docker compose logs -f sandbox-server tools-server`
 
-### vLLM OOMKilled (exit code 137)
 
-- Need ~80 GB free RAM (`free -h`)
-- Reduce `VLLM_CPU_KVCACHE_SPACE` to `5` or use a smaller model
-- With TP=1, use `VLLM_CPU_OMP_THREADS_BIND="all"` to avoid NUMA strict binding
-
-### vLLM: `sched_setaffinity errno: 22`
-
-`VLLM_CPU_OMP_THREADS_BIND` includes NRI-reserved cores. Check and rebuild ranges:
-
-```bash
-kubectl get configmap -n kube-system nri-resource-policy-balloons-config -o yaml | grep -A5 reservedResources
-```
-
-### vLLM v0.16.0: `getpwuid(): uid not found: 1001`
-
-Add `LOGNAME=vllm` — see [LOGNAME fix](#vllm-v0160-logname-fix) above, or `-e LOGNAME=vllm` for Docker.
-
-### vLLM image won't pull (ECR blocked)
-
-Pull from a machine with access and transfer: `docker save` / `docker load`.
 
 ---
 
 ## Data Attribution
 
-The retail and airline databases are sourced from [τ-bench](https://github.com/sierra-research/tau2-bench) by Sierra Research (MIT license). They contain synthetic data for evaluating tool-calling agents. The servers auto-download these files on first run if not present locally.
+The retail and airline databases are sourced from [τ-bench](https://github.com/sierra-research/tau2-bench) by Sierra Research (MIT license). They contain **synthetic data** generated for testing and demonstration purposes only — no personal or real-world data is used. The banking and stocks databases bundled in this repository are also entirely synthetic. The retail and airline databases are auto-downloaded from τ-bench on first run if not present locally.
+
+See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for full attribution.

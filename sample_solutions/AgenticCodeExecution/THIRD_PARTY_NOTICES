@@ -1,0 +1,10 @@
+This project includes or references components from the following third-party projects:
+
+τ-bench (tau2-bench)
+https://github.com/sierra-research/tau2-bench
+License: MIT
+Copyright (c) Sierra Research
+
+The retail and airline domain databases used in this solution are sourced from
+τ-bench. They contain synthetic data generated for testing and evaluation of
+tool-calling agents. No personal or real-world data is used.
