@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: examples/Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-public.ecr.aws/docker/library/python:3.12-slim}
     container_name: mcp-tools-server
     ports:
       - "5050:5050"
@@ -36,6 +38,8 @@ services:
     build:
       context: .
       dockerfile: sandbox-server/Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-public.ecr.aws/docker/library/python:3.12-slim}
     container_name: mcp-sandbox-server
     depends_on:
       tools-server:

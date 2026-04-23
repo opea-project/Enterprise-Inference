@@ -23,6 +23,32 @@ Flowise (or other MCP client)
 
 **sandbox-server (port 5051)** — Exposes `execute_python` and proxies `actions.*` calls to tools-server. Uses session-aware routing (`mcp-session-id`) and stores run hashes in `sandbox-server/session_hashes/`. Starts independently and auto-refreshes tool discovery in the background. Dynamically regenerates `execute_python` description when connected tools change.
 
+## Minimum Hardware Requirements
+
+Measured on a bare-metal deployment with `Qwen/Qwen3-Coder-30B-A3B-Instruct` (BF16, ~57 GB model weights).
+
+| Resource | Minimum | Recommended | Notes |
+|---|---|---|---|
+| **RAM** | 80 GB | 128 GB | vLLM alone uses ~81 GB RSS (model weights + KV cache + runtime). K8s + Flowise + MCP add ~8 GB. |
+| **CPU cores** | 16 | 32+ | vLLM CPU inference is compute-bound. More cores reduce latency. |
+| **Disk** | 120 GB | 200 GB | ~57 GB model weights, ~2 GB container images, ~30 GB K8s/containerd, OS overhead. |
+| **NUMA** | — | interleave | Multi-socket systems **must** use `numactl --interleave=all` for vLLM. See [NUMA notes](#numa-considerations) below. |
+
+### NUMA considerations
+
+On multi-NUMA-node systems (e.g. dual-socket Xeon), vLLM's IPEX backend migrates all memory to a single NUMA node by default. Since each node typically has only 30–32 GB, the model loading fails with OOM on a 60 GB+ model.
+
+**Solution:** Launch vLLM with memory interleaving and disable IPEX's thread binding:
+
+```bash
+VLLM_CPU_OMP_THREADS_BIND=nobind numactl --interleave=all vllm serve <model> ...
+```
+
+- `VLLM_CPU_OMP_THREADS_BIND=nobind` — prevents IPEX from calling `numa_migrate_pages()`.
+- `numactl --interleave=all` — distributes allocations evenly across all NUMA nodes.
+
+---
+
 ## Quick Start (Docker)
 
 ```bash
@@ -80,7 +106,7 @@ You need a running vLLM endpoint serving `Qwen/Qwen3-Coder-30B-A3B-Instruct` (or
 
 ### Enterprise Inference (Kubernetes)
 
-Deploy the model using [Enterprise Inference](../../docs/README.md). EI handles model download, CPU pinning, NUMA binding, and proxy configuration automatically.
+Deploy the model using [Enterprise Inference](../../docs/README.md). EI handles model download, proxy configuration, and basic CPU pinning.
 
 ```bash
 cd /path/to/Enterprise-Inference
@@ -89,6 +115,14 @@ helm install vllm-qwen3-coder ./core/helm-charts/vllm \
   -f ./core/helm-charts/vllm/xeon-values.yaml \
   --set LLM_MODEL_ID="Qwen/Qwen3-Coder-30B-A3B-Instruct"
 ```
+
+> **Multi-NUMA systems:** If the model is larger than a single NUMA node's memory (e.g. ~60 GB model on a system with 4 × 32 GB NUMA nodes), the default vLLM/IPEX configuration will fail with OOM. You **must** set two environment variables in the vLLM container:
+>
+> ```
+> VLLM_CPU_OMP_THREADS_BIND=nobind
+> ```
+>
+> and launch the process with `numactl --interleave=all`. See [NUMA considerations](#numa-considerations) for details.
 
 See the [EI deployment guide](../../docs/README.md) for full instructions, proxy setup, and troubleshooting.
 
