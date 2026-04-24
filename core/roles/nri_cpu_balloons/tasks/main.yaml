@@ -281,7 +281,7 @@
   tags:
     - install
 
-- name: Ensure NRI plugins Helm repository is available
+- name: Ensure NRI plugins Helm repository is available (internet)
   kubernetes.core.helm_repository:
     name: "{{ nri_cpu_balloons.helm.repo_name }}"
     repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
@@ -296,7 +296,23 @@
   until: helm_repo_result is succeeded
   delegate_to: "{{ groups['kube_control_plane'][0] }}"
   run_once: true
-  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  when:
+    - not airgap_enabled | default(false) | bool
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
+  tags:
+    - install
+
+- name: Ensure NRI plugins Helm repository is available (airgap via JFrog)
+  ansible.builtin.command: >
+    helm repo add {{ nri_cpu_balloons.helm.repo_name }} {{ helm_repo_nri_plugins }}
+    --username {{ jfrog_username }} --password {{ jfrog_password }}
+    --force-update
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  changed_when: false
+  when:
+    - airgap_enabled | default(false) | bool
+    - not vllm_balloon_exists or balloon_needs_update | default(false)
   tags:
     - install
 

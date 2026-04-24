@@ -46,7 +46,40 @@ fresh_installation() {
 
             if [[ "$deploy_kubernetes_fresh" == "yes" ]]; then
                 echo "Starting fresh installation of Intel AI for Enterprise Inference Cluster..."
+                if [[ "$airgap_enabled" == "yes" ]]; then
+                    echo "Airgap mode: fixing containerd mirrors and purging any stale image blobs before Kubernetes install..."
+                    local _b64 _jfrog_host
+                    _jfrog_host=$(echo "$jfrog_url" | sed 's|https\?://||' | sed 's|/.*||')
+                    _b64=$(echo -n "${jfrog_username}:${jfrog_password}" | base64 -w 0)
+                    for _reg in docker.io ghcr.io registry.k8s.io quay.io public.ecr.aws; do
+                        sudo mkdir -p /etc/containerd/certs.d/$_reg
+                        sudo tee /etc/containerd/certs.d/$_reg/hosts.toml > /dev/null <<EOF
+server = "https://$_reg"
+[host."http://${_jfrog_host}/v2/ei-docker-virtual"]
+  capabilities = ["pull", "resolve"]
+  override_path = true
+  [host."http://${_jfrog_host}/v2/ei-docker-virtual".header]
+    Authorization = ["Basic $_b64"]
+EOF
+                    done
+                    # Purge any HTML blobs cached from failed prior pulls (containerd corruption loop)
+                    for _img in docker.io/library/nginx:1.25.2-alpine; do
+                        sudo crictl rmi "$_img" 2>/dev/null; true
+                        sudo ctr -n k8s.io images rm "$_img" 2>/dev/null; true
+                    done
+                    sudo find /var/lib/containerd/io.containerd.content.v1.content/blobs/sha256 \
+                        -size +100k -newer /etc/containerd/config.toml \
+                        -exec sh -c 'file "$1" | grep -q "HTML" && sudo rm -f "$1"' _ {} \; 2>/dev/null; true
+                    sudo systemctl restart containerd
+                    echo "Containerd mirrors configured and restarted."
+                fi
                 install_kubernetes "$@"
+                if [[ "$airgap_enabled" == "yes" ]]; then
+                    echo "Patching local-path-config to use busybox:1.28 (airgap mode)..."
+                    kubectl patch configmap local-path-config -n local-path-storage --type merge -p \
+                      '{"data":{"helperPod.yaml":"apiVersion: v1\nkind: Pod\nmetadata:\n  name: helper-pod\nspec:\n  containers:\n  - name: helper-pod\n    image: \"docker.io/library/busybox:1.28\"\n    imagePullPolicy: IfNotPresent"}}' \
+                      2>/dev/null || true
+                fi
             else
                 echo "Skipping Kubernetes installation..."
             fi
@@ -137,7 +170,11 @@ fresh_installation() {
                     --extra-vars "cluster_url=${cluster_url} \
                                   cert_file=${cert_file} \
                                   key_file=${key_file} \
-                                  kubernetes_platform=${kubernetes_platform}" \
+                                  kubernetes_platform=${kubernetes_platform} \
+                                  airgap_enabled=${airgap_enabled} \
+                                  jfrog_url=${jfrog_url} \
+                                  jfrog_username=${jfrog_username} \
+                                  jfrog_password=${jfrog_password}" \
                     --vault-password-file "$vault_pass_file"
                 if [ $? -eq 0 ]; then
                     echo "Agentic AI Plugin deployed successfully."
@@ -230,5 +267,9 @@ fresh_installation() {
 
 run_fresh_install_playbook() {
     echo "Running the cluster.yml playbook to set up the Kubernetes cluster..."
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root cluster.yml
+    local _airgap_extra_vars=""
+    if [[ "$airgap_enabled" == "yes" ]]; then
+        _airgap_extra_vars="--extra-vars \"airgap_enabled=true jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}\""
+    fi
+    eval ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root cluster.yml ${_airgap_extra_vars}
 }

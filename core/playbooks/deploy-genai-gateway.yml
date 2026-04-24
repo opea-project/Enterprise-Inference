@@ -29,7 +29,7 @@
             name: genai-gateway
       run_once: true
     - name: Create TLS secret for GenAI Gateway
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -109,11 +109,61 @@
         helm dependency update {{ remote_helm_charts_base }}/genai-gateway
       register: genai_gateway_deps
       run_once: true
+      when: not airgap_enabled | bool
+
+    - name: Ensure genai-gateway charts directory exists (airgap)
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/charts"
+        state: directory
+        mode: "0755"
+      run_once: true
+      when: airgap_enabled | bool
+
+    - name: Add JFrog Helm repo for genai-gateway dependencies (airgap)
+      ansible.builtin.command: >
+        helm repo add ei-helm-deps {{ jfrog_url }}/ei-helm-virtual
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      run_once: true
+      when: airgap_enabled | bool
+      changed_when: false
+
+    - name: Patch genai-gateway Chart.yaml - replace OCI repo with JFrog HTTP (airgap)
+      ansible.builtin.replace:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/Chart.yaml"
+        regexp: 'repository: oci://registry-1\.docker\.io/bitnamicharts'
+        replace: "repository: {{ jfrog_url }}/ei-helm-virtual"
+      run_once: true
+      when: airgap_enabled | bool
+
+    - name: Patch genai-gateway Chart.yaml - pin postgresql version (airgap)
+      ansible.builtin.replace:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/Chart.yaml"
+        regexp: 'version: ">=13\.3\.0"'
+        replace: 'version: "16.7.4"'
+      run_once: true
+      when: airgap_enabled | bool
+
+    - name: Patch genai-gateway Chart.yaml - pin redis version (airgap)
+      ansible.builtin.replace:
+        path: "{{ remote_helm_charts_base }}/genai-gateway/Chart.yaml"
+        regexp: 'version: ">=18\.0\.0"'
+        replace: 'version: "21.1.3"'
+      run_once: true
+      when: airgap_enabled | bool
+
+    - name: Update genai-gateway helm dependencies (airgap via JFrog)
+      ansible.builtin.command: >
+        helm dependency update {{ remote_helm_charts_base }}/genai-gateway
+      register: genai_gateway_deps
+      run_once: true
+      when: airgap_enabled | bool
     - name: Install GenAI Gateway System
       command: >
         helm upgrade --install genai-gateway {{ remote_helm_charts_base }}/genai-gateway
         --namespace genai-gateway
         --create-namespace
+        --set global.security.allowInsecureImages=true
         --set env.LITELLM_MASTER_KEY={{ litellm_master_key }}
         --set env.LITELLM_SALT_KEY={{ litellm_salt_key }}
         --set env.LANGFUSE_SECRET_KEY={{ langfuse_secret_key }}
@@ -158,17 +208,27 @@
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
       run_once: true
     
-    - name: Add GenAI Gateway Trace Repository
+    - name: Add GenAI Gateway Trace Repository (internet)
       command: >
         helm repo add langfuse https://langfuse.github.io/langfuse-k8s
       run_once: true
+      when: not airgap_enabled | bool
+
+    - name: Add GenAI Gateway Trace Repository (airgap via JFrog)
+      command: >
+        helm repo add langfuse {{ helm_repo_langfuse }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      run_once: true
+      when: airgap_enabled | bool
+      changed_when: false
     - name: Update GenAI Gateway Trace Repositories
       command: >
         helm repo update
       run_once: true
                    
     - name: Create TLS secret for GenAI Gateway
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1

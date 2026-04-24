@@ -45,7 +45,7 @@ update_drivers() {
     invoke_prereq_workflows
     echo "${YELLOW}Updating drivers...${NC}"
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-gaudi-firmware-driver.yml \
-        --extra-vars "update_type=drivers"
+        --extra-vars "update_type=drivers airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"
     echo "${GREEN}Drivers updated successfully!${NC}"
 }
 
@@ -54,7 +54,7 @@ update_firmware() {
     invoke_prereq_workflows
     echo "${YELLOW}Updating firmware...${NC}"
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-gaudi-firmware-driver.yml \
-        --extra-vars "update_type=firmware"
+        --extra-vars "update_type=firmware airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"
     echo "${GREEN}Firmware updated successfully!${NC}"
 }
 

@@ -11,11 +11,20 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add the Ingress-NGINX Helm repository
-      community.kubernetes.helm_repository:
+    - name: Add the Ingress-NGINX Helm repository (internet)
+      kubernetes.core.helm_repository:
         name: ingress-nginx
         repo_url: https://kubernetes.github.io/ingress-nginx
         state: present
+      when: not airgap_enabled | bool
+
+    - name: Add the Ingress-NGINX Helm repository (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add ingress-nginx {{ helm_repo_ingress_nginx }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: airgap_enabled | bool
+      changed_when: false
     - name: Validate if the Helm repositories are configured correctly
       ansible.builtin.command: helm repo list
       register: helm_repo_list
@@ -51,18 +60,21 @@
       run_once: true
 
     - name: Deploy Ingress Nginx Controller
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: ingress-nginx
         chart_ref: ingress-nginx/ingress-nginx
         release_namespace: ingress-nginx
         create_namespace: true
         chart_version: "{{ ingress_controller | default('4.12.2') }}"
         state: present
+        force: true
         values:
           controller:
             progressDeadlineSeconds: 300
             minReadySeconds: 0
             replicaCount: "{{ inference_infra_replica_count | int }}"
+            image:
+              digest: "{{ '' if airgap_enabled | default(false) | bool else omit }}"
             hostPort:
               enabled: true
               ports:
@@ -94,6 +106,10 @@
                         matchLabels:
                           app: ingress-nginx
                       topologyKey: "kubernetes.io/hostname"
+          admissionWebhooks:
+            patch:
+              image:
+                digest: "{{ '' if airgap_enabled | default(false) | bool else omit }}"
       run_once: true
     - name: Pause to Allow Controller to Initialize
       pause:
@@ -102,7 +118,8 @@
       shell: |
         kubectl get pods -n ingress-nginx -o json | jq -r '
           .items[] |
-          select(.status.phase != "Running" or (.status.containerStatuses[] | select(.ready != true))) |
+          select(.status.phase != "Running" and .status.phase != "Succeeded") |
+          select(.status.containerStatuses == null or (.status.containerStatuses[] | select(.ready != true))) |
           .metadata.name' | wc -l
       register: pod_status
       until: pod_status.stdout == "0" and pod_status.rc == 0

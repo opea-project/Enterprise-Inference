@@ -13,12 +13,12 @@
     - role: inference-tools
   tasks:
     - name: Create Kubernetes Namespace for Habana AI Operator
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         kind: Namespace
         name: habana-ai-operator
     - name: Label namespace for pod Security Enforcement
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         kind: Namespace
         name: habana-ai-operator
@@ -29,7 +29,7 @@
               pod-security.kubernetes.io/audit: privileged
               pod-security.kubernetes.io/warn: privileged
     - name: Add Gaudi Repository
-      community.kubernetes.helm_repository:
+      kubernetes.core.helm_repository:
         name: gaudi-helm
         repo_url: https://vault.habana.ai/artifactory/api/helm/gaudi-helm
         state: present
@@ -40,7 +40,7 @@
       run_once: true
 
     - name: Deploy Habana AI Operator
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: habana-ai-operator
         chart_ref: gaudi-helm/habana-ai-operator
         release_namespace: habana-ai-operator

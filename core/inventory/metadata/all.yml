@@ -140,6 +140,61 @@ ntp_servers:
   - "2.pool.ntp.org iburst"
   - "3.pool.ntp.org iburst"
 
+# Airgap: JFrog registry mirrors — Kubespray writes these into /etc/containerd/config.toml
+# on every cluster node automatically during cluster.yml.
+# Add registries here as you validate each one through JFrog.
+containerd_registries_mirrors:
+  - registry: "docker.io"
+    prefix: "docker.io"
+    mirrors:
+      - host: "http://JFROG_HOST:8082/v2/ei-docker-virtual"
+        capabilities:
+          - pull
+          - resolve
+        override_path: true
+  - registry: "ghcr.io"
+    prefix: "ghcr.io"
+    mirrors:
+      - host: "http://JFROG_HOST:8082/v2/ei-docker-virtual"
+        capabilities:
+          - pull
+          - resolve
+        override_path: true
+  - registry: "registry.k8s.io"
+    prefix: "registry.k8s.io"
+    mirrors:
+      - host: "http://JFROG_HOST:8082/v2/ei-docker-virtual"
+        capabilities:
+          - pull
+          - resolve
+        override_path: true
+  - registry: "quay.io"
+    prefix: "quay.io"
+    mirrors:
+      - host: "http://JFROG_HOST:8082/v2/ei-docker-virtual"
+        capabilities:
+          - pull
+          - resolve
+        override_path: true
+  - registry: "public.ecr.aws"
+    prefix: "public.ecr.aws"
+    mirrors:
+      - host: "http://JFROG_HOST:8082/v2/ei-docker-virtual"
+        capabilities:
+          - pull
+          - resolve
+        override_path: true
+## Pin Kubernetes to version with binaries and images cached in JFrog
+kube_version: v1.30.4
+
+## Pin Calico to version validated in JFrog airgap cache (v3.28.1)
+## Without this pin kubespray uses its own default which may differ across kubespray versions
+calico_version: v3.28.1
+
+## Pin CoreDNS to version validated in JFrog airgap cache (v1.11.1)
+## Without this pin kubespray may select a newer version not cached in JFrog
+coredns_version: v1.11.1
+
 ## Used to control no_log attribute
 unsafe_show_logs: false
 
