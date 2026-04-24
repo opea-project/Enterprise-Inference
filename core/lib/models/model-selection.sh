@@ -58,9 +58,10 @@ model_selection(){
                             echo "24. deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
                             echo "25. Qwen/Qwen3-1.7B"
                             echo "26. Qwen/Qwen3-4B-Instruct-2507"
+                            echo "27. Qwen/Qwen3-Coder-30B-A3B-Instruct"
                             read -p "Enter the number of the CPU model you want to deploy/remove: " cpu_model
                             # Validate input
-                            if ! [[ "$cpu_model" =~ ^(21|22|23|24|25|26)$ ]]; then
+                            if ! [[ "$cpu_model" =~ ^(21|22|23|24|25|26|27)$ ]]; then
                                 echo "Error: Invalid model selected ($cpu_model). Exiting." >&2
                                 exit 1
                             fi
@@ -242,6 +243,13 @@ get_model_names() {
                 fi
                 model_names+=("cpu-qwen3-4b")
                 ;;
+            27)
+                if [ "$cpu_or_gpu" = "g" ]; then
+                    echo "Error: CPU model identifier provided for GPU deployment/removal." >&2
+                    exit 1
+                fi
+                model_names+=("cpu-qwen3-coder-30b")
+                ;;
             "llama-8b"|"llama-70b"|"codellama-34b"|"mixtral-8x-7b"|"mistral-7b"|"tei"|"tei-rerank"|"falcon3-7b"|"deepseek-r1-distill-qwen-32b"|"deepseek-r1-distill-llama8b"|"llama3-405b"|"llama-3-3-70b"|"llama-4-scout-17b"|"qwen-2-5-32b")
                 if [ "$cpu_or_gpu" = "c" ]; then
                     echo "Error: GPU model identifier provided for CPU deployment/removal." >&2
@@ -249,7 +257,7 @@ get_model_names() {
                 fi
                 model_names+=("$model")
                 ;;
-            "cpu-llama-8b"|"cpu-deepseek-r1-distill-qwen-32b"|"cpu-deepseek-r1-distill-llama8b"|"cpu-qwen3-1-7b"|"cpu-llama-3-2-3b"|"cpu-qwen3-4b")
+            "cpu-llama-8b"|"cpu-deepseek-r1-distill-qwen-32b"|"cpu-deepseek-r1-distill-llama8b"|"cpu-qwen3-1-7b"|"cpu-llama-3-2-3b"|"cpu-qwen3-4b"|"cpu-qwen3-coder-30b")
                 if [ "$cpu_or_gpu" = "g" ]; then
                     echo "Error: CPU model identifier provided for GPU deployment/removal." >&2
                     exit 1

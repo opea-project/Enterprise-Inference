@@ -1,0 +1,453 @@
+{
+  "_disclaimer": "This is synthetic data generated for testing and demonstration purposes only. No personal or real-world data is used.",
+  "accounts": {
+    "acc_jane_001": {
+      "account_id": "acc_jane_001",
+      "name": "Jane Miller",
+      "email": "jane.miller@example.com",
+      "cash_balance": 25000.0,
+      "positions": {
+        "AAPL": {"quantity": 40, "avg_cost": 176.25},
+        "MSFT": {"quantity": 12, "avg_cost": 401.1},
+        "NVDA": {"quantity": 18, "avg_cost": 109.45},
+        "AMZN": {"quantity": 15, "avg_cost": 171.9}
+      },
+      "watchlist": ["TSLA", "META", "AMD", "NFLX"],
+      "order_ids": ["ORD-000001", "ORD-000002", "ORD-000004", "ORD-000005"]
+    },
+    "acc_marcus_002": {
+      "account_id": "acc_marcus_002",
+      "name": "Marcus Lee",
+      "email": "marcus.lee@example.com",
+      "cash_balance": 8400.5,
+      "positions": {
+        "TSLA": {"quantity": 8, "avg_cost": 218.8},
+        "GOOGL": {"quantity": 9, "avg_cost": 158.3},
+        "XOM": {"quantity": 30, "avg_cost": 104.7}
+      },
+      "watchlist": ["AAPL", "MSFT", "JPM", "PFE"],
+      "order_ids": ["ORD-000003", "ORD-000006", "ORD-000007"]
+    },
+    "acc_sofia_003": {
+      "account_id": "acc_sofia_003",
+      "name": "Sofia Alvarez",
+      "email": "sofia.alvarez@example.com",
+      "cash_balance": 15230.75,
+      "positions": {
+        "META": {"quantity": 11, "avg_cost": 488.2},
+        "NFLX": {"quantity": 7, "avg_cost": 561.35},
+        "AMD": {"quantity": 40, "avg_cost": 151.8},
+        "BAC": {"quantity": 120, "avg_cost": 34.9}
+      },
+      "watchlist": ["NVDA", "AAPL", "UNH", "AMZN"],
+      "order_ids": ["ORD-000008", "ORD-000009", "ORD-000010"]
+    },
+    "acc_ethan_004": {
+      "account_id": "acc_ethan_004",
+      "name": "Ethan Brooks",
+      "email": "ethan.brooks@example.com",
+      "cash_balance": 50210.2,
+      "positions": {
+        "JPM": {"quantity": 55, "avg_cost": 179.4},
+        "XOM": {"quantity": 80, "avg_cost": 102.1},
+        "BRKB": {"quantity": 16, "avg_cost": 420.6},
+        "UNH": {"quantity": 6, "avg_cost": 534.25}
+      },
+      "watchlist": ["MSFT", "GOOGL", "PFE", "TSLA"],
+      "order_ids": ["ORD-000011", "ORD-000012"]
+    },
+    "acc_priya_005": {
+      "account_id": "acc_priya_005",
+      "name": "Priya Nair",
+      "email": "priya.nair@example.com",
+      "cash_balance": 11200.0,
+      "positions": {
+        "AAPL": {"quantity": 14, "avg_cost": 182.0},
+        "PFE": {"quantity": 210, "avg_cost": 30.15},
+        "BAC": {"quantity": 90, "avg_cost": 33.5},
+        "MSFT": {"quantity": 5, "avg_cost": 398.6}
+      },
+      "watchlist": ["JPM", "BRKB", "NVDA", "AMD"],
+      "order_ids": ["ORD-000013", "ORD-000014"]
+    },
+    "acc_noah_006": {
+      "account_id": "acc_noah_006",
+      "name": "Noah Chen",
+      "email": "noah.chen@example.com",
+      "cash_balance": 18675.95,
+      "positions": {
+        "NVDA": {"quantity": 24, "avg_cost": 114.9},
+        "AMD": {"quantity": 65, "avg_cost": 148.1},
+        "AMZN": {"quantity": 10, "avg_cost": 174.25},
+        "GOOGL": {"quantity": 12, "avg_cost": 160.4},
+        "TSLA": {"quantity": 4, "avg_cost": 222.2}
+      },
+      "watchlist": ["META", "NFLX", "AAPL", "XOM"],
+      "order_ids": ["ORD-000015"]
+    }
+  },
+  "market": {
+    "AAPL": {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "sector": "Technology",
+      "current_price": 189.42,
+      "day_open": 186.95,
+      "day_high": 190.3,
+      "day_low": 186.7,
+      "volume": 58100412
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "name": "Microsoft Corp.",
+      "sector": "Technology",
+      "current_price": 412.75,
+      "day_open": 409.55,
+      "day_high": 414.1,
+      "day_low": 408.92,
+      "volume": 21245033
+    },
+    "NVDA": {
+      "symbol": "NVDA",
+      "name": "NVIDIA Corp.",
+      "sector": "Technology",
+      "current_price": 121.38,
+      "day_open": 118.44,
+      "day_high": 122.21,
+      "day_low": 117.98,
+      "volume": 132740120
+    },
+    "TSLA": {
+      "symbol": "TSLA",
+      "name": "Tesla Inc.",
+      "sector": "Automotive",
+      "current_price": 214.86,
+      "day_open": 219.2,
+      "day_high": 220.74,
+      "day_low": 213.41,
+      "volume": 94752113
+    },
+    "AMZN": {
+      "symbol": "AMZN",
+      "name": "Amazon.com Inc.",
+      "sector": "Consumer Discretionary",
+      "current_price": 178.91,
+      "day_open": 177.16,
+      "day_high": 179.33,
+      "day_low": 176.42,
+      "volume": 33659210
+    },
+    "GOOGL": {
+      "symbol": "GOOGL",
+      "name": "Alphabet Inc.",
+      "sector": "Communication Services",
+      "current_price": 163.27,
+      "day_open": 161.4,
+      "day_high": 163.8,
+      "day_low": 160.92,
+      "volume": 28992220
+    },
+    "META": {
+      "symbol": "META",
+      "name": "Meta Platforms Inc.",
+      "sector": "Communication Services",
+      "current_price": 512.34,
+      "day_open": 504.1,
+      "day_high": 513.9,
+      "day_low": 503.7,
+      "volume": 15440210
+    },
+    "AMD": {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices Inc.",
+      "sector": "Technology",
+      "current_price": 156.82,
+      "day_open": 153.9,
+      "day_high": 157.25,
+      "day_low": 152.8,
+      "volume": 61210340
+    },
+    "NFLX": {
+      "symbol": "NFLX",
+      "name": "Netflix Inc.",
+      "sector": "Communication Services",
+      "current_price": 589.76,
+      "day_open": 582.3,
+      "day_high": 591.2,
+      "day_low": 579.4,
+      "volume": 9812375
+    },
+    "JPM": {
+      "symbol": "JPM",
+      "name": "JPMorgan Chase & Co.",
+      "sector": "Financials",
+      "current_price": 183.64,
+      "day_open": 181.22,
+      "day_high": 184.5,
+      "day_low": 180.91,
+      "volume": 14287123
+    },
+    "XOM": {
+      "symbol": "XOM",
+      "name": "Exxon Mobil Corp.",
+      "sector": "Energy",
+      "current_price": 108.55,
+      "day_open": 107.4,
+      "day_high": 109.02,
+      "day_low": 106.95,
+      "volume": 19833110
+    },
+    "BRKB": {
+      "symbol": "BRKB",
+      "name": "Berkshire Hathaway Inc. Class B",
+      "sector": "Financials",
+      "current_price": 436.18,
+      "day_open": 431.7,
+      "day_high": 437.45,
+      "day_low": 430.9,
+      "volume": 4822010
+    },
+    "UNH": {
+      "symbol": "UNH",
+      "name": "UnitedHealth Group Inc.",
+      "sector": "Healthcare",
+      "current_price": 548.27,
+      "day_open": 541.3,
+      "day_high": 549.1,
+      "day_low": 539.8,
+      "volume": 4075190
+    },
+    "PFE": {
+      "symbol": "PFE",
+      "name": "Pfizer Inc.",
+      "sector": "Healthcare",
+      "current_price": 31.28,
+      "day_open": 30.95,
+      "day_high": 31.44,
+      "day_low": 30.81,
+      "volume": 42310980
+    },
+    "BAC": {
+      "symbol": "BAC",
+      "name": "Bank of America Corp.",
+      "sector": "Financials",
+      "current_price": 35.74,
+      "day_open": 35.29,
+      "day_high": 35.88,
+      "day_low": 35.12,
+      "volume": 52477035
+    },
+    "INTC": {
+      "symbol": "INTC",
+      "name": "Intel Corp.",
+      "sector": "Technology",
+      "current_price": 58.74,
+      "day_open": 57.90,
+      "day_high": 59.12,
+      "day_low": 57.45,
+      "volume": 47823540
+    }
+  },
+  "orders": {
+    "ORD-000001": {
+      "order_id": "ORD-000001",
+      "account_id": "acc_jane_001",
+      "symbol": "AAPL",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 10,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 182.25,
+      "created_at": "2026-02-28T14:12:03Z",
+      "filled_at": "2026-02-28T14:12:03Z"
+    },
+    "ORD-000002": {
+      "order_id": "ORD-000002",
+      "account_id": "acc_jane_001",
+      "symbol": "NVDA",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 5,
+      "limit_price": 115.0,
+      "status": "open",
+      "executed_price": null,
+      "created_at": "2026-03-01T09:45:10Z",
+      "filled_at": null
+    },
+    "ORD-000003": {
+      "order_id": "ORD-000003",
+      "account_id": "acc_marcus_002",
+      "symbol": "TSLA",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 3,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 210.75,
+      "created_at": "2026-03-01T11:03:55Z",
+      "filled_at": "2026-03-01T11:03:55Z"
+    },
+    "ORD-000004": {
+      "order_id": "ORD-000004",
+      "account_id": "acc_jane_001",
+      "symbol": "AMZN",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 6,
+      "limit_price": 176.0,
+      "status": "filled",
+      "executed_price": 175.8,
+      "created_at": "2026-03-02T10:18:12Z",
+      "filled_at": "2026-03-02T10:19:04Z"
+    },
+    "ORD-000005": {
+      "order_id": "ORD-000005",
+      "account_id": "acc_jane_001",
+      "symbol": "MSFT",
+      "side": "sell",
+      "order_type": "market",
+      "quantity": 4,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 410.6,
+      "created_at": "2026-03-02T14:50:00Z",
+      "filled_at": "2026-03-02T14:50:00Z"
+    },
+    "ORD-000006": {
+      "order_id": "ORD-000006",
+      "account_id": "acc_marcus_002",
+      "symbol": "GOOGL",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 5,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 159.1,
+      "created_at": "2026-03-03T12:22:19Z",
+      "filled_at": "2026-03-03T12:22:19Z"
+    },
+    "ORD-000007": {
+      "order_id": "ORD-000007",
+      "account_id": "acc_marcus_002",
+      "symbol": "XOM",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 20,
+      "limit_price": 103.0,
+      "status": "open",
+      "executed_price": null,
+      "created_at": "2026-03-03T13:15:40Z",
+      "filled_at": null
+    },
+    "ORD-000008": {
+      "order_id": "ORD-000008",
+      "account_id": "acc_sofia_003",
+      "symbol": "META",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 4,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 501.2,
+      "created_at": "2026-03-04T09:41:56Z",
+      "filled_at": "2026-03-04T09:41:56Z"
+    },
+    "ORD-000009": {
+      "order_id": "ORD-000009",
+      "account_id": "acc_sofia_003",
+      "symbol": "AMD",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 25,
+      "limit_price": 149.0,
+      "status": "filled",
+      "executed_price": 149.0,
+      "created_at": "2026-03-04T10:03:21Z",
+      "filled_at": "2026-03-04T10:07:02Z"
+    },
+    "ORD-000010": {
+      "order_id": "ORD-000010",
+      "account_id": "acc_sofia_003",
+      "symbol": "BAC",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 60,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 34.1,
+      "created_at": "2026-03-04T11:28:33Z",
+      "filled_at": "2026-03-04T11:28:33Z"
+    },
+    "ORD-000011": {
+      "order_id": "ORD-000011",
+      "account_id": "acc_ethan_004",
+      "symbol": "JPM",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 15,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 180.2,
+      "created_at": "2026-03-05T15:16:48Z",
+      "filled_at": "2026-03-05T15:16:48Z"
+    },
+    "ORD-000012": {
+      "order_id": "ORD-000012",
+      "account_id": "acc_ethan_004",
+      "symbol": "UNH",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 3,
+      "limit_price": 533.0,
+      "status": "filled",
+      "executed_price": 533.0,
+      "created_at": "2026-03-05T15:55:09Z",
+      "filled_at": "2026-03-05T16:01:44Z"
+    },
+    "ORD-000013": {
+      "order_id": "ORD-000013",
+      "account_id": "acc_priya_005",
+      "symbol": "PFE",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 100,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 29.95,
+      "created_at": "2026-03-06T13:09:55Z",
+      "filled_at": "2026-03-06T13:09:55Z"
+    },
+    "ORD-000014": {
+      "order_id": "ORD-000014",
+      "account_id": "acc_priya_005",
+      "symbol": "AAPL",
+      "side": "buy",
+      "order_type": "limit",
+      "quantity": 8,
+      "limit_price": 181.5,
+      "status": "open",
+      "executed_price": null,
+      "created_at": "2026-03-06T13:40:17Z",
+      "filled_at": null
+    },
+    "ORD-000015": {
+      "order_id": "ORD-000015",
+      "account_id": "acc_noah_006",
+      "symbol": "AMD",
+      "side": "buy",
+      "order_type": "market",
+      "quantity": 20,
+      "limit_price": null,
+      "status": "filled",
+      "executed_price": 150.9,
+      "created_at": "2026-03-07T10:12:43Z",
+      "filled_at": "2026-03-07T10:12:43Z"
+    }
+  },
+  "meta": {
+    "next_order_id": 16,
+    "currency": "USD",
+    "updated_at": "2026-03-11T00:00:00Z"
+  }
+}
