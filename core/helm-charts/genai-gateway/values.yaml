@@ -4,7 +4,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/berriai/litellm-non_root
   tag: main-v1.75.8-stable
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   imagePullSecrets: []
 service:
   type: LoadBalancer

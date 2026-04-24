@@ -24,7 +24,7 @@
       debug:
         var: cert_file, key_file, secret_name
     - name: Create TLS secret for Keycloak
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -38,7 +38,7 @@
             tls.key: "{{ lookup('file', key_file) | b64encode }}"
       register: kubectl_output
     - name: Create TLS secret for Keycloak in APISIX namespace
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -75,13 +75,26 @@
         namespace: genai-gateway
       ignore_errors: true
    
+    - name: Add ei-helm repository for Keycloak (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add ei-helm {{ jfrog_url }}/ei-helm-virtual
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: airgap_enabled | bool and deploy_keycloak == "yes"
+      changed_when: false
+
+    - name: Update Helm repositories for Keycloak (airgap)
+      ansible.builtin.command: helm repo update
+      when: airgap_enabled | bool and deploy_keycloak == "yes"
+      changed_when: false
+
     - name: Deploy Keycloak System
       run_once: true
       register: helm_output
       when: deploy_keycloak == "yes"
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: keycloak
-        chart_ref: oci://registry-1.docker.io/bitnamicharts/keycloak
+        chart_ref: "{{ 'ei-helm/keycloak' if airgap_enabled | bool else 'oci://registry-1.docker.io/bitnamicharts/keycloak' }}"
         release_namespace: default # Set the namespace where Keycloak will be installed
         create_namespace: true
         chart_version: "{{ keycloak_chart_version|default('22.1.0') }}"
@@ -202,7 +215,7 @@
                         app: keycloak
                     topologyKey: "kubernetes.io/hostname"
     - name: Verify Keycloak StatefulSet readiness
-      community.kubernetes.k8s_info:
+      kubernetes.core.k8s_info:
         kind: StatefulSet
         namespace: default
         name: keycloak
@@ -368,13 +381,68 @@
         path: "{{ remote_helm_charts_base }}/keycloak/templates/ingress_eks.yaml"
         state: absent
       when: kubernetes_platform != "eks"
-    - name: Synchronize dependencies for APISIX
+    - name: Add APISIX Helm repository (internet)
+      ansible.builtin.command: >
+        helm repo add apisix https://charts.apiseven.com --force-update
+      when: deploy_apisix == "yes" and not airgap_enabled | bool
+      changed_when: false
+
+    - name: Add APISIX Helm repository (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add apisix {{ helm_repo_apisix }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: deploy_apisix == "yes" and airgap_enabled | bool
+      changed_when: false
+
+    - name: Update Helm repositories for APISIX
+      ansible.builtin.command: helm repo update
+      when: deploy_apisix == "yes"
+      changed_when: false
+
+    - name: Synchronize dependencies for APISIX (internet)
       ansible.builtin.command: helm dependency update "{{ remote_helm_charts_base }}/apisix-helm/"
       register: helm_dependency_update
       failed_when: helm_dependency_update.rc != 0
-      when: deploy_apisix == "yes"
+      when:
+        - deploy_apisix == "yes"
+        - not airgap_enabled | bool
+
+    - name: Create charts directory for APISIX (airgap)
+      ansible.builtin.file:
+        path: "{{ remote_helm_charts_base }}/apisix-helm/charts"
+        state: directory
+        mode: '0755'
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+
+    - name: Pull APISIX subchart from JFrog (airgap)
+      ansible.builtin.command: >
+        helm pull apisix/apisix --version 2.8.1
+        --destination "{{ remote_helm_charts_base }}/apisix-helm/charts"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+      changed_when: true
+
+    - name: Patch APISIX Chart.yaml to use JFrog repository (airgap)
+      ansible.builtin.replace:
+        path: "{{ remote_helm_charts_base }}/apisix-helm/Chart.yaml"
+        regexp: 'repository: https://charts\.apiseven\.com'
+        replace: "repository: {{ helm_repo_apisix }}"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+
+    - name: Build APISIX dependencies from local charts (airgap)
+      ansible.builtin.command: helm dependency build "{{ remote_helm_charts_base }}/apisix-helm/"
+      when:
+        - deploy_apisix == "yes"
+        - airgap_enabled | bool
+      changed_when: true
     - name: Synchronize dependencies for APISIX
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: auth-apisix
         chart_ref: "{{ remote_helm_charts_base }}/apisix-helm/"
         update_repo_cache: yes

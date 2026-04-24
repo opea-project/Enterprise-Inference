@@ -12,12 +12,20 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add Ingress-Nginx repository
-      community.kubernetes.helm_repository:
+    - name: Add Ingress-Nginx repository (internet)
+      kubernetes.core.helm_repository:
         name: ingress-nginx
         repo_url: https://kubernetes.github.io/ingress-nginx
         state: present
-      when: delete_pv_on_purge == "no"
+      when: delete_pv_on_purge == "no" and not airgap_enabled | bool
+
+    - name: Add Ingress-Nginx repository (airgap via JFrog)
+      ansible.builtin.command: >
+        helm repo add ingress-nginx {{ helm_repo_ingress_nginx }}
+        --username {{ jfrog_username }} --password {{ jfrog_password }}
+        --force-update
+      when: delete_pv_on_purge == "no" and airgap_enabled | bool
+      changed_when: false
     - name: Verify repository availability
       ansible.builtin.command: helm repo list
       register: helm_repo_list
