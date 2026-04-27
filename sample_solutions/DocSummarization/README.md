@@ -109,6 +109,11 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
+| API Configuration | Validated |
+|---|:---:|
+| GenAI Gateway | ✅ |
+| Keycloak/APISIX | ✅ |
+
 - **GenAI Gateway**: Provide your GenAI Gateway URL and API key
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
   - The API key is the `litellm_master_key` value from the generated `vault.yml` file
@@ -117,21 +122,14 @@ This application supports multiple inference deployment patterns:
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
 
-### Local Development Configuration
+### Deploy Required Model(s)
 
-**For Local Testing Only (Optional)**
+The following models have been validated on different hardware platforms. At least one model must be deployed.
 
-If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
-
-1. Edit `backend/.env` and set:
-   ```bash
-   LOCAL_URL_ENDPOINT=api.example.com
-   ```
-   (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
-
-2. This allows Docker containers to resolve your local domain correctly.
-
-**Note:** For public domains or cloud-hosted endpoints, leave the default value `not-needed`.
+| Model | Xeon | Gaudi |
+|---|:---:|:---:|
+| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ❌ |
 
 ### Verify Docker Installation
 
@@ -159,95 +157,28 @@ cd Enterprise-Inference/sample_solutions/DocSummarization
 
 ### Set up the Environment
 
-This application requires **two `.env` files** for proper configuration:
-
-1. **Root `.env` file** (for Docker Compose variables)
-2. **`backend/.env` file** (for backend application configuration)
-
-#### Step 1: Create Root `.env` File
-
-You can either copy from the example file:
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
 cp .env.example .env
 ```
-
-Then edit `.env` if needed, **OR** create it directly:
-
-```bash
-# From the DocSummarization directory
-cat > .env << EOF
-# Docker Compose Configuration
-LOCAL_URL_ENDPOINT=not-needed
-EOF
-```
-
-**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
-
-#### Step 2: Create `backend/.env` File
-
-You can either copy from the example file:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Then edit `backend/.env` with your actual credentials, **OR** create it directly:
-
-```bash
-cat > backend/.env << EOF
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
-#     Note: APISIX Gateway requires the model name in the URL path
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-#   - For GenAI Gateway: Your GenAI Gateway API key
-#   - For APISIX Gateway: Your APISIX authentication token
-INFERENCE_API_ENDPOINT=https://your-actual-api-endpoint.com
-INFERENCE_API_TOKEN=your-actual-token-here
-
-# Model Configuration
-# IMPORTANT: Use the full model names as they appear in your inference service
-# Check available models: curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"
-INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-
-# LLM Configuration
-LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=2000
-
-# Local URL Endpoint (for Docker)
-LOCAL_URL_ENDPOINT=not-needed
-
-# Service Configuration
-SERVICE_PORT=8000
-LOG_LEVEL=INFO
-
-# File Upload Limits
-MAX_FILE_SIZE=524288000
-MAX_PDF_SIZE=52428800
-MAX_PDF_PAGES=100
-
-# SSL Verification Settings
-# Set to false only for dev with self-signed certs
-VERIFY_SSL=true
-EOF
-```
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions.
 
 **Important Configuration Notes:**
 
-- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-actual-api-endpoint.com`)
-  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/Llama-3.1-8B-Instruct`)
+- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/Llama-3.1-8B-Instruct`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
-  - To check available models: `curl https://your-api-endpoint.com/v1/models -H "Authorization: Bearer your-token"`
-- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping
+  - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
+- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
+  - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
+  - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
 - **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
   - Set to `false` only for development environments with self-signed certificates
   - Keep as `true` for production environments
 
-**Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./backend/.env` (backend) files.
+**Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for the backend service.
 
 ### Running the Application
 
@@ -329,14 +260,3 @@ docker compose down
 For comprehensive troubleshooting guidance, common issues, and solutions, refer to:
 
 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-
----
-
-## Additional Info
-
-The following models have been validated with DocSummarization:
-
-| Model | Hardware |
-|-------|----------|
-| **meta-llama/Llama-3.1-8B-Instruct** | Gaudi |
-| **Qwen/Qwen3-4B-Instruct-2507** | Xeon |
