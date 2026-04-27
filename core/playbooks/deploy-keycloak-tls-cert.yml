@@ -67,7 +67,7 @@
         msg: "Number of ei-infra-eligible nodes configured: {{ inference_infra_replica_count }}"
       run_once: true
       when: deploy_keycloak == "yes"
-    - name: Delete genai-gateway-ingress resource
+    - name: Delete stale genai-gateway-ingress resource
       kubernetes.core.k8s:
         state: absent
         kind: Ingress
@@ -156,10 +156,10 @@
                   name: memory
                   targetAverageUtilization: 60
           ingress:
-            enabled: "{{ false if kubernetes_platform == 'openshift' or kubernetes_platform == 'eks' else true }}"
+            enabled: "{{ true if kubernetes_platform == 'eks' else false }}"
             hostname: "{{ secret_name }}"
             tls: true
-            ingressClassName: "nginx"
+            ingressClassName: "{{ 'alb' if kubernetes_platform == 'eks' else 'nginx' }}"
             proxyAddressForwarding: true
             annotations:
               nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -320,6 +320,34 @@
       when: 
         - deploy_keycloak == "yes"
         - kubernetes_platform == "eks"
+
+    - name: Create HTTPRoute for Keycloak (non-EKS, non-OpenShift)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
+          metadata:
+            name: keycloak-httproute
+            namespace: default
+          spec:
+            parentRefs:
+              - name: enterprise-edge-gateway
+                namespace: envoy-gateway-system
+            hostnames:
+              - "{{ secret_name }}"
+            rules:
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /
+                backendRefs:
+                  - name: keycloak
+                    port: 80
+      when:
+        - deploy_keycloak == "yes"
+        - kubernetes_platform != "eks"
+        - kubernetes_platform != "openshift"
 
     - name: Ensure Remote Directory Exists
       ansible.builtin.file:

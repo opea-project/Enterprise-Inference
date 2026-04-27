@@ -27,10 +27,10 @@ deploy_inference_llm_models_playbook() {
     else        
         apisix_enabled="true"
     fi
-    if [ "$deploy_keycloak" == "no" ]; then
-        ingress_enabled="false"        
-    else
+    if [ "$deploy_ingress_controller" == "yes" ]; then
         ingress_enabled="true"
+    else
+        ingress_enabled="false"
     fi
     if [ "$deploy_observability" == "yes" ]; then
         vllm_metrics_enabled="true"        

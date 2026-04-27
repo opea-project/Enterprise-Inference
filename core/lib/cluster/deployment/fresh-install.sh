@@ -93,11 +93,11 @@ fresh_installation() {
             fi
 
             if [[ "$deploy_ingress_controller" == "yes" ]]; then
-                execute_and_check "Deploying Ingress NGINX Controller..." run_ingress_nginx_playbook \
-                    "Ingress NGINX Controller is deployed successfully." \
-                    "Failed to deploy Ingress NGINX Controller. Exiting."
+                execute_and_check "Deploying Envoy Gateway Edge Controller..." run_edge_gateway_playbook \
+                    "Envoy Gateway Edge Controller is deployed successfully." \
+                    "Failed to deploy Envoy Gateway Edge Controller. Exiting."
             else
-                echo "Skipping Ingress NGINX Controller deployment..."
+                echo "Skipping Edge Gateway Controller deployment..."
             fi
 
             if [[ "$deploy_keycloak" == "yes" || "$deploy_apisix" == "yes" ]]; then
