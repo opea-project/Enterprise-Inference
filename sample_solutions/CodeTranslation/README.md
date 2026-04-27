@@ -148,7 +148,7 @@ This application supports multiple inference deployment patterns:
 
 ### Deploy Required Model(s)
 
-The following models and Enterprise Inference API configs have been validated. At least one model must be deployed.
+The following models have been validated. At least one model must be deployed.
 
 | Model | Xeon | Gaudi | Dell XE7740 |
 |---|:---:|:---:|:---:|
