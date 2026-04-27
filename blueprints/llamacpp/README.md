@@ -1,8 +1,42 @@
-# llama.cpp — Intel oneAPI with VMWare Foundation
+# llama.cpp — Intel oneAPI with VMware Foundation
 
-Runs [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` built with Intel oneAPI compilers and oneMKL BLAS for optimized CPU inference.
+## Overview
 
-> **Note:** You can use any GGUF model from Hugging Face. The examples below use specific models, but you can replace them with any GGUF model by setting the appropriate environment variables.
+This guide covers deploying [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` as a Docker container built with Intel oneAPI compilers and oneMKL BLAS for optimized CPU inference on Intel Xeon systems
+
+llama.cpp exposes an OpenAI-compatible REST API, making it a drop-in inference backend for applications that consume `/v1/completions` and `/v1/chat/completions` endpoints.
+
+> **Note:** You can use any GGUF model from Hugging Face. The examples below use specific models, but you can replace them with GGUF model by setting the appropriate environment variables.
+
+---
+
+## Prerequisites
+
+### Hardware Requirements
+
+For best performance, Intel® Xeon® 6 Processors are recommended.
+
+| Component    | Specification                                                                                  |
+|--------------|-----------------------------------------------------------------------------------------------|
+| CPU Cores    | Minimum 8 cores recommended; 16+ cores for optimal inference throughput                       |
+| RAM Memory   | Minimum 32 GB; 64 GB or more recommended for larger models                                    |
+| Disk Space   | Minimum 100 GB free (SSD recommended); model files range from ~1 GB to 20+ GB per GGUF file   |
+
+### Software Requirements
+
+| Tool              | Version          | Notes                                                        |
+|-------------------|------------------|--------------------------------------------------------------|
+| Docker Engine     | v20.10 or later  | [Install Docker](https://docs.docker.com/engine/install/)    |
+| HuggingFace Token | —                | Required to download gated or private models (optional for public GGUF repos) |
+| Internet Access   | —                | Needed on first run to pull the GGUF model from Hugging Face |
+
+Verify Docker is running before proceeding:
+
+```bash
+docker info
+```
+
+---
 
 ## Build & Run
 
