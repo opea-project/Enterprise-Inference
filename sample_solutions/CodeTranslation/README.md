@@ -143,12 +143,15 @@ This application supports multiple inference deployment patterns:
 
 ### Deploy Required Model(s)
 
-The following models have been validated with code-translation. At least one must be deployed with Enterprise Inference.
+The following models and Enterprise Inference API configs have been validated. At least one model must be deployed.
 
-| Model | Hardware |
-|-------|----------|
-| **codellama/CodeLlama-34b-Instruct-hf** | Gaudi |
-| **Qwen/Qwen3-4B-Instruct-2507** | Xeon |
+| Model | Xeon | Gaudi | Dell XE7740 |
+| **codellama/CodeLlama-34b-Instruct-hf** | | ✅ | ✅ |
+ |**Qwen/Qwen3-4B-Instruct-2507** | ✅ | | ✅ |
+
+| API Configuration | Validated |
+| GenAI Gateway | ✅ |
+| Keycloak/APISIX | ✅ |
 
 ### Verify Docker Installation
 
