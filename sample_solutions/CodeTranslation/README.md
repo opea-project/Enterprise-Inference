@@ -152,8 +152,8 @@ The following models have been validated on different hardware platforms. At lea
 
 | Model | Xeon | Gaudi |
 |---|:---:|:---:|
-| **codellama/CodeLlama-34b-Instruct-hf** | ❌ | ✅ including Dell XE7740 |
-| **Qwen/Qwen3-4B-Instruct-2507** | ✅ including Dell XE7740 | ❌ |
+| **codellama/CodeLlama-34b-Instruct-hf** | ❌ | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ❌ |
 
 ### Verify Docker Installation
 
@@ -192,6 +192,8 @@ Then modify it as needed, with special consideration to certain environment vari
 - **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
   - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/CodeLlama-34b-Instruct-hf`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
+- **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
+  - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
   - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
   - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
