@@ -134,7 +134,7 @@ Before you begin, ensure you have the following installed:
 This application supports multiple inference deployment patterns:
 
 | API Configuration | Validated |
-|---|---|
+|---|:---:|
 | GenAI Gateway | ✅ |
 | Keycloak/APISIX | ✅ |
 
@@ -151,7 +151,7 @@ This application supports multiple inference deployment patterns:
 The following models and Enterprise Inference API configs have been validated. At least one model must be deployed.
 
 | Model | Xeon | Gaudi | Dell XE7740 |
-|---|---|---|---|
+|---|:---:|:---:|:---:|
 | **codellama/CodeLlama-34b-Instruct-hf** | | ✅ | ✅ |
 | **Qwen/Qwen3-4B-Instruct-2507** | ✅ | | ✅ |
 
