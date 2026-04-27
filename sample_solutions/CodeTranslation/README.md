@@ -152,8 +152,8 @@ The following models have been validated on different hardware platforms. At lea
 
 | Model | Xeon | Gaudi |
 |---|:---:|:---:|
-| **codellama/CodeLlama-34b-Instruct-hf** | | Yes, including Dell XE7740 |
-| **Qwen/Qwen3-4B-Instruct-2507** | Yes, including Dell XE7740 | |
+| **codellama/CodeLlama-34b-Instruct-hf** | ❌ | ✅ including Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ including Dell XE7740 | ❌ |
 
 ### Verify Docker Installation
 
