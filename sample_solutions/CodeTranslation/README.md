@@ -148,12 +148,12 @@ This application supports multiple inference deployment patterns:
 
 ### Deploy Required Model(s)
 
-The following models have been validated. At least one model must be deployed.
+The following models have been validated on different hardware platforms. At least one model must be deployed.
 
-| Model | Xeon | Gaudi | Dell XE7740 |
-|---|:---:|:---:|:---:|
-| **codellama/CodeLlama-34b-Instruct-hf** | | ✅ | ✅ |
-| **Qwen/Qwen3-4B-Instruct-2507** | ✅ | | ✅ |
+| Model | Xeon | Gaudi |
+|---|:---:|:---:|
+| **codellama/CodeLlama-34b-Instruct-hf** | | Yes, including Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | Yes, including Dell XE7740 | |
 
 ### Verify Docker Installation
 
