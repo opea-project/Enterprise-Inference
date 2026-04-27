@@ -86,7 +86,6 @@ echo ""
 echo "4. Network connectivity check..."
 echo "   Note: Try to SSH to the server if you know the IP:"
 echo "   ssh user@<server-ip>"
-echo "   Password: Linux123!"
 
 echo ""
 echo "=========================================="

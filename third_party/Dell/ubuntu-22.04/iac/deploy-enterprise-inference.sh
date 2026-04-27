@@ -11,7 +11,7 @@
 # Options:
 #   -u, --username          Enterprise Inference owner username (required)
 #   -t, --token            Hugging Face token (required)
-#   -p, --password         User sudo password for Ansible (default: Linux123!)
+#   -p, --password         User sudo password for Ansible
 #   -g, --gpu-type         GPU type: 'gaudi3' or 'cpu' (default: gaudi3)
 #   -m, --models           Model IDs to deploy, comma-separated (default: "5")
 #   -b, --branch            Git branch to clone (default: dell-deploy)
@@ -212,7 +212,7 @@ Required Options (uninstall):
   -u, --username          Enterprise Inference owner username
 
 Optional Options:
-  -p, --password         User sudo password for Ansible (default: Linux123!)
+  -p, --password         User sudo password for Ansible
   -g, --gpu-type         GPU type: 'gaudi3' or 'cpu' (default: gaudi3)
   -m, --models           Model IDs to deploy, comma-separated (default: empty)
   -b, --branch            Git branch to clone (default: dell-deploy)
