@@ -133,6 +133,11 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
+| API Configuration | Validated |
+|---|---|
+| GenAI Gateway | ✅ |
+| Keycloak/APISIX | ✅ |
+
 - **GenAI Gateway**: Provide your GenAI Gateway URL and API key
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
   - The API key is the `litellm_master_key` value from the generated `vault.yml` file
@@ -146,12 +151,9 @@ This application supports multiple inference deployment patterns:
 The following models and Enterprise Inference API configs have been validated. At least one model must be deployed.
 
 | Model | Xeon | Gaudi | Dell XE7740 |
+|---|---|---|---|
 | **codellama/CodeLlama-34b-Instruct-hf** | | ✅ | ✅ |
- |**Qwen/Qwen3-4B-Instruct-2507** | ✅ | | ✅ |
-
-| API Configuration | Validated |
-| GenAI Gateway | ✅ |
-| Keycloak/APISIX | ✅ |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ | | ✅ |
 
 ### Verify Docker Installation
 
