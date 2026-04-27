@@ -1,0 +1,311 @@
+{
+  "_disclaimer": "This is synthetic data generated for testing and demonstration purposes only. No personal or real-world data is used.",
+  "customers": {
+    "cust_emma_reed_102": {
+      "customer_id": "cust_emma_reed_102",
+      "name": {
+        "first_name": "Emma",
+        "last_name": "Reed"
+      },
+      "email": "emma.reed@examplebank.com",
+      "date_of_birth": "1988-04-12",
+      "phone_last_four": "1842",
+      "address": {
+        "address1": "14 Cedar Lane",
+        "address2": "Apt 5B",
+        "city": "Boston",
+        "state": "MA",
+        "country": "USA",
+        "zip": "02116"
+      },
+      "cards": [
+        "card_emma_debit_4821",
+        "card_emma_credit_7719"
+      ]
+    },
+    "cust_marco_silva_204": {
+      "customer_id": "cust_marco_silva_204",
+      "name": {
+        "first_name": "Marco",
+        "last_name": "Silva"
+      },
+      "email": "marco.silva@examplebank.com",
+      "date_of_birth": "1979-11-03",
+      "phone_last_four": "9044",
+      "address": {
+        "address1": "88 Harbor Street",
+        "address2": "",
+        "city": "Miami",
+        "state": "FL",
+        "country": "USA",
+        "zip": "33131"
+      },
+      "cards": [
+        "card_marco_credit_1147"
+      ]
+    },
+    "cust_priya_natarajan_318": {
+      "customer_id": "cust_priya_natarajan_318",
+      "name": {
+        "first_name": "Priya",
+        "last_name": "Natarajan"
+      },
+      "email": "priya.natarajan@examplebank.com",
+      "date_of_birth": "1992-08-27",
+      "phone_last_four": "6610",
+      "address": {
+        "address1": "501 Westfield Drive",
+        "address2": "Unit 12",
+        "city": "Seattle",
+        "state": "WA",
+        "country": "USA",
+        "zip": "98109"
+      },
+      "cards": [
+        "card_priya_debit_9033",
+        "card_priya_travel_5520"
+      ]
+    }
+  },
+  "cards": {
+    "card_emma_debit_4821": {
+      "card_id": "card_emma_debit_4821",
+      "customer_id": "cust_emma_reed_102",
+      "nickname": "Daily debit",
+      "product_name": "Everyday Checking Debit",
+      "card_type": "debit",
+      "network": "Visa",
+      "linked_account": "CHK-100214",
+      "last_four": "4821",
+      "expiry_month": 8,
+      "expiry_year": 2028,
+      "status": "active",
+      "limits": {
+        "atm_withdrawal_limit": 800,
+        "pos_purchase_limit": 3000,
+        "ecommerce_purchase_limit": 1500,
+        "contactless_purchase_limit": 200
+      },
+      "limit_bounds": {
+        "minimum": {
+          "atm_withdrawal_limit": 100,
+          "pos_purchase_limit": 500,
+          "ecommerce_purchase_limit": 200,
+          "contactless_purchase_limit": 50
+        },
+        "maximum": {
+          "atm_withdrawal_limit": 2000,
+          "pos_purchase_limit": 7000,
+          "ecommerce_purchase_limit": 4000,
+          "contactless_purchase_limit": 500
+        }
+      },
+      "temporary_block_reason": null,
+      "block_reason": null,
+      "events": [
+        {
+          "timestamp": "2025-01-15T14:20:00Z",
+          "action": "card_issued",
+          "details": {
+            "channel": "mobile_app"
+          }
+        }
+      ]
+    },
+    "card_emma_credit_7719": {
+      "card_id": "card_emma_credit_7719",
+      "customer_id": "cust_emma_reed_102",
+      "nickname": "Travel rewards",
+      "product_name": "Premium Rewards Credit",
+      "card_type": "credit",
+      "network": "Mastercard",
+      "linked_account": "CRD-550812",
+      "last_four": "7719",
+      "expiry_month": 11,
+      "expiry_year": 2029,
+      "status": "frozen",
+      "limits": {
+        "atm_withdrawal_limit": 1200,
+        "pos_purchase_limit": 6000,
+        "ecommerce_purchase_limit": 3500,
+        "contactless_purchase_limit": 300
+      },
+      "limit_bounds": {
+        "minimum": {
+          "atm_withdrawal_limit": 200,
+          "pos_purchase_limit": 1000,
+          "ecommerce_purchase_limit": 500,
+          "contactless_purchase_limit": 100
+        },
+        "maximum": {
+          "atm_withdrawal_limit": 2500,
+          "pos_purchase_limit": 10000,
+          "ecommerce_purchase_limit": 6000,
+          "contactless_purchase_limit": 800
+        }
+      },
+      "temporary_block_reason": "Customer requested a temporary lock while traveling",
+      "block_reason": null,
+      "events": [
+        {
+          "timestamp": "2024-09-10T09:15:00Z",
+          "action": "card_issued",
+          "details": {
+            "channel": "branch"
+          }
+        },
+        {
+          "timestamp": "2026-03-08T18:42:00Z",
+          "action": "card_frozen",
+          "details": {
+            "reason": "Customer requested a temporary lock while traveling"
+          }
+        }
+      ]
+    },
+    "card_marco_credit_1147": {
+      "card_id": "card_marco_credit_1147",
+      "customer_id": "cust_marco_silva_204",
+      "nickname": "Main credit",
+      "product_name": "Platinum Cashback Credit",
+      "card_type": "credit",
+      "network": "Visa",
+      "linked_account": "CRD-661904",
+      "last_four": "1147",
+      "expiry_month": 5,
+      "expiry_year": 2027,
+      "status": "blocked",
+      "limits": {
+        "atm_withdrawal_limit": 500,
+        "pos_purchase_limit": 4500,
+        "ecommerce_purchase_limit": 2500,
+        "contactless_purchase_limit": 250
+      },
+      "limit_bounds": {
+        "minimum": {
+          "atm_withdrawal_limit": 100,
+          "pos_purchase_limit": 1000,
+          "ecommerce_purchase_limit": 300,
+          "contactless_purchase_limit": 50
+        },
+        "maximum": {
+          "atm_withdrawal_limit": 1500,
+          "pos_purchase_limit": 8000,
+          "ecommerce_purchase_limit": 4000,
+          "contactless_purchase_limit": 500
+        }
+      },
+      "temporary_block_reason": null,
+      "block_reason": "suspected_fraud",
+      "events": [
+        {
+          "timestamp": "2023-06-21T11:00:00Z",
+          "action": "card_issued",
+          "details": {
+            "channel": "branch"
+          }
+        },
+        {
+          "timestamp": "2026-02-28T07:31:00Z",
+          "action": "card_blocked",
+          "details": {
+            "reason": "suspected_fraud"
+          }
+        }
+      ]
+    },
+    "card_priya_debit_9033": {
+      "card_id": "card_priya_debit_9033",
+      "customer_id": "cust_priya_natarajan_318",
+      "nickname": "Household debit",
+      "product_name": "Smart Checking Debit",
+      "card_type": "debit",
+      "network": "Visa",
+      "linked_account": "CHK-204990",
+      "last_four": "9033",
+      "expiry_month": 2,
+      "expiry_year": 2029,
+      "status": "active",
+      "limits": {
+        "atm_withdrawal_limit": 1000,
+        "pos_purchase_limit": 2800,
+        "ecommerce_purchase_limit": 1800,
+        "contactless_purchase_limit": 250
+      },
+      "limit_bounds": {
+        "minimum": {
+          "atm_withdrawal_limit": 100,
+          "pos_purchase_limit": 500,
+          "ecommerce_purchase_limit": 200,
+          "contactless_purchase_limit": 50
+        },
+        "maximum": {
+          "atm_withdrawal_limit": 2200,
+          "pos_purchase_limit": 6000,
+          "ecommerce_purchase_limit": 4500,
+          "contactless_purchase_limit": 600
+        }
+      },
+      "temporary_block_reason": null,
+      "block_reason": null,
+      "events": [
+        {
+          "timestamp": "2025-05-02T16:05:00Z",
+          "action": "card_issued",
+          "details": {
+            "channel": "mobile_app"
+          }
+        }
+      ]
+    },
+    "card_priya_travel_5520": {
+      "card_id": "card_priya_travel_5520",
+      "customer_id": "cust_priya_natarajan_318",
+      "nickname": "Travel card",
+      "product_name": "Explorer Travel Credit",
+      "card_type": "credit",
+      "network": "Mastercard",
+      "linked_account": "CRD-909221",
+      "last_four": "5520",
+      "expiry_month": 9,
+      "expiry_year": 2030,
+      "status": "active",
+      "limits": {
+        "atm_withdrawal_limit": 1500,
+        "pos_purchase_limit": 7500,
+        "ecommerce_purchase_limit": 5000,
+        "contactless_purchase_limit": 400
+      },
+      "limit_bounds": {
+        "minimum": {
+          "atm_withdrawal_limit": 200,
+          "pos_purchase_limit": 1500,
+          "ecommerce_purchase_limit": 500,
+          "contactless_purchase_limit": 100
+        },
+        "maximum": {
+          "atm_withdrawal_limit": 3000,
+          "pos_purchase_limit": 12000,
+          "ecommerce_purchase_limit": 8000,
+          "contactless_purchase_limit": 1000
+        }
+      },
+      "temporary_block_reason": null,
+      "block_reason": null,
+      "events": [
+        {
+          "timestamp": "2024-12-19T10:45:00Z",
+          "action": "card_issued",
+          "details": {
+            "channel": "branch"
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "bank_name": "Example Bank",
+    "currency": "USD",
+    "updated_at": "2026-03-20T09:00:00Z"
+  }
+}
