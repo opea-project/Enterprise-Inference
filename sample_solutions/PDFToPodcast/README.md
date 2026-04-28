@@ -106,6 +106,15 @@ Before you begin, ensure you have the following installed:
 - **Docker and Docker Compose**
 - **Enterprise inference endpoint access** (token-based authentication)
 
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **deepseek-ai/DeepSeek-R1-Distill-Qwen-32B** | ❌ | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ❌ | ❌ |
+
 ### Verify Docker Installation
 
 ```bash
@@ -119,7 +128,7 @@ docker compose version
 docker ps
 ```
 
-### Required API Keys
+### Required API Configuration
 
 **For LLM Service (Script Generation):**
 
@@ -132,14 +141,9 @@ This application supports multiple inference deployment patterns:
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
   - URL format: https://api.example.com/DeepSeek-R1-Distill-Qwen-32B
-  - Note: APISIX requires the model name in the URL path
+  - Note: APISIX requires the model name in the URL path. Run `kubectl get apisixroutes` for all models.
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
-
-Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (example: https://api.example.com)
-- INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
-- INFERENCE_MODEL_NAME: Model name (default: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B)
 
 **For TTS Service (Audio Generation):**
 
@@ -148,22 +152,6 @@ OpenAI API Key for text-to-speech:
 - Create API key at https://platform.openai.com/api-keys
 - Key format starts with `sk-proj-`
 - Requires access to TTS APIs (tts-1-hd model)
-
-### Local Development Configuration
-
-**For Local Testing Only**
-
-If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
-
-1. Edit `api/llm-service/.env` and set:
-   ```bash
-   LOCAL_URL_ENDPOINT=inference.example.com
-   ```
-   (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
-
-2. This allows Docker containers to resolve your local domain correctly.
-
-**Note:** For public domains or cloud-hosted endpoints, leave the default value `not-needed`.
 
 ---
 
@@ -178,43 +166,39 @@ cd Enterprise-Inference/sample_solutions/PDFToPodcast
 
 ### Set up the Environment
 
-Each service needs its own `.env` file. Copy the example files and edit with your credentials.
-
-**1. PDF Service Configuration:**
-
-```bash
-cp api/pdf-service/.env.example api/pdf-service/.env
-```
-
-No changes needed. Uses default values.
-
-**2. TTS Service Configuration:**
-
-```bash
-cp api/tts-service/.env.example api/tts-service/.env
-```
-
-Open `api/tts-service/.env` and replace `your-openai-api-key-here` with your actual OpenAI API key.
-
-Available TTS voices: alloy, echo, fable, onyx, nova, shimmer. Default voices are alloy (host) and nova (guest).
-
-**3. LLM Service Configuration:**
-
-```bash
-cp api/llm-service/.env.example api/llm-service/.env
-```
-
-Open `api/llm-service/.env` and configure your inference endpoint with the values from the "Required API Keys" section above.
-
-**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), also edit `LOCAL_URL_ENDPOINT` and replace `not-needed` with your domain name (without `https://`).
-
-**4. Backend Service Configuration:**
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
 cp .env.example .env
 ```
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions.
 
-**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), edit `.env` and replace `not-needed` with your domain name (without `https://`).
+1. **Backend Service Configuration**
+    - No changes needed. Use default values.
+
+2. **PDF Service Configuration**
+    - No changes needed. Use default values.
+
+3. **LLM Service Configuration**
+    - **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
+        - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/DeepSeek-R1-Distill-Qwen-32B`)
+    - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
+    - **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
+        - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
+    - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
+        - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
+        - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
+    - **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
+        - Set to `false` only for development environments with self-signed certificates
+        - Keep as `true` for production environments
+
+4. **TTS Service Configuration**
+    - **OPENAI_API_KEY**: Replace with actual OpenAI API key
+    - **DEFAULT_HOST_VOICE**, **DEFAULT_GUEST_VOICE**: Voice used for the podcast
+        - Default voices are alloy (host) and nova (guest)
+        - Available TTS voices: alloy, echo, fable, onyx, nova, shimmer
+
+**Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for all services.
 
 ### Running the Application
 
@@ -318,12 +302,3 @@ docker compose down
 For detailed troubleshooting guidance and solutions to common issues, refer to:
 
 [TROUBLESHOOTING_and_ADDITIONAL_INFO.md](./TROUBLESHOOTING_and_ADDITIONAL_INFO.md)
-
-## Additional Info
-
-The following models have been validated with PDFToPodcast:
-
-| Model | Hardware |
-|-------|----------|
-| **deepseek-ai/DeepSeek-R1-Distill-Qwen-32B** | Gaudi |
-| **Qwen/Qwen3-4B-Instruct-2507** | Xeon |

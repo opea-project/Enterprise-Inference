@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="TTS Audio Generation Service",
+    title=settings.TTS_SERVICE_NAME,
     description="Generate podcast audio from scripts using OpenAI TTS",
-    version="1.0.0",
+    version=settings.TTS_SERVICE_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -49,8 +49,8 @@ app.include_router(router, tags=["Audio Generation"])
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup"""
-    logger.info("TTS Audio Generation Service starting up...")
-    logger.info(f"Service running on port {settings.SERVICE_PORT}")
+    logger.info(f"{settings.TTS_SERVICE_NAME} starting up...")
+    logger.info(f"Service running on port {settings.TTS_SERVICE_PORT}")
 
     # Check API key
     if settings.OPENAI_API_KEY:
@@ -65,14 +65,14 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run on application shutdown"""
-    logger.info("TTS Audio Generation Service shutting down...")
+    logger.info(f"{settings.TTS_SERVICE_NAME} shutting down...")
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "service": "TTS Audio Generation Service",
-        "version": "1.0.0",
+        "service": settings.TTS_SERVICE_NAME,
+        "version": settings.TTS_SERVICE_VERSION,
         "description": "Generate podcast audio from scripts using OpenAI TTS",
         "endpoints": {
             "generate_audio": "POST /generate-audio - Generate podcast audio",
@@ -87,4 +87,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.SERVICE_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=settings.TTS_SERVICE_PORT)

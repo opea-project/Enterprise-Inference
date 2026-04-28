@@ -4,6 +4,7 @@ import logging
 import sys
 
 from app.api.routes import router
+from app.config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -18,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="PDF Processing Service",
+    title=settings.PDF_SERVICE_NAME,
     description="Extract text from PDFs with OCR support for scanned documents",
-    version="1.0.0",
+    version=settings.PDF_SERVICE_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -40,20 +41,20 @@ app.include_router(router, tags=["PDF Processing"])
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup"""
-    logger.info("PDF Processing Service starting up...")
-    logger.info("Service running on port 8001")
+    logger.info(f"{settings.PDF_SERVICE_NAME} starting up...")
+    logger.info(f"Service running on port {settings.PDF_SERVICE_PORT}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run on application shutdown"""
-    logger.info("PDF Processing Service shutting down...")
+    logger.info(f"{settings.PDF_SERVICE_NAME} shutting down...")
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "service": "PDF Processing Service",
-        "version": "1.0.0",
+        "service": settings.PDF_SERVICE_NAME,
+        "version": settings.PDF_SERVICE_VERSION,
         "description": "Extract text from PDFs with OCR support",
         "endpoints": {
             "extract": "POST /extract - Extract text from PDF",
@@ -67,4 +68,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=settings.PDF_SERVICE_PORT)

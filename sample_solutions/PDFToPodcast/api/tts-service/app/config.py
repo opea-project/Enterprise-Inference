@@ -5,15 +5,15 @@ class Settings(BaseSettings):
     """TTS Service Configuration"""
 
     # Service info
-    SERVICE_NAME: str = "TTS Audio Generation Service"
-    SERVICE_VERSION: str = "1.0.0"
-    SERVICE_PORT: int = 8003
+    TTS_SERVICE_NAME: str = "TTS Audio Generation Service"
+    TTS_SERVICE_VERSION: str = "1.0.0"
+    TTS_SERVICE_PORT: int = 8003
 
     # API Keys
     OPENAI_API_KEY: Optional[str] = None
 
     # TTS settings
-    TTS_MODEL: str = "tts-1-hd"  # or tts-1 for faster/cheaper
+    TTS_MODEL: str = "tts-1-hd"
     DEFAULT_HOST_VOICE: str = "alloy"
     DEFAULT_GUEST_VOICE: str = "nova"
 
@@ -25,10 +25,11 @@ class Settings(BaseSettings):
 
     # Processing
     MAX_CONCURRENT_REQUESTS: int = 5
-    MAX_SCRIPT_LENGTH: int = 100  # Max dialogue turns
+    MAX_SCRIPT_LENGTH: int = 100
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 settings = Settings()
