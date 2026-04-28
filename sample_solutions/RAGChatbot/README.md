@@ -92,7 +92,7 @@ See the table below for supported models, hardware, and gateway configuration.
 In addition, an embedding model must be deployed.
 | Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
 |---|:---:|:---:|:---:|:---:|
-| **BAAI/bge-base-en-v1.5** | ✅ Validated on Dell XE7740 | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **BAAI/bge-base-en-v1.5** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
 ### Required API Configuration
 
