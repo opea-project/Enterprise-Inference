@@ -17,8 +17,9 @@
 #             (conntrack socat ipset ebtables nfs-common ipvsadm unzip python3-pip)
 #   Step 3g - Kubernetes / Kubespray binaries
 #   Step 3h - Kubespray tarball
-#   Step 3i - Meta-Llama-3.1-8B-Instruct model (optional, requires HuggingFace token)
-#   Step 3j - Meta-Llama-3.2-3B-Instruct model (optional, requires HuggingFace token)
+#   Step 3i - Meta-Llama-3.2-3B-Instruct model (optional, requires HuggingFace token)
+#   Step 3j - Qwen/Qwen3.5-0.8B model (optional, requires HuggingFace token)
+#   Step 3k - Qwen/Qwen3.5-4B model (optional, requires HuggingFace token)
 #
 # Run this script on VM1 (internet-connected machine with JFrog installed).
 #
@@ -1017,31 +1018,31 @@ set_jfrog_upload_limit_unlimited() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 3i — Meta-Llama-3.1-8B-Instruct (optional)
+# Step 3k — Qwen3.5-4B (optional)
 # ---------------------------------------------------------------------------
-step_3i() {
-  step_hdr "3i - LLM Model: Meta-Llama-3.1-8B-Instruct"
+step_3k() {
+  step_hdr "3k - LLM Model: Qwen/Qwen3.5-4B"
 
   if [[ -z "$HF_TOKEN" ]]; then
-    warn "Skipping 3h: --hf-token not provided"
-    warn "Re-run with: --step 3i --hf-token hf_..."
+    warn "Skipping 3k: --hf-token not provided"
+    warn "Re-run with: --step 3k --hf-token hf_..."
     return 0
   fi
 
   set_jfrog_upload_limit_unlimited
   upload_hf_model \
-    "meta-llama/Llama-3.1-8B-Instruct" \
-    "Meta-Llama-3.1-8B-Instruct" \
-    "$WORKDIR/Llama-3.1-8B-Instruct"
+    "Qwen/Qwen3.5-4B" \
+    "Qwen3.5-4B" \
+    "$WORKDIR/Qwen3.5-4B"
 
-  success "3i complete"
+  success "3k complete"
 }
 
 # ---------------------------------------------------------------------------
-# Step 3j — Meta-Llama-3.2-3B-Instruct (optional)
+# Step 3j — Qwen3.5-0.8B (optional)
 # ---------------------------------------------------------------------------
 step_3j() {
-  step_hdr "3j - LLM Model: Meta-Llama-3.2-3B-Instruct"
+  step_hdr "3j - LLM Model: Qwen/Qwen3.5-0.8B"
 
   if [[ -z "$HF_TOKEN" ]]; then
     warn "Skipping 3j: --hf-token not provided"
@@ -1051,11 +1052,32 @@ step_3j() {
 
   set_jfrog_upload_limit_unlimited
   upload_hf_model \
+    "Qwen/Qwen3.5-0.8B" \
+    "Qwen3.5-0.8B" \
+    "$WORKDIR/Qwen3.5-0.8B"
+
+  success "3j complete"
+}
+
+# ---------------------------------------------------------------------------
+# Step 3i — Meta-Llama-3.2-3B-Instruct (optional)
+# ---------------------------------------------------------------------------
+step_3i() {
+  step_hdr "3i - LLM Model: Meta-Llama-3.2-3B-Instruct"
+
+  if [[ -z "$HF_TOKEN" ]]; then
+    warn "Skipping 3i: --hf-token not provided"
+    warn "Re-run with: --step 3i --hf-token hf_..."
+    return 0
+  fi
+
+  set_jfrog_upload_limit_unlimited
+  upload_hf_model \
     "meta-llama/Llama-3.2-3B-Instruct" \
     "Meta-Llama-3.2-3B-Instruct" \
     "$WORKDIR/Llama-3.2-3B-Instruct"
 
-  success "3j complete"
+  success "3i complete"
 }
 
 # ---------------------------------------------------------------------------
@@ -1147,6 +1169,7 @@ should_run "3g" && step_3g
 should_run "3h" && step_3h
 should_run "3i" && step_3i
 should_run "3j" && step_3j
+should_run "3k" && step_3k
 
 should_run "4"  && step_4
 
