@@ -150,7 +150,7 @@ Then modify it as needed, with special consideration to certain environment vari
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **EMBEDDING_MODEL_NAME**, **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
   - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
-- **EMBEDDING_API_ENDPOINT** (APISIX only): Your actual embedding service URL
+- **EMBEDDING_API_ENDPOINT** (APISIX only): Your actual embedding service URL. **Comment out** for GenAI Gateway.
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
   - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
   - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
