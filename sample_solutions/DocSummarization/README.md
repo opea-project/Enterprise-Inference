@@ -101,7 +101,16 @@ The application consists of:
 Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose**
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
+
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ❌ | ❌ |
 
 ### Required API Configuration
 
@@ -109,27 +118,16 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
-| API Configuration | Validated |
-|---|:---:|
-| GenAI Gateway | ✅ |
-| Keycloak/APISIX | ✅ |
-
-- **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+**GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
-  - The API key is the `litellm_master_key` value from the generated `vault.yml` file
-  
-- **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - The API key is the litellm_master_key value from the generated vault.yml file
+
+**APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
-
-### Deploy Required Model(s)
-
-The following models have been validated on different hardware platforms. At least one model must be deployed.
-
-| Model | Xeon | Gaudi |
-|---|:---:|:---:|
-| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ✅ Validated on Dell XE7740 |
-| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ❌ |
 
 ### Verify Docker Installation
 
