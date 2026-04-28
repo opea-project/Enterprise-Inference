@@ -38,7 +38,7 @@ so connectivity between them is required throughout the entire process.
 |---|---|---|
 | Purpose | Hosts JFrog Artifactory, downloads and stores all assets | Runs the Enterprise Inference stack (Kubernetes + vLLM) |
 | Internet access | Required (to download Docker images, models, binaries) | Not required (blocked after initial setup) |
-| Disk space | At least 80 GB free. This has been validated for downloading Llama 3.1 8B and Llama 3.2 3B models. If you plan to download additional models, you will need more disk space. | At least 80 GB free (for Kubernetes, container images, and model storage) |
+| Disk space | At least 80 GB free. This has been validated for downloading Llama-3.2-3B, Qwen3.5-0.8B, and Qwen3.5-4B models. If you plan to download additional or larger models, you will need more disk space. | At least 80 GB free (for Kubernetes, container images, and model storage) |
 | RAM | At least 8 GB | At least 64 GB (vLLM requires significant memory for CPU inference) |
 | CPU | No special requirement (JFrog is a file server) | At least 16 cores recommended |
 | Network | Must be reachable from VM2 on port 8082 | Must be reachable from VM1, no internet access after setup |
@@ -63,13 +63,19 @@ https://jfrog.com/start-free/
 
 **HuggingFace Token**
 
-Required to download the Meta Llama LLM models (Llama 3.1 8B is about 30 GB, Llama 3.2 3B
-is about 7 GB). The models are gated, so you need to accept the license agreement on
-HuggingFace before a token will work.
+Required to download LLM models. The following models are supported:
 
-1. Accept the Llama 3.1 8B license at https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct
-2. Accept the Llama 3.2 3B license at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct
-3. Generate a token at https://huggingface.co/settings/tokens and select Read access.
+| Step | Model | Approximate size |
+|---|---|---|
+| 3i | meta-llama/Llama-3.2-3B-Instruct | ~7 GB |
+| 3j | Qwen/Qwen3.5-0.8B | ~1.5 GB |
+| 3k | Qwen/Qwen3.5-4B | ~8 GB |
+
+The Llama model is gated and requires you to accept the license agreement before downloading.
+The Qwen models are open and do not require acceptance.
+
+1. Accept the Llama 3.2 3B license at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct
+2. Generate a token at https://huggingface.co/settings/tokens and select Read access.
 
 **Docker Hub Credentials**
 
@@ -228,7 +234,7 @@ chmod +x jfrog-setup.sh
 | `--jfrog-url URL` | Yes | JFrog base URL. Script fails to connect if not provided or incorrect |
 | `--jfrog-user USER` | Yes | JFrog admin username. Script fails to authenticate if missing |
 | `--jfrog-pass PASS` | Yes | JFrog admin password set during the UI wizard. Script fails to authenticate if missing |
-| `--hf-token TOKEN` | Only for steps 3i, 3j | HuggingFace token with read access to gated Llama models. If omitted without `--skip 3i --skip 3j`, steps 3i and 3j will fail |
+| `--hf-token TOKEN` | Only for steps 3i, 3j, 3k | HuggingFace token with read access. Required for Llama-3.2-3B (gated) and Qwen models. If omitted, steps 3i, 3j, and 3k will be skipped with a warning |
 | `--dockerhub-user USER` | Only for step 3a | Docker Hub username for `apache/apisix-ingress-controller`. If omitted, that image is skipped with a warning and all other images still upload |
 | `--dockerhub-pass PASS` | Only for step 3a | Docker Hub password or Personal Access Token. Required alongside `--dockerhub-user` |
 | `--step STEP` | No | Run only one specific step, e.g. `--step 3a`. Useful for re-running a failed step |
@@ -253,8 +259,9 @@ these commands:
 | `./jfrog-setup.sh --step 3f` | Downloads jq and its dependencies as .deb files and uploads them to JFrog. These are installed directly on VM2 since apt cannot reach the internet in airgap mode. Prompts for sudo password during install |
 | `./jfrog-setup.sh --step 3g` | Downloads all binaries Kubespray needs to set up the Kubernetes cluster (kubeadm, kubectl, kubelet, containerd, runc, etcd, calico, cni-plugins, crictl, helm, nerdctl, yq, kubectx, kubens) and uploads them to JFrog |
 | `./jfrog-setup.sh --step 3h` | Packages the Kubespray repository as a tarball and uploads it to JFrog. VM2 uses this instead of cloning from GitHub |
-| `./jfrog-setup.sh --step 3i --hf-token <hf-token>` | Downloads **Meta-Llama-3.1-8B-Instruct** (~30 GB) from HuggingFace and uploads all files to JFrog. Requires a HuggingFace token with access to the model |
-| `./jfrog-setup.sh --step 3j --hf-token <hf-token>` | Downloads **Meta-Llama-3.2-3B-Instruct** (~7 GB) from HuggingFace and uploads all files to JFrog. Requires the same HuggingFace token as step 3i |
+| `./jfrog-setup.sh --step 3i --hf-token <hf-token>` | Downloads **Meta-Llama-3.2-3B-Instruct** (~7 GB) from HuggingFace and uploads all files to JFrog. Requires a HuggingFace token with access to the model |
+| `./jfrog-setup.sh --step 3j --hf-token <hf-token>` | Downloads **Qwen/Qwen3.5-0.8B** (~1.5 GB) from HuggingFace and uploads all files to JFrog |
+| `./jfrog-setup.sh --step 3k --hf-token <hf-token>` | Downloads **Qwen/Qwen3.5-4B** (~8 GB) from HuggingFace and uploads all files to JFrog |
 | `./jfrog-setup.sh --step 4` | Sets all remote repos to Offline so JFrog serves only cached content and does not fetch anything new from the internet. This enforces the true airgap |
 
 ---
