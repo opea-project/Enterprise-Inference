@@ -114,16 +114,16 @@ Before you begin, ensure you have the following installed:
 - Docker and Docker Compose
 - Python 3.10+ (optional, for local development)
 
-### Required Models
-The following models must be deployed on Enterprise Inference before running this application:
+### Deploy Required Model(s)
+The following models must be deployed on Enterprise Inference before running this application. It has been validated on different hardware platforms.
 
-| Model | Purpose |
-|-------|---------|
-| `BAAI/bge-base-en-v1.5` | Embedding generation for dense retrieval |
-| `BAAI/bge-reranker-base` | Reranking retrieved results for improved relevance |
-| `Qwen/Qwen3-4B-Instruct-2507` | LLM for question answering and generation |
+| Model | Purpose | Xeon | Gaudi | 
+|-------|---------|:---:|:---:|
+| `BAAI/bge-base-en-v1.5` | Embedding generation for dense retrieval | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| `BAAI/bge-reranker-base` | Reranking retrieved results for improved relevance | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| `Qwen/Qwen3-4B-Instruct-2507` | LLM for question answering and generation | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
-Verify your models are available:
+Verify your models are available. An example `your-gateway-url` is `api.example.com`. 
 ```bash
 curl https://your-gateway-url/v1/models -H "Authorization: Bearer your-token"
 ```
@@ -140,9 +140,6 @@ docker compose version
 docker ps
 ```
 
-### Credentials & Authentication
-The system uses GenAI Gateway for authentication with API key-based access.
-
 ## Deployment & Configuration
 
 ### Clone the Repository
@@ -152,27 +149,33 @@ cd Enterprise-Inference/sample_solutions/HybridSearch
 ```
 
 ### Set up the Environment
-Create a `.env` file from the example and configure your credentials.
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
 cp .env.example .env
 ```
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions. Additional notes are given below.
 
-**Note:** The `LOCAL_URL_ENDPOINT` variable enables Docker's `extra_hosts` configuration for local domain resolution. Set it to `not-needed` if you don't require custom domain mapping.
+### Local Development Configuration (Local Testing Only)
+If using a local domain like api.example.com mapped to localhost, set `LOCAL_URL_ENDPOINT` to the domain without `https://`. Otherwise, set to: `not-needed`.
 
-### Configure Authentication
+### Configure Inference Gateway
 Configure GenAI Gateway authentication in your `.env` file:
 
 ```bash
 # GenAI Gateway Configuration
 GENAI_GATEWAY_URL=https://api.example.com
 GENAI_API_KEY=your-api-key-here
-
-# SSL Verification (set to false only for dev with self-signed certs)
-VERIFY_SSL=true
 ```
 
 **Generating API tokens by gateway type:**
+
+This application supports multiple inference deployment patterns:
+
+| API Configuration | Validated |
+|---|:---:|
+| GenAI Gateway | ✅ |
+| Keycloak/APISIX | ✅ |
 
 - **GenAI Gateway**: Provide your GenAI Gateway URL and API key
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
@@ -211,6 +214,11 @@ INFERENCE_BACKEND=tei
 EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5-vllmcpu
 RERANKER_API_ENDPOINT=https://api.example.com/bge-reranker-base-vllmcpu
 LLM_API_ENDPOINT=https://api.example.com/Qwen3-4B-Instruct-2507-vllmcpu
+```
+
+### SSL Verification (set to false only for dev with self-signed certs)
+```bash
+VERIFY_SSL=false
 ```
 
 ### Running the Application
