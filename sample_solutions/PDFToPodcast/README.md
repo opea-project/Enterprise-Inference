@@ -104,7 +104,7 @@ This application is built using FastAPI microservices architecture with Docker c
 Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose**
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
 
 #### Deploy Required Models
 
@@ -141,7 +141,7 @@ This application supports multiple inference deployment patterns:
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
   - URL format: https://api.example.com/DeepSeek-R1-Distill-Qwen-32B
-  - Note: APISIX requires the model name in the URL path. Run `kubectl get apisixroutes` for all models.
+  - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
 
