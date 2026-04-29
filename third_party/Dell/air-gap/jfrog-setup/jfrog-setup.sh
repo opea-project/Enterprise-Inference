@@ -18,8 +18,9 @@
 #   Step 3g - Kubernetes / Kubespray binaries
 #   Step 3h - Kubespray tarball
 #   Step 3i - Meta-Llama-3.2-3B-Instruct model (optional, requires HuggingFace token)
-#   Step 3j - Qwen/Qwen3.5-0.8B model (optional, requires HuggingFace token)
-#   Step 3k - Qwen/Qwen3.5-4B model (optional, requires HuggingFace token)
+#   Step 3j - Qwen/Qwen3-0.6B model (optional, requires HuggingFace token)
+#   Step 3k - Qwen/Qwen3-4B model (optional, requires HuggingFace token)
+#   Step 3l - Qwen/Qwen3-1.7B model (optional, requires HuggingFace token)
 #
 # Run this script on VM1 (internet-connected machine with JFrog installed).
 #
@@ -30,7 +31,7 @@
 #   --jfrog-url URL        JFrog base URL (default: http://localhost:8082/artifactory)
 #   --jfrog-user USER      JFrog username (default: admin)
 #   --jfrog-pass PASS      JFrog password (default: password)
-#   --hf-token TOKEN       HuggingFace token (required for steps 3i and 3j)
+#   --hf-token TOKEN       HuggingFace token (required for steps 3i, 3j, 3k and 3l)
 #   --dockerhub-user USER  Docker Hub username (required for apisix-ingress-controller)
 #   --dockerhub-pass PASS  Docker Hub password / PAT
 #   --step STEP            Run only a specific step (e.g. --step 1, --step 3a)
@@ -101,7 +102,7 @@ run() {
 should_run() {
   local s="$1"
   [[ -z "$ONLY_STEP" || "$ONLY_STEP" == "$s" ]] || return 1
-  for skip in "${SKIP_STEPS[@]:-}"; do [[ "$skip" == "$s" ]] && return 1; done
+  for skip in "${SKIP_STEPS[@]}"; do [[ "$skip" == "$s" ]] && return 1; done
   return 0
 }
 
@@ -1018,10 +1019,10 @@ set_jfrog_upload_limit_unlimited() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 3k — Qwen3.5-4B (optional)
+# Step 3k — Qwen3-4B (optional)
 # ---------------------------------------------------------------------------
 step_3k() {
-  step_hdr "3k - LLM Model: Qwen/Qwen3.5-4B"
+  step_hdr "3k - LLM Model: Qwen/Qwen3-4B"
 
   if [[ -z "$HF_TOKEN" ]]; then
     warn "Skipping 3k: --hf-token not provided"
@@ -1031,18 +1032,39 @@ step_3k() {
 
   set_jfrog_upload_limit_unlimited
   upload_hf_model \
-    "Qwen/Qwen3.5-4B" \
-    "Qwen3.5-4B" \
-    "$WORKDIR/Qwen3.5-4B"
+    "Qwen/Qwen3-4B" \
+    "Qwen3-4B" \
+    "$WORKDIR/Qwen3-4B"
 
   success "3k complete"
 }
 
 # ---------------------------------------------------------------------------
-# Step 3j — Qwen3.5-0.8B (optional)
+# Step 3l — Qwen3-1.7B (optional)
+# ---------------------------------------------------------------------------
+step_3l() {
+  step_hdr "3l - LLM Model: Qwen/Qwen3-1.7B"
+
+  if [[ -z "$HF_TOKEN" ]]; then
+    warn "Skipping 3l: --hf-token not provided"
+    warn "Re-run with: --step 3l --hf-token hf_..."
+    return 0
+  fi
+
+  set_jfrog_upload_limit_unlimited
+  upload_hf_model \
+    "Qwen/Qwen3-1.7B" \
+    "Qwen3-1.7B" \
+    "$WORKDIR/Qwen3-1.7B"
+
+  success "3l complete"
+}
+
+# ---------------------------------------------------------------------------
+# Step 3j — Qwen3-0.6B (optional)
 # ---------------------------------------------------------------------------
 step_3j() {
-  step_hdr "3j - LLM Model: Qwen/Qwen3.5-0.8B"
+  step_hdr "3j - LLM Model: Qwen/Qwen3-0.6B"
 
   if [[ -z "$HF_TOKEN" ]]; then
     warn "Skipping 3j: --hf-token not provided"
@@ -1052,9 +1074,9 @@ step_3j() {
 
   set_jfrog_upload_limit_unlimited
   upload_hf_model \
-    "Qwen/Qwen3.5-0.8B" \
-    "Qwen3.5-0.8B" \
-    "$WORKDIR/Qwen3.5-0.8B"
+    "Qwen/Qwen3-0.6B" \
+    "Qwen3-0.6B" \
+    "$WORKDIR/Qwen3-0.6B"
 
   success "3j complete"
 }
@@ -1170,6 +1192,7 @@ should_run "3h" && step_3h
 should_run "3i" && step_3i
 should_run "3j" && step_3j
 should_run "3k" && step_3k
+should_run "3l" && step_3l
 
 should_run "4"  && step_4
 
