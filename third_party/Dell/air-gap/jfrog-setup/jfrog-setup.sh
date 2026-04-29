@@ -801,14 +801,23 @@ step_3f() {
                /var/cache/apt/archives/ebtables*.deb \
                /var/cache/apt/archives/nfs-common*.deb \
                /var/cache/apt/archives/apt-transport-https*.deb \
-               /var/cache/apt/archives/ipvsadm*.deb
+               /var/cache/apt/archives/ipvsadm*.deb \
+               /var/cache/apt/archives/python3-pip*.deb \
+               /var/cache/apt/archives/python3-wheel*.deb \
+               /var/cache/apt/archives/python3.10*.deb \
+               /var/cache/apt/archives/libpython3.10*.deb \
+               /var/cache/apt/archives/python3-dev*.deb
 
     run sudo apt-get install --download-only -y \
       conntrack socat ipset ebtables nfs-common apt-transport-https ipvsadm \
-      python3-pip \
       || { warn "Some packages may not have been cached"; precache_ok=false; }
 
-    # unzip requires --reinstall because it is typically already installed
+    # python3-pip, unzip, and their deps require --reinstall because they are
+    # typically already installed on VM1 — without it apt skips the download
+    # and JFrog never caches the .deb files
+    run sudo apt-get install --download-only --reinstall -y python3-pip \
+      || { warn "python3-pip may not have been cached"; precache_ok=false; }
+
     run sudo apt-get install --download-only --reinstall -y unzip \
       || { warn "unzip may not have been cached"; precache_ok=false; }
   else
