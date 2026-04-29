@@ -794,32 +794,30 @@ step_3f() {
     # Clear any locally cached .deb files so apt must fetch from JFrog
     # (if the package is already in /var/cache/apt/archives, apt skips the
     # download entirely and JFrog never sees the request)
-    sudo rm -f /var/cache/apt/archives/unzip*.deb \
-               /var/cache/apt/archives/conntrack*.deb \
+    sudo rm -f /var/cache/apt/archives/conntrack*.deb \
                /var/cache/apt/archives/socat*.deb \
                /var/cache/apt/archives/ipset*.deb \
                /var/cache/apt/archives/ebtables*.deb \
                /var/cache/apt/archives/nfs-common*.deb \
                /var/cache/apt/archives/apt-transport-https*.deb \
-               /var/cache/apt/archives/ipvsadm*.deb \
-               /var/cache/apt/archives/python3-pip*.deb \
-               /var/cache/apt/archives/python3-wheel*.deb \
-               /var/cache/apt/archives/python3.10*.deb \
-               /var/cache/apt/archives/libpython3.10*.deb \
-               /var/cache/apt/archives/python3-dev*.deb
+               /var/cache/apt/archives/ipvsadm*.deb
 
     run sudo apt-get install --download-only -y \
       conntrack socat ipset ebtables nfs-common apt-transport-https ipvsadm \
       || { warn "Some packages may not have been cached"; precache_ok=false; }
 
-    # python3-pip, unzip, and their deps require --reinstall because they are
-    # typically already installed on VM1 — without it apt skips the download
-    # and JFrog never caches the .deb files
-    run sudo apt-get install --download-only --reinstall -y python3-pip \
+    # apt-get download always fetches from the configured sources regardless of
+    # whether the package is already installed — unlike `install --reinstall`
+    # which can use apt's in-memory state and skip the network fetch entirely.
+    local pip_tmpdir
+    pip_tmpdir=$(mktemp -d)
+    cd "$pip_tmpdir"
+    run apt-get download python3-pip \
       || { warn "python3-pip may not have been cached"; precache_ok=false; }
-
-    run sudo apt-get install --download-only --reinstall -y unzip \
+    run apt-get download unzip \
       || { warn "unzip may not have been cached"; precache_ok=false; }
+    cd - >/dev/null
+    rm -rf "$pip_tmpdir"
   else
     warn "apt-get update through JFrog failed — Kubespray packages may not be cached"
     precache_ok=false
