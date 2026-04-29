@@ -248,6 +248,8 @@ See the table below for supported models, hardware, and gateway configuration.
 |---|:---:|:---:|:---:|:---:|
 | **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
+>**Note** When deploying, the model must have the `--enable-auto-tool-choice` argument for the AI agents to use the model endpoint. On Xeon deployments, it is included, but on Gaudi (as of Enterprise Inference release v1.4.0), it is not. This needs to be added in the vLLM Helm Chart `gaudi3_values.yaml` or `gaudi-values.yaml` as a new model config or in the default config before deploying the model.
+
 All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Environment Config, Dependency Analyzer, Planner, Mermaid Generator, and QA Validator) use this model for efficient documentation generation.
 
 ### Required API Configuration
