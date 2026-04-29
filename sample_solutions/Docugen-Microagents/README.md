@@ -238,7 +238,17 @@ Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose** (required for running the application containers)
 - **Docker daemon running** (required for PR Agent's GitHub MCP server container)
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
+
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+
+All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Environment Config, Dependency Analyzer, Planner, Mermaid Generator, and QA Validator) use this model for efficient documentation generation.
 
 ### Required API Configuration
 
@@ -246,28 +256,16 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
-| API Configuration | Validated |
-|---|:---:|
-| GenAI Gateway | ✅ |
-| Keycloak/APISIX | ✅ |
-
 **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-- To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
-- The API key is the `litellm_master_key` value from the generated `vault.yml` file
+  - URL format: https://api.example.com
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the litellm_master_key value from the generated vault.yml file
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-- To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
-- The token is generated using Keycloak client credentials
-
-### Deploy Required Model(s)
-
-The following models have been validated on different hardware platforms. At least one model must be deployed.
-
-| Model | Xeon | Gaudi |
-|---|:---:|:---:|
-| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
-
-All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Environment Config, Dependency Analyzer, Planner, Mermaid Generator, and QA Validator) use this model for efficient documentation generation.
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 ### GitHub Personal Access Token (Optional)
 
