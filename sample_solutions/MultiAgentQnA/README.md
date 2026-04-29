@@ -105,42 +105,38 @@ The application consists of:
 Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose**
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
+
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ❌ | ❌ |
+
+In addition, an embedding model must be deployed.
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **BAAI/bge-base-en-v1.5** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
 ### Required API Configuration
 
-**For Inference Service:**
+**For Inference Service (RAG Chatbot):**
 
 This application supports multiple inference deployment patterns:
 
-| API Configuration | Validated |
-|---|:---:|
-| GenAI Gateway | ✅ |
-| Keycloak/APISIX | ✅ |
-
 **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
   - The API key is the litellm_master_key value from the generated vault.yml file
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
-
-### Deploy Required Model(s)
-
-The following models have been validated on different hardware platforms. 
-
-At least one of the following models must be deployed.
-
-| Model | Xeon | Gaudi |
-|---|:---:|:---:|
-| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ✅ Validated on Dell XE7740 |
-| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ❌ |
-
-In addition, an embedding model must be deployed.
-| Model | Xeon | Gaudi |
-|---|:---:|:---:|
-| **BAAI/bge-base-en-v1.5** | ❌ | ✅ Validated on Dell XE7740 |
 
 ### Verify Docker Installation
 
@@ -181,7 +177,7 @@ Then modify it as needed, with special consideration to certain environment vari
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
 - **EMBEDDING_MODEL_NAME**, **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
   - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
-- **EMBEDDING_API_ENDPOINT** (APISIX only): Your actual embedding service URL
+- **EMBEDDING_API_ENDPOINT** (APISIX only): Your actual embedding service URL. **Comment out** for GenAI Gateway
 - **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
   - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
   - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
