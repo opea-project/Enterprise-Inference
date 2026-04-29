@@ -15,7 +15,7 @@ import config
 logger = logging.getLogger(__name__)
 
 # Constants
-VECTOR_STORE_PATH = "./dmv_index"
+VECTOR_STORE_PATH = "/tmp/dmv_index"
 
 
 class CustomEmbeddings(Embeddings):
