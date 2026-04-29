@@ -111,22 +111,18 @@ UI (8501) → Gateway (8000) → [Embedding (8001), Retrieval (8002), LLM (8003)
 ### System Requirements
 Before you begin, ensure you have the following installed:
 
-- Docker and Docker Compose
-- Python 3.10+ (optional, for local development)
+- **Docker and Docker Compose**
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
 
-### Deploy Required Model(s)
-The following models must be deployed on Enterprise Inference before running this application. It has been validated on different hardware platforms.
+#### Deploy Required Models
 
-| Model | Purpose | Xeon | Gaudi | 
-|-------|---------|:---:|:---:|
-| `BAAI/bge-base-en-v1.5` | Embedding generation for dense retrieval | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
-| `BAAI/bge-reranker-base` | Reranking retrieved results for improved relevance | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
-| `Qwen/Qwen3-4B-Instruct-2507` | LLM for question answering and generation | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+See the table below for supported models, hardware, and gateway configuration.
 
-Verify your models are available. An example `your-gateway-url` is `api.example.com`. 
-```bash
-curl https://your-gateway-url/v1/models -H "Authorization: Bearer your-token"
-```
+| Model | Purpose | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|---|:---:|:---:|:---:|:---:|
+| `BAAI/bge-base-en-v1.5` | Embedding generation for dense retrieval | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| `BAAI/bge-reranker-base` | Reranking retrieved results for improved relevance | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| `Qwen/Qwen3-4B-Instruct-2507` | LLM for question answering and generation | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
 ### Verify Docker Installation
 ```bash
@@ -172,19 +168,16 @@ GENAI_API_KEY=your-api-key-here
 
 This application supports multiple inference deployment patterns:
 
-| API Configuration | Validated |
-|---|:---:|
-| GenAI Gateway | ✅ |
-| Keycloak/APISIX | ✅ |
-
-- **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+**GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
-  - The API key is the `litellm_master_key` value from the generated `vault.yml` file
+  - The API key is the litellm_master_key value from the generated vault.yml file
 
-- **Keycloak / APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+**APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
-  - The token is generated using Keycloak client credentials (expires in 15 minutes by default; a Keycloak admin can configure longer-lived tokens in the Keycloak console)
-  - For Keycloak, each model has its own APISIX route path. Run `kubectl get apisixroutes` to find the route names for your deployed models (e.g., `bge-base-en-v1.5`, `bge-reranker-base`, `Qwen3-4B-Instruct-2507`)
+  - The token is generated using Keycloak client credentials
 
 ### Configure Models
 Model endpoint names differ by deployment type. Use the table below to determine the correct values:
