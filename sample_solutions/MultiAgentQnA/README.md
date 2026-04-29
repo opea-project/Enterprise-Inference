@@ -123,6 +123,8 @@ In addition, an embedding model must be deployed.
 
 ### Required API Configuration
 
+**For LLM Inference and Embedding Services:**
+
 This application supports multiple inference deployment patterns:
 
 **GenAI Gateway**: Provide your GenAI Gateway URL and API key
