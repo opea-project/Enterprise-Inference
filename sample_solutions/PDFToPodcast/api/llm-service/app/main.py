@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="LLM Script Generation Service",
+    title=settings.LLM_SERVICE_NAME,
     description="Generate podcast scripts from text using AI",
-    version="1.0.0",
+    version=settings.LLM_SERVICE_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -43,9 +43,9 @@ app.include_router(router, tags=["Script Generation"])
 async def startup_event():
     """Run on application startup"""
     logger.info("=" * 60)
-    logger.info("LLM Script Generation Service starting up...")
+    logger.info(f"{settings.LLM_SERVICE_NAME} starting up...")
     logger.info("=" * 60)
-    logger.info(f"Service running on port {settings.SERVICE_PORT}")
+    logger.info(f"Service running on port {settings.LLM_SERVICE_PORT}")
 
     if settings.INFERENCE_API_ENDPOINT and settings.INFERENCE_API_TOKEN:
         logger.info("LLM Provider: Inference API")
@@ -60,14 +60,14 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run on application shutdown"""
-    logger.info("LLM Script Generation Service shutting down...")
+    logger.info(f"{settings.LLM_SERVICE_NAME} shutting down...")
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "service": "LLM Script Generation Service",
-        "version": "1.0.0",
+        "service": settings.LLM_SERVICE_NAME,
+        "version": settings.LLM_SERVICE_VERSION,
         "description": "Convert text content into engaging podcast dialogue",
         "config": {
             "llm_provider": "Inference API",
@@ -86,4 +86,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.SERVICE_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=settings.LLM_SERVICE_PORT)
