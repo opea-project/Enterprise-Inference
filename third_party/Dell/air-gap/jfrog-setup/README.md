@@ -38,7 +38,7 @@ so connectivity between them is required throughout the entire process.
 |---|---|---|
 | Purpose | Hosts JFrog Artifactory, downloads and stores all assets | Runs the Enterprise Inference stack (Kubernetes + vLLM) |
 | Internet access | Required (to download Docker images, models, binaries) | Not required (blocked after initial setup) |
-| Disk space | At least 80 GB free. This has been validated for downloading Llama-3.2-3B, Qwen3.5-0.8B, and Qwen3.5-4B models. If you plan to download additional or larger models, you will need more disk space. | At least 80 GB free (for Kubernetes, container images, and model storage) |
+| Disk space | At least 80 GB free. This has been validated for downloading Llama-3.2-3B, Qwen3-0.6B, Qwen3-1.7B, and Qwen3-4B models. If you plan to download additional or larger models, you will need more disk space. | At least 80 GB free (for Kubernetes, container images, and model storage) |
 | RAM | At least 8 GB | At least 64 GB (vLLM requires significant memory for CPU inference) |
 | CPU | No special requirement (JFrog is a file server) | At least 16 cores recommended |
 | Network | Must be reachable from VM2 on port 8082 | Must be reachable from VM1, no internet access after setup |
@@ -67,9 +67,10 @@ Required to download LLM models. The following models are supported:
 
 | Step | Model | Approximate size |
 |---|---|---|
-| 3i | meta-llama/Llama-3.2-3B-Instruct | ~7 GB |
-| 3j | Qwen/Qwen3.5-0.8B | ~1.5 GB |
-| 3k | Qwen/Qwen3.5-4B | ~8 GB |
+| 3i | meta-llama/Llama-3.2-3B-Instruct | ~6.5 GB |
+| 3j | Qwen/Qwen3-0.6B | ~1.2 GB |
+| 3k | Qwen/Qwen3-4B | ~7.6 GB |
+| 3l | Qwen/Qwen3-1.7B | ~3.4 GB |
 
 The Llama model is gated and requires you to accept the license agreement before downloading.
 The Qwen models are open and do not require acceptance.
@@ -102,7 +103,7 @@ Clone the repo and check out the airgap branch:
 ```bash
 git clone https://github.com/cld2labs/Enterprise-Inference.git Enterprise-Inference
 cd Enterprise-Inference
-git checkout ei/airgapped
+git checkout cld2labs/airgap
 ```
 
 Then run the install script:
@@ -259,9 +260,10 @@ these commands:
 | `./jfrog-setup.sh --step 3f` | Downloads jq and its dependencies as .deb files and uploads them to JFrog. These are installed directly on VM2 since apt cannot reach the internet in airgap mode. Prompts for sudo password during install |
 | `./jfrog-setup.sh --step 3g` | Downloads all binaries Kubespray needs to set up the Kubernetes cluster (kubeadm, kubectl, kubelet, containerd, runc, etcd, calico, cni-plugins, crictl, helm, nerdctl, yq, kubectx, kubens) and uploads them to JFrog |
 | `./jfrog-setup.sh --step 3h` | Packages the Kubespray repository as a tarball and uploads it to JFrog. VM2 uses this instead of cloning from GitHub |
-| `./jfrog-setup.sh --step 3i --hf-token <hf-token>` | Downloads **Meta-Llama-3.2-3B-Instruct** (~7 GB) from HuggingFace and uploads all files to JFrog. Requires a HuggingFace token with access to the model |
-| `./jfrog-setup.sh --step 3j --hf-token <hf-token>` | Downloads **Qwen/Qwen3.5-0.8B** (~1.5 GB) from HuggingFace and uploads all files to JFrog |
-| `./jfrog-setup.sh --step 3k --hf-token <hf-token>` | Downloads **Qwen/Qwen3.5-4B** (~8 GB) from HuggingFace and uploads all files to JFrog |
+| `./jfrog-setup.sh --step 3i --hf-token <hf-token>` | Downloads **meta-llama/Llama-3.2-3B-Instruct** (~6.5 GB) from HuggingFace and uploads all files to JFrog. Requires a HuggingFace token with access to the model |
+| `./jfrog-setup.sh --step 3j --hf-token <hf-token>` | Downloads **Qwen/Qwen3-0.6B** (~1.2 GB) from HuggingFace and uploads all files to JFrog |
+| `./jfrog-setup.sh --step 3k --hf-token <hf-token>` | Downloads **Qwen/Qwen3-4B** (~7.6 GB) from HuggingFace and uploads all files to JFrog |
+| `./jfrog-setup.sh --step 3l --hf-token <hf-token>` | Downloads **Qwen/Qwen3-1.7B** (~3.4 GB) from HuggingFace and uploads all files to JFrog |
 | `./jfrog-setup.sh --step 4` | Sets all remote repos to Offline so JFrog serves only cached content and does not fetch anything new from the internet. This enforces the true airgap |
 
 ---
