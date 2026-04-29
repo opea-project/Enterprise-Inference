@@ -1,6 +1,6 @@
-idrac_endpoint     = "replace endpoint"
-idrac_user         = "replace idrac username"
-idrac_password     = "replace idrac password"
+idrac_endpoint     = "https://100.67.153.13"
+idrac_user         = "root"
+idrac_password     = "calvin"
 idrac_ssl_insecure = true
-ubuntu_username    = "provide username for ubunutu machine"
-ubuntu_password    = "provide password for ubuntu machine"
+ubuntu_username    = "user"
+ubuntu_password    = "Linux123!"
