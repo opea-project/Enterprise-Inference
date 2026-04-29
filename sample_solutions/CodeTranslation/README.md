@@ -125,7 +125,16 @@ This application is built with enterprise inference capabilities using token-bas
 Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose**
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
+
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **codellama/CodeLlama-34b-Instruct-hf** | ❌ | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ❌ | ❌ |
 
 ### Required API Configuration
 
@@ -133,29 +142,16 @@ Before you begin, ensure you have the following installed:
 
 This application supports multiple inference deployment patterns:
 
-- **GenAI Gateway**: Provide your GenAI Gateway URL and API key
+**GenAI Gateway**: Provide your GenAI Gateway URL and API key
+  - URL format: https://api.example.com
   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
-  - The API key is the `litellm_master_key` value from the generated `vault.yml` file
-  
-- **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - The API key is the litellm_master_key value from the generated vault.yml file
+
+**APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
-
-### Local Development Configuration
-
-**For Local Testing Only (Optional)**
-
-If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
-
-1. Edit `.env` and set:
-   ```bash
-   LOCAL_URL_ENDPOINT=api.example.com
-   ```
-   (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
-
-2. This allows Docker containers to resolve your local domain correctly.
-
-**Note:** For public domains or cloud-hosted endpoints, leave the default value `not-needed`.
 
 ### Verify Docker Installation
 
@@ -182,101 +178,23 @@ cd Enterprise-Inference/sample_solutions/CodeTranslation
 
 ### Set up the Environment
 
-This application requires an `.env` file in the root directory for proper configuration. Create it with the commands below:
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
-# Create the .env file
-cat > .env << EOF
-# Backend API Configuration
-BACKEND_PORT=5001
-
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf
-#     Note: APISIX Gateway requires the model name in the URL path
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-#   - For GenAI Gateway: Your GenAI Gateway API key
-#   - For APISIX Gateway: Your APISIX authentication token
-INFERENCE_API_ENDPOINT=https://your-api-endpoint.com/deployment
-INFERENCE_API_TOKEN=your-pre-generated-token-here
-INFERENCE_MODEL_NAME=codellama/CodeLlama-34b-Instruct-hf
-
-# LLM Settings
-LLM_TEMPERATURE=0.2
-LLM_MAX_TOKENS=4096
-
-# Code Translation Settings
-# MAX_CODE_LENGTH: Maximum input code length in characters
-# Note: For Enterprise Inference with CodeLlama-34b (max tokens: 5196)
-#       Set to 4000 characters to stay safely under the token limit with prompt overhead
-MAX_CODE_LENGTH=4000
-MAX_FILE_SIZE=10485760
-
-# CORS Configuration
-CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
-
-# Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
-# Otherwise, set to: not-needed
-LOCAL_URL_ENDPOINT=not-needed
-
-# SSL Verification Settings
-# Set to false only for dev with self-signed certs
-VERIFY_SSL=true
-EOF
+cp .env.example .env
 ```
-
-Or manually create `.env` with:
-
-```bash
-# Backend API Configuration
-BACKEND_PORT=5001
-
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#   - For GenAI Gateway: https://genai-gateway.example.com
-#   - For APISIX Gateway: https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf
-#     Note: APISIX Gateway requires the model name in the URL path
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-#   - For GenAI Gateway: Your GenAI Gateway API key
-#   - For APISIX Gateway: Your APISIX authentication token
-INFERENCE_API_ENDPOINT=https://your-api-endpoint.com/deployment
-INFERENCE_API_TOKEN=your-pre-generated-token-here
-INFERENCE_MODEL_NAME=codellama/CodeLlama-34b-Instruct-hf
-
-# LLM Settings
-LLM_TEMPERATURE=0.2
-LLM_MAX_TOKENS=4096
-
-# Code Translation Settings
-# MAX_CODE_LENGTH: Maximum input code length in characters
-# Note: For Enterprise Inference with CodeLlama-34b (max tokens: 5196)
-#       Set to 4000 characters to stay safely under the token limit with prompt overhead
-MAX_CODE_LENGTH=4000
-MAX_FILE_SIZE=10485760
-
-# CORS Configuration
-CORS_ALLOW_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
-
-# Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
-# Otherwise, set to: not-needed
-LOCAL_URL_ENDPOINT=not-needed
-
-# SSL Verification Settings
-# Set to false only for dev with self-signed certs
-VERIFY_SSL=true
-```
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions.
 
 **Important Configuration Notes:**
 
-- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-api-endpoint.com/deployment`)
-  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/CodeLlama-34b-Instruct-hf`)
+- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/CodeLlama-34b-Instruct-hf`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
-- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (see [Local Development Configuration](#local-development-configuration))
+- **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
+  - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
+- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
+  - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
+  - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
 - **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
   - Set to `false` only for development environments with self-signed certificates
   - Keep as `true` for production environments
@@ -371,14 +289,3 @@ docker compose down
 For comprehensive troubleshooting guidance, common issues, and solutions, refer to:
 
 [Troubleshooting Guide - TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-
----
-
-## Additional Info
-
-The following models have been validated with code-translation:
-
-| Model | Hardware |
-|-------|----------|
-| **codellama/CodeLlama-34b-Instruct-hf** | Gaudi |
-| **Qwen/Qwen3-4B-Instruct-2507** | Xeon |
