@@ -16,7 +16,7 @@ from services.api_client import get_api_client
 logger = logging.getLogger(__name__)
 
 # Constants
-VECTOR_STORE_DIR = "./rag_index"
+VECTOR_STORE_DIR = "/tmp/rag_index"
 CHUNK_SIZE = 1000  # Characters per chunk
 CHUNK_OVERLAP = 200  # Overlap between chunks
 

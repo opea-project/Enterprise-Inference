@@ -105,11 +105,25 @@ The application consists of:
 Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose**
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
+
+#### Deploy Required Models
+
+See the table below for supported models, hardware, and gateway configuration.
+
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **meta-llama/Llama-3.1-8B-Instruct** | ❌ | ❌ | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ❌ | ❌ |
+
+In addition, an embedding model must be deployed.
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **BAAI/bge-base-en-v1.5** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
 
 ### Required API Configuration
 
-**For Inference Service:**
+**For LLM Inference and Embedding Services:**
 
 This application supports multiple inference deployment patterns:
 
@@ -119,34 +133,10 @@ This application supports multiple inference deployment patterns:
   - The API key is the litellm_master_key value from the generated vault.yml file
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-  - URL format: https://api.example.com/bge-base-en-v1.5 (for embedding) and https://api.example.com/Llama-3.1-8B-Instruct (for inference)
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
   - Note: APISIX requires the model name in the URL path
   - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
   - The token is generated using Keycloak client credentials
-
-Configuration requirements:
-- INFERENCE_API_ENDPOINT: URL to your inference service (example: https://api.example.com)
-- INFERENCE_API_TOKEN: Authentication token/API key for your chosen service
-- EMBEDDING_MODEL_NAME: Embedding model name (default: BAAI/bge-base-en-v1.5)
-- INFERENCE_MODEL_NAME: Inference model name (default: meta-llama/Llama-3.1-8B-Instruct)
-- EMBEDDING_API_ENDPOINT: (Optional, for APISIX only) URL with embedding model in path
-- INFERENCE_MODEL_ENDPOINT: (Optional, for APISIX only) URL with inference model in path
-
-### Local Development Configuration
-
-**For Local Testing Only**
-
-If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
-
-1. Edit `api/.env` and set:
-   ```bash
-   LOCAL_URL_ENDPOINT=inference.example.com
-   ```
-   (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
-
-2. This allows Docker containers to resolve your local domain correctly.
-
-**Note:** For public domains or cloud-hosted endpoints, leave the default value `not-needed`.
 
 ### Verify Docker Installation
 
@@ -173,126 +163,29 @@ cd Enterprise-Inference/sample_solutions/MultiAgentQnA
 
 ### Set up the Environment
 
-This application requires **two `.env` files** for proper configuration:
-
-1. **Root `.env` file** (for Docker Compose variables)
-2. **`api/.env` file** (for backend application configuration)
-
-#### Step 1: Create Root `.env` File
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
-# From the MultiAgentQnA directory
-cat > .env << EOF
-# Docker Compose Configuration
-LOCAL_URL_ENDPOINT=not-needed
-EOF
+cp .env.example .env
 ```
-
-**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
-
-#### Step 2: Create `api/.env` File
-
-This application requires an `api/.env` file for proper configuration. Create it with the commands below:
-
-```bash
-# Create the api/.env file
-cat > api/.env << EOF
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#
-# **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-#   - URL format: https://genai-gateway.example.com
-#   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh] script
-#   - The API key is the litellm_master_key value from the generated vault.yml file
-#
-# **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-#   - For APISIX, include the model name in the INFERENCE_API_ENDPOINT path
-#   - Example: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
-#   - Set EMBEDDING_API_ENDPOINT separately for the embedding model
-#   - Example: https://apisix-gateway.example.com/bge-base-en-v1.5
-#   - To generate the APISIX authentication token, use the [generate-token.sh] script
-#   - The token is generated using Keycloak client credentials
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-INFERENCE_API_ENDPOINT=https://your-api.example.com/
-INFERENCE_API_TOKEN=your-pre-generated-token-here
-
-# Model Configuration
-EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
-INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-
-# APISIX Gateway Endpoints
-# Uncomment and set these when using APISIX Gateway:
-# IMPORTANT: Use exact APISIX route paths:
-# Example routes: /bge-base-en-v1.5/* and /Llama-3.1-8B-Instruct/*
-# INFERENCE_API_ENDPOINT=https://api.example.com/Llama-3.1-8B-Instruct
-# EMBEDDING_API_ENDPOINT=https://api.example.com/bge-base-en-v1.5
-
-# Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like api.example.com mapped to localhost:
-#   Set this to: api.example.com (domain without https://)
-# If using a public domain, set any placeholder value like: not-needed
-LOCAL_URL_ENDPOINT=not-needed
-
-# SSL Verification Settings
-# Set to false only for dev with self-signed certs
-VERIFY_SSL=true
-EOF
-```
-
-Or manually create `api/.env` with:
-
-```bash
-# Inference API Configuration
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#
-# **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-#   - URL format: https://genai-gateway.example.com
-#   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh] script
-#   - The API key is the litellm_master_key value from the generated vault.yml file
-#
-# **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-#   - For APISIX, include the model name in the INFERENCE_API_ENDPOINT path
-#   - Example: https://apisix-gateway.example.com/Llama-3.1-8B-Instruct
-#   - Set EMBEDDING_API_ENDPOINT separately for the embedding model
-#   - Example: https://apisix-gateway.example.com/bge-base-en-v1.5
-#   - To generate the APISIX authentication token, use the [generate-token.sh] script
-#   - The token is generated using Keycloak client credentials
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-INFERENCE_API_ENDPOINT=https://your-api.example.com/
-INFERENCE_API_TOKEN=your-pre-generated-token-here
-
-# Model Configuration
-EMBEDDING_MODEL_NAME=BAAI/bge-base-en-v1.5
-INFERENCE_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-
-# APISIX Gateway Endpoints
-# Uncomment and set these when using APISIX Gateway:
-# IMPORTANT: Use exact APISIX route paths:
-# Example routes: /bge-base-en-v1.5/* and /Llama-3.1-8B-Instruct/*
-# INFERENCE_API_ENDPOINT=https://your-api-endpoint.com/Llama-3.1-8B-Instruct
-# EMBEDDING_API_ENDPOINT=https://your-api-endpoint.com/bge-base-en-v1.5
-
-# Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like api.example.com mapped to localhost:
-#   Set this to: api.example.com (domain without https://)
-# If using a public domain, set any placeholder value like: not-needed
-LOCAL_URL_ENDPOINT=not-needed
-
-# SSL Verification Settings
-# Set to false only for dev with self-signed certs
-VERIFY_SSL=true
-```
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions.
 
 **Important Configuration Notes:**
 
-- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://your-api-endpoint.com/deployment`)
-  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://apisix-gateway.example.com/Llama-3.1-8B-Instruct`)
+- **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/Llama-3.1-8B-Instruct`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
-- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (see [Local Development Configuration](#local-development-configuration))
+- **EMBEDDING_MODEL_NAME**, **INFERENCE_MODEL_NAME**: Use the exact model name from your inference service
+  - To check available models: `curl https://api.example.com/v1/models -H "Authorization: Bearer your-token"`
+- **EMBEDDING_API_ENDPOINT** (APISIX only): Your actual embedding service URL. **Comment out** for GenAI Gateway
+- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
+  - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
+  - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
+- **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
+  - Set to `false` only for development environments with self-signed certificates
+  - Keep as `true` for production environments
 
-**Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./api/.env` (backend) files.
+**Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for the backend service.
 
 ### Running the Application
 
@@ -378,15 +271,3 @@ docker compose down
 For comprehensive troubleshooting guidance, common issues, and solutions, refer to:
 
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-
----
-
-## Additional Info
-
-The following models have been validated with MultiAgentQnA:
-
-| Model | Hardware |
-|-------|----------|
-| **meta-llama/Llama-3.1-8B-Instruct** | Gaudi |
-| **Qwen/Qwen3-4B-Instruct-2507** | Xeon |
-| **BAAI/bge-base-en-v1.5** (embeddings) | Gaudi |
