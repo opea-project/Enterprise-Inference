@@ -283,4 +283,28 @@ curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
 
 ---
 
+## Additional Information
+
+### Validated Models in Airgap Mode
+
+The following models have been tested and validated end-to-end in airgap mode. These are
+the **only models that are confirmed to work** in an airgapped deployment. Other models
+may work if their weights and tokenizer files are uploaded to JFrog manually, but they
+have not been tested and are not supported in this configuration.
+
+| Model | HuggingFace ID | Approximate size | JFrog setup step |
+|---|---|---|---|
+| Llama 3.2 3B Instruct | `meta-llama/Llama-3.2-3B-Instruct` | ~6.5 GB | Step 3i |
+| Qwen3 0.6B | `Qwen/Qwen3-0.6B` | ~1.2 GB | Step 3j |
+| Qwen3 4B | `Qwen/Qwen3-4B` | ~7.6 GB | Step 3k |
+| Qwen3 1.7B | `Qwen/Qwen3-1.7B` | ~3.4 GB | Step 3l |
+
+> [!IMPORTANT]
+> Only the models listed above have been validated in airgap mode. Deploying a model not
+> listed here requires manually downloading its weights and uploading them to
+> `ei-generic-models` in JFrog before deployment. Untested models may fail at model
+> load time even if all other components deploy successfully.
+
+---
+
 For troubleshooting common failures, see [air-gap-troubleshooting.md](air-gap-troubleshooting.md).
