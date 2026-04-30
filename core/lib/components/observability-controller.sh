@@ -16,7 +16,7 @@ deploy_observability_playbook() {
         playbook_path="playbooks/deploy-observability-openshift.yml"
     fi
 
-    local extra_vars="secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} deploy_observability=${deploy_observability} deploy_logging=${deploy_logging} observability_stack_chart_version=${observability_stack_chart_version} kubernetes_platform=${kubernetes_platform}"
+    local extra_vars="secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} deploy_observability=${deploy_observability} deploy_logging=${deploy_logging} observability_stack_chart_version=${observability_stack_chart_version} kubernetes_platform=${kubernetes_platform} airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"
 
     ansible-playbook -i "${INVENTORY_PATH}" "$playbook_path" --become --become-user=root --extra-vars "$extra_vars" --tags "$tags" --vault-password-file "$vault_pass_file"
 }

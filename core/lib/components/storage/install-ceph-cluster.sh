@@ -13,7 +13,7 @@ deploy_ceph_cluster() {
     fi
 
     echo "Deploying Ceph storage cluster..."
-    if ! ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-ceph-storage.yml; then
+    if ! ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-ceph-storage.yml --extra-vars "airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"; then
         echo -e "${RED} Ceph Cluster deployment FAILED!${NC}"
         echo ""
         echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
