@@ -2735,6 +2735,7 @@
       ansible.builtin.shell:
         cmd: "helm list --short | grep 'vllm-'"
       register: inference_models
+      failed_when: inference_models.rc not in [0, 1]
       when: list_model_true == 'true'
     - name: Print Installed Models in Comma Separated Format
       ansible.builtin.debug:
