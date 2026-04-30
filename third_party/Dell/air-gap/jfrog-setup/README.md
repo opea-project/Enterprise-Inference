@@ -41,7 +41,7 @@ so connectivity between them is required throughout the entire process.
 | Disk space | At least 80 GB free. This has been validated for downloading Llama-3.2-3B, Qwen3-0.6B, Qwen3-1.7B, and Qwen3-4B models. If you plan to download additional or larger models, you will need more disk space. | At least 80 GB free (for Kubernetes, container images, and model storage) |
 | RAM | At least 8 GB | At least 64 GB (vLLM requires significant memory for CPU inference) |
 | CPU | No special requirement (JFrog is a file server) | At least 16 cores recommended |
-| Network | Must be reachable from VM2 on port 8082 | Must be reachable from VM1, no internet access after setup |
+| Network | Must be reachable from VM2 on port 8082 | Must be reachable from VM1. **Internet access must be fully disabled before running the EI deployment.** EI will exit with an error if `airgap_enabled=yes` and the machine can still reach the internet. |
 | OS | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
 | Access | Root or sudo privileges | Root or sudo privileges |
 
@@ -257,7 +257,7 @@ these commands:
 | `./jfrog-setup.sh --step 3c` | Downloads ~30 Python packages used by the EI deployment playbooks and uploads them to JFrog so VM2 can install them without internet access |
 | `./jfrog-setup.sh --step 3d` | Uploads the pip installer wheel to JFrog. Required because Ubuntu disables pip by default and VM2 needs it to bootstrap the Python environment |
 | `./jfrog-setup.sh --step 3e` | Downloads 4 Ansible collections used by the EI playbooks and uploads them to JFrog |
-| `./jfrog-setup.sh --step 3f` | Downloads jq and its dependencies as .deb files and uploads them to JFrog. These are installed directly on VM2 since apt cannot reach the internet in airgap mode. Prompts for sudo password during install |
+| `./jfrog-setup.sh --step 3f` | Downloads jq and its dependencies as .deb files and uploads them to JFrog. Also pre-caches all Kubespray apt packages (conntrack, socat, nfs-common, python3-pip, unzip, etc.) in JFrog by temporarily routing VM1's apt through JFrog. Uses `apt-get download` to force a network fetch for already-installed packages so JFrog caches them reliably. Prompts for sudo password during install |
 | `./jfrog-setup.sh --step 3g` | Downloads all binaries Kubespray needs to set up the Kubernetes cluster (kubeadm, kubectl, kubelet, containerd, runc, etcd, calico, cni-plugins, crictl, helm, nerdctl, yq, kubectx, kubens) and uploads them to JFrog |
 | `./jfrog-setup.sh --step 3h` | Packages the Kubespray repository as a tarball and uploads it to JFrog. VM2 uses this instead of cloning from GitHub |
 | `./jfrog-setup.sh --step 3i --hf-token <hf-token>` | Downloads **meta-llama/Llama-3.2-3B-Instruct** (~6.5 GB) from HuggingFace and uploads all files to JFrog. Requires a HuggingFace token with access to the model |
@@ -288,6 +288,29 @@ guide](../EI/single-node/air-gap.md) to configure VM2 and run the EI stack.
 
 <details>
 <summary>Click to expand</summary>
+
+### Deployment exits with "airgap_enabled is set to yes but this machine has internet connectivity"
+
+This check runs at the start of every EI deployment when `airgap_enabled=yes`. It means
+VM2 can still reach the internet, which defeats the purpose of airgap mode — Docker images
+not cached in JFrog would silently fall back to internet registries.
+
+Disable internet access on VM2 before running the deployment. A common way to do this is
+to drop the default route or use iptables:
+
+```bash
+# Option 1: remove the default route (re-add it later if needed)
+sudo ip route del default
+
+# Option 2: block outbound internet with iptables (allow LAN traffic to VM1)
+sudo iptables -I OUTPUT -d <VM1-IP> -j ACCEPT
+sudo iptables -I OUTPUT -d 0.0.0.0/0 -j DROP
+```
+
+After disabling internet, re-run the EI deployment. The check will pass once no internet
+routes are reachable.
+
+---
 
 ### Use skopeo to copy Docker images, not docker
 
