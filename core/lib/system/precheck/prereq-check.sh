@@ -81,6 +81,12 @@ run_system_prerequisites_check() {
                     -u "${jfrog_username}:${jfrog_password}" \
                     "${jfrog_url}/api/system/ping" > /dev/null 2>&1; then
                 echo -e "${GREEN}✓ JFrog Artifactory connectivity confirmed (airgap mode)${NC}"
+                if curl -s --connect-timeout 5 --max-time 10 https://google.com > /dev/null 2>&1 || \
+                   curl -s --connect-timeout 5 --max-time 10 https://github.com > /dev/null 2>&1; then
+                    echo -e "${RED}✗ airgap_enabled is set to yes but this machine has internet connectivity.${NC}"
+                    echo -e "${RED}  Disable internet access before proceeding with airgap deployment.${NC}"
+                    exit 1
+                fi
             else
                 echo -e "${RED}✗ Cannot reach JFrog Artifactory at ${jfrog_url}${NC}"
                 missing_deps+=("internet-connectivity")
