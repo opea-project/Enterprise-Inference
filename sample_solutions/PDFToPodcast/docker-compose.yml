@@ -6,6 +6,8 @@ services:
     container_name: pdf-service
     ports:
       - "8001:8001"
+    env_file:
+      - ./.env
     volumes:
       - ./api/pdf-service:/app
     networks:
@@ -20,7 +22,7 @@ services:
     ports:
       - "8002:8002"
     env_file:
-      - ./api/llm-service/.env
+      - ./.env
     volumes:
       - ./api/llm-service:/app
     networks:
@@ -37,7 +39,7 @@ services:
     ports:
       - "8003:8003"
     env_file:
-      - ./api/tts-service/.env
+      - ./.env
     volumes:
       - ./api/tts-service:/app
       - ./api/tts-service/static:/app/static

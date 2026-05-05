@@ -5,9 +5,9 @@ class Settings(BaseSettings):
     """LLM Service Configuration"""
 
     # Service info
-    SERVICE_NAME: str = "LLM Script Generation Service"
-    SERVICE_VERSION: str = "1.0.0"
-    SERVICE_PORT: int = 8002
+    LLM_SERVICE_NAME: str = "LLM Script Generation Service"
+    LLM_SERVICE_VERSION: str = "1.0.0"
+    LLM_SERVICE_PORT: int = 8002
 
     # Inference API Configuration
     INFERENCE_API_ENDPOINT: Optional[str] = None
