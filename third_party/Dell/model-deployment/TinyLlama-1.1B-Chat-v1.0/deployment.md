@@ -30,7 +30,7 @@ helm install tinyllama-1-1b-cpu ./core/helm-charts/vllm \
   --set LLM_MODEL_ID="TinyLlama/TinyLlama-1.1B-Chat-v1.0" \
   --set global.HUGGINGFACEHUB_API_TOKEN="$HUGGING_FACE_HUB_TOKEN" \
   --set ingress.enabled=true \
-  --set ingress.secretname=api.example.com \
+  --set ingress.secretname="${BASE_URL}" \
   --set ingress.host="${BASE_URL}" \
   --set oidc.client_id="$KEYCLOAK_CLIENT_ID" \
   --set oidc.client_secret="$KEYCLOAK_CLIENT_SECRET" \
