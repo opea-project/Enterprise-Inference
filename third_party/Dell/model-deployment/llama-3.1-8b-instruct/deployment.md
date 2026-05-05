@@ -65,7 +65,7 @@ vllm-llama-8b-apisixroute    api.example.com
 ## Step 4: Test the Deployed Model
 
 ```bash
-curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
+curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
