@@ -1,0 +1,31 @@
+# MCP Agent Servers - Core Dependencies
+# Install with: pip install -r requirements.txt
+
+# MCP Framework
+fastmcp==3.2.3
+mcp==1.27.0
+
+# Data Models & Validation
+pydantic==2.13.0
+pydantic-settings==2.13.1
+
+# HTTP/Async
+httpx==0.28.1
+httpx-sse==0.4.3
+uvicorn==0.44.0
+anyio==4.13.0
+
+# Utilities
+python-dotenv==1.2.2
+
+# Code Execution Sandbox (RestrictedPython)
+RestrictedPython==8.1
+
+# UTCP & Code-Mode with native MCP support
+# Install from local/git:
+#   pip install -e /path/to/code-mode
+#   OR
+#   pip install git+https://github.com/universal-tool-calling-protocol/code-mode.git#subdirectory=python-library
+utcp==1.1.2
+utcp-mcp==1.1.2
+mcp-use==1.3.11

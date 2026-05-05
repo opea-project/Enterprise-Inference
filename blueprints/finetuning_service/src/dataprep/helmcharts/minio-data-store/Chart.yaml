@@ -1,0 +1,12 @@
+apiVersion: v2
+name: minio
+description: A Helm chart for deploying MinIO object storage
+type: application
+version: 0.1.0
+appVersion: "RELEASE.2024-10-13T13-34-11Z"
+keywords:
+  - storage
+  - object-storage
+  - s3
+maintainers:
+  - name: Your Team

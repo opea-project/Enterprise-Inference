@@ -1,0 +1,86 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: buildkit-frontend
+  namespace: finetuning-ui
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: buildkit
+          image: moby/buildkit:latest
+          env:
+            - name: http_proxy
+              value: "${http_proxy}"
+            - name: https_proxy
+              value: "${https_proxy}"
+            - name: no_proxy
+              value: "${no_proxy}"
+            - name: NEXT_PUBLIC_AUTH_URL
+              value: "$NEXT_PUBLIC_AUTH_URL"
+            - name: NEXT_PUBLIC_FILES_BASE_URL
+              value: "$NEXT_PUBLIC_FILES_BASE_URL"
+            - name: NEXT_PUBLIC_DATAPREP_BASE_URL
+              value: "$NEXT_PUBLIC_DATAPREP_BASE_URL"
+            - name: NEXT_PUBLIC_FINETUNING_API_URL
+              value: "$NEXT_PUBLIC_FINETUNING_API_URL"
+            - name: NEXT_TELEMETRY_DISABLED
+              value: "$NEXT_TELEMETRY_DISABLED"
+            - name: NEXT_PUBLIC_BASE_PATH
+              value: "$NEXT_PUBLIC_BASE_PATH"
+          command:
+            - buildctl-daemonless.sh
+          args:
+            - build
+            - "--frontend=dockerfile.v0"
+            - "--local=context=/workspace"
+            - "--local=dockerfile=/workspace"
+            - "--opt=build-arg:http_proxy=${http_proxy}"
+            - "--opt=build-arg:https_proxy=${https_proxy}"
+            - "--opt=build-arg:no_proxy=${no_proxy}"
+            - "--opt=build-arg:NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL}"
+            - "--opt=build-arg:NEXT_PUBLIC_FILES_BASE_URL=${NEXT_PUBLIC_FILES_BASE_URL}"
+            - "--opt=build-arg:NEXT_PUBLIC_DATAPREP_BASE_URL=${NEXT_PUBLIC_DATAPREP_BASE_URL}"
+            - "--opt=build-arg:NEXT_PUBLIC_FINETUNING_API_URL=${NEXT_PUBLIC_FINETUNING_API_URL}"
+            - "--opt=build-arg:NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}"
+            - "--output=type=image,name=${REGISTRY_URL}/finetuning-ui:latest,push=true,registry.insecure=true"
+            - "--opt=cache-from=type=registry,ref=${REGISTRY_URL}/finetuning-ui:buildcache,registry.insecure=true"
+            - "--opt=cache-to=type=registry,ref=${REGISTRY_URL}/finetuning-ui:buildcache,mode=max,registry.insecure=true"
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            readOnlyRootFilesystem: false
+            privileged: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          volumeMounts:
+            - name: build-context
+              mountPath: /workspace
+              readOnly: true
+            - name: buildkit-tmp
+              mountPath: /tmp
+      volumes:
+        - name: build-context
+          hostPath:
+            path: $BUILD_CONTEXT
+            type: Directory
+        - name: buildkit-tmp
+          emptyDir: {}

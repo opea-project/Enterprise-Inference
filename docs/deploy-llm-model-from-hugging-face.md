@@ -17,6 +17,6 @@ This option allows you to deploy any Hugging Face-hosted LLM on the Inference Cl
 3. When prompted, provide:
    - **Hugging Face Model ID** (e.g., `meta-llama/Meta-Llama-3-8B`)  
    - **Model Deployment Name** (e.g., `metallama-8b`)  
-   - **Tensor Parallel Size** (based on available Gaudi cards)
+   - **Tensor Parallel Size** (based on available  Intel® AI Accelerator cards)
 
 > **Note**: This deploys a model that has **not** been pre-validated. Make sure the tensor parallel size is configured correctly. An incorrect value can result in the model being stuck in a "not ready" state.

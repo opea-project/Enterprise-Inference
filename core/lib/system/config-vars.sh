@@ -56,4 +56,6 @@ kubeconfig_file=""
 brownfield_deployment_host_file="/tmp/brownfield-bastion-hosts.yaml"
 xeon_values_file_path=""
 kubernetes_platform=""
+deploy_agenticai_plugin=""
+deploy_finetune_plugin=""
 

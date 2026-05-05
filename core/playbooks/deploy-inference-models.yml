@@ -492,6 +492,17 @@
                     containers:
                     - name: keycloak-setup
                       image: ubuntu:22.04
+                      env: >-
+                        {{
+                          [
+                            {'name': 'http_proxy',  'value': env_proxy.http_proxy  | default('')},
+                            {'name': 'https_proxy', 'value': env_proxy.https_proxy | default('')},
+                            {'name': 'HTTP_PROXY',  'value': env_proxy.http_proxy  | default('')},
+                            {'name': 'HTTPS_PROXY', 'value': env_proxy.https_proxy | default('')},
+                            {'name': 'no_proxy',    'value': env_proxy.no_proxy    | default('')},
+                            {'name': 'NO_PROXY',    'value': env_proxy.no_proxy    | default('')}
+                          ] if (env_proxy is defined and env_proxy.http_proxy | default('') != '') else []
+                        }}
                       command: ["/bin/bash", "-c"]
                       args:
                         - |
@@ -608,10 +619,14 @@
     - name: Set proxy args if proxy is defined
       set_fact:
         helm_proxy_args: >-
-          {% if env_proxy is defined %}
-          --set global.http_proxy="{{ env_proxy.http_proxy | default('') | replace(',', '\\,') }}"
-          --set global.https_proxy="{{ env_proxy.https_proxy | default('') | replace(',', '\\,') }}"
-          --set global.no_proxy="{{ env_proxy.no_proxy | default('') | replace(',', '\\,') }}"
+          {% if env_proxy is defined and env_proxy.http_proxy | default('') != '' %}
+          --set global.http_proxy="{{ env_proxy.http_proxy | replace(',', '\\,') }}"
+          {% if env_proxy.https_proxy | default('') != '' %}
+          --set global.https_proxy="{{ env_proxy.https_proxy | replace(',', '\\,') }}"
+          {% endif %}
+          {% if env_proxy.no_proxy | default('') != '' %}
+          --set global.no_proxy="{{ env_proxy.no_proxy | replace(',', '\\,') }}"
+          {% endif %}
           {% else %}
           {{ '' }}
           {% endif %}
@@ -2675,6 +2690,110 @@
         - cpu_playbook == 'true'
         - install_true == 'true'
         - "'cpu-qwen3-4b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+
+    - name: Check if CPU Qwen3-Coder-30B is installed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-qwen3-coder-30b-cpu --short"
+      register: helm_release_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-cpu-qwen3-coder-30b
+    - name: Uninstall Qwen3-Coder-30B
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-qwen3-coder-30b-cpu"
+      run_once: true
+      tags: uninstall-cpu-qwen3-coder-30b
+      when:
+        - model_name_list is defined
+        - "'cpu-qwen3-coder-30b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_installed.stdout != ""
+
+    - name: Deploy CPU Qwen3-Coder-30B LLM model
+      block:
+        - name: Delete Ingress resource Qwen3-Coder-30B from default namespace
+          tags: install-cpu-qwen3-coder-30b
+          ignore_errors: yes
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-qwen3-coder-30b-cpu-ingress
+            state: absent
+        - name: Delete Ingress resource Qwen3-Coder-30B from auth-apisix namespace
+          tags: install-cpu-qwen3-coder-30b
+          ignore_errors: yes
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-qwen3-coder-30b-cpu-ingress
+            state: absent
+        - name: Deploy CPU based LLM model Qwen3-Coder-30B Installation
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-qwen3-coder-30b-cpu "{{ remote_helm_charts_base }}/vllm"
+            --values "{{ xeon_values_file }}"
+            --set LLM_MODEL_ID="Qwen/Qwen3-Coder-30B-A3B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if cpu_playbook == 'true' %}
+            --set cpu_balloon_annotation="vllm-balloon"
+            --set podLabels.name="vllm"
+            --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
+            --set memory="{{ optimal_memory_gb | default(8) }}Gi"
+            --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if kubernetes_platform == 'openshift' %}
+              --set route.enabled=true
+              --set route.host={{ secret_name }}
+              --set route.tls.termination=edge
+              --set route.tls.insecureEdgeTerminationPolicy=Redirect
+              --set ingress.enabled=false
+            {% elif ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              --set route.enabled=false
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_model_deployment_cpu_qwen3_coder_30b
+          failed_when: helm_upgrade_install_model_deployment_cpu_qwen3_coder_30b.rc != 0
+        - name: Register Xeon/CPU Qwen3-Coder-30B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+            reg_litellm_model: "openai/Qwen/Qwen3-Coder-30B-A3B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-qwen3-coder-30b-cpu-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-cpu-qwen3-coder-30b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-cpu-qwen3-coder-30b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      tags: install-cpu-qwen3-coder-30b
+      when:
+        - model_name_list is defined
+        - cpu_playbook == 'true'
+        - install_true == 'true'
+        - "'cpu-qwen3-coder-30b' in (model_name_list | regex_replace(',', ' ') | split())"
 
 
 

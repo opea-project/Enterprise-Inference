@@ -1,0 +1,191 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "finetuning-service.fullname" . }}
+  labels:
+    {{- include "finetuning-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Never allow all pods to be unavailable
+  selector:
+    matchLabels:
+      {{- include "finetuning-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "finetuning-service.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      {{- end }}
+      {{- if .Values.app.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ .Values.app.terminationGracePeriodSeconds }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-postgresql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z finetuning-service-postgresql.finetuning-api.svc.cluster.local 5432; do echo waiting for postgresql; sleep 2; done;']
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            {{- if .Values.securityContext.readOnlyRootFilesystem }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            {{- end }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.securityContext.capabilities.drop | nindent 16 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # Database Configuration
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-secret
+                  key: database-url
+
+            # API Configuration
+            - name: API_BASE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: API_BASE_PATH
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: KEYCLOAK_ISSUER
+
+
+            # Resource Adapter Configuration
+            - name: ENABLE_NVIDIA
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: ENABLE_NVIDIA
+
+            # Nvidia/Unsloth Configuration
+            - name: NVIDIA_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: NVIDIA_API_URL
+
+            # Keycloak OAuth2 Configuration for Nvidia Backend
+            - name: NVIDIA_KEYCLOAK_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-secret
+                  key: nvidia-keycloak-token-url
+            - name: NVIDIA_KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-secret
+                  key: nvidia-keycloak-client-id
+            - name: NVIDIA_KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-secret
+                  key: nvidia-keycloak-client-secret
+            - name: NVIDIA_KEYCLOAK_VERIFY_SSL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: NVIDIA_KEYCLOAK_VERIFY_SSL
+
+            # Rate Limiting Configuration
+            - name: RATE_LIMIT_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_ENABLED
+            - name: RATE_LIMIT_DEFAULT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_DEFAULT
+            - name: RATE_LIMIT_HEALTH
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_HEALTH
+            - name: RATE_LIMIT_MODELS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_MODELS
+            - name: RATE_LIMIT_JOB_CREATE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_JOB_CREATE
+            - name: RATE_LIMIT_JOB_READ
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_JOB_READ
+            - name: RATE_LIMIT_JOB_CANCEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_JOB_CANCEL
+            - name: RATE_LIMIT_JOB_EVENTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "finetuning-service.fullname" . }}-config
+                  key: RATE_LIMIT_JOB_EVENTS
+
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: /api/liveness
+              port: http
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /api/liveness
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /api/readiness
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}

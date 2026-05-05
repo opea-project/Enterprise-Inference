@@ -1,0 +1,97 @@
+{{- if .Values.apisix.enabled }}
+{{- $commonPlugins := list -}}
+{{- if .Values.apisix.cors.enabled }}
+{{- $corsPlugin := dict "name" "cors" "enable" true "config" (dict "allow_origins" (printf "https://%s,%s" .Values.ingress.baseDomain .Values.apisix.cors.allowOrigins) "allow_methods" .Values.apisix.cors.allowMethods "allow_headers" .Values.apisix.cors.allowHeaders "expose_headers" .Values.apisix.cors.exposeHeaders "allow_credentials" .Values.apisix.cors.allowCredentials "max_age" .Values.apisix.cors.maxAge) -}}
+{{- $commonPlugins = append $commonPlugins $corsPlugin -}}
+{{- end }}
+{{- if .Values.apisix.oidc.enabled }}
+{{- $oidcPlugin := dict "name" "openid-connect" "enable" .Values.apisix.oidc.enabled "config" (dict "bearer_only" (.Values.apisix.oidc.bearer_only | default true) "discovery" (printf "https://%s/realms/%s/.well-known/openid-configuration" .Values.ingress.baseDomain .Values.apisix.oidc.realm) "introspection_endpoint" (printf "https://%s/realms/%s/protocol/openid-connect/token/introspect" .Values.ingress.baseDomain .Values.apisix.oidc.realm) "introspection_endpoint_auth_method" .Values.apisix.oidc.introspection_endpoint_auth_method "realm" .Values.apisix.oidc.realm "scope" .Values.apisix.oidc.scope) "secretRef" .Values.apisix.oidc.secret_ref -}}
+{{- $commonPlugins = append $commonPlugins $oidcPlugin -}}
+{{- end }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "finetuning-service.fullname" . }}-apisixroute
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "finetuning-service.labels" . | nindent 4 }}
+spec:
+  http:
+  # Fine-tuning API routes
+  - name: {{ include "finetuning-service.fullname" . }}-fine-tuning-route
+    priority: 100
+    match:
+      hosts:
+      - {{ .Values.ingress.baseDomain }}
+      paths:
+      - {{ .Values.ingress.basePath }}/v1/fine_tuning*
+    backends:
+    - serviceName: {{ include "finetuning-service.fullname" . }}
+      servicePort: {{ .Values.app.service.port }}
+    plugins:
+    {{- toYaml $commonPlugins | nindent 4 }}
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^{{ .Values.ingress.basePath }}(/v1/fine_tuning.*)
+          - $1
+  # Models API routes
+  - name: {{ include "finetuning-service.fullname" . }}-models-route
+    priority: 100
+    match:
+      hosts:
+      - {{ .Values.ingress.baseDomain }}
+      paths:
+      - {{ .Values.ingress.basePath }}/v1/models*
+    backends:
+    - serviceName: {{ include "finetuning-service.fullname" . }}
+      servicePort: {{ .Values.app.service.port }}
+    plugins:
+    {{- toYaml $commonPlugins | nindent 4 }}
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^{{ .Values.ingress.basePath }}(/v1/models.*)
+          - $1
+  # Health check routes (no auth required)
+  - name: {{ include "finetuning-service.fullname" . }}-api-health-route
+    priority: 90
+    match:
+      hosts:
+      - {{ .Values.ingress.baseDomain }}
+      paths:
+      - {{ .Values.ingress.basePath }}/api/health
+      - {{ .Values.ingress.basePath }}/api/liveness
+      - {{ .Values.ingress.basePath }}/api/readiness
+    backends:
+    - serviceName: {{ include "finetuning-service.fullname" . }}
+      servicePort: {{ .Values.app.service.port }}
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^{{ .Values.ingress.basePath }}(/api/(health|liveness|readiness))
+          - $1
+  - name: {{ include "finetuning-service.fullname" . }}-api-docs-route
+    priority: 90
+    match:
+      hosts:
+      - {{ .Values.ingress.baseDomain }}
+      paths:
+      - {{ .Values.ingress.basePath }}/api/docs*
+      - {{ .Values.ingress.basePath }}/api/openapi.json
+      - {{ .Values.ingress.basePath }}/api/redoc*
+    backends:
+    - serviceName: {{ include "finetuning-service.fullname" . }}
+      servicePort: {{ .Values.app.service.port }}
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+          - ^{{ .Values.ingress.basePath }}(/api/.*)
+          - $1
+{{- end }}

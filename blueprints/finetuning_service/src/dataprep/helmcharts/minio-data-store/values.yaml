@@ -1,0 +1,46 @@
+# Default values for MinIO deployment
+replicaCount: 1
+
+image:
+  repository: minio/minio
+  tag: RELEASE.2024-10-13T13-34-11Z
+  pullPolicy: IfNotPresent
+
+# MinIO credentials
+# REQUIRED: supply at deploy-time via --set or a Kubernetes Secret (never commit real values here)
+# kubectl create secret generic minio-credentials \
+#   --from-literal=root-user=<user> --from-literal=root-password=<password> -n dataprep
+auth:
+  existingSecret: ""  # set to a pre-existing secret name to skip auto-creation
+  rootUser: ""  # used when existingSecret is empty; supply via --set at deploy-time
+  rootPassword: ""  # used when existingSecret is empty; supply via --set at deploy-time
+
+service:
+  type: ClusterIP
+  port: 9000
+  consolePort: 9001
+
+# Storage configuration
+persistence:
+  enabled: true
+  storageClass: ""  # Use default storage class
+  accessMode: ReadWriteOnce
+  size: 120Gi
+
+# Resource limits
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+
+# Node selector for pod assignment
+nodeSelector: {}
+
+# Tolerations for pod assignment
+tolerations: []
+
+# Affinity for pod assignment
+affinity: {}

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "celery.fullname" . }}
+  labels:
+    app: {{ include "celery.name" . }}
+    chart: {{ include "celery.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.celery.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "celery.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "celery.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 1000
+      containers:
+        - name: celery-worker
+          image: "{{ .Values.celery.image.repository }}:{{ .Values.celery.image.tag }}"
+          imagePullPolicy: {{ .Values.celery.image.pullPolicy }}
+          command: {{- toYaml .Values.celery.command | nindent 10 }}
+          resources:
+            {{- toYaml .Values.celery.resources | nindent 12 }}
+          env:
+            {{- toYaml .Values.celery.env | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-celery
+{{- if .Values.flower.enabled }}
+        - name: flower
+          image: "{{ .Values.flower.image.repository }}:{{ .Values.flower.image.tag }}"
+          imagePullPolicy: {{ .Values.flower.image.pullPolicy }}
+          command: {{- toYaml .Values.flower.command | nindent 10 }}
+          resources:
+            {{- toYaml .Values.flower.resources | nindent 12 }}
+          env:
+            {{- toYaml .Values.flower.env | nindent 12 }}
+          securityContext:
+            runAsNonRoot: false  # mher/flower runs as root; cannot override without custom image
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-flower
+{{- end }}
+      volumes:
+        - name: tmp-celery
+          emptyDir: {}
+        - name: tmp-flower
+          emptyDir: {}

@@ -1,0 +1,868 @@
+{
+  "nodes": [
+    {
+      "id": "startAgentflow_0",
+      "type": "agentFlow",
+      "position": {
+        "x": -218.5,
+        "y": 116
+      },
+      "data": {
+        "id": "startAgentflow_0",
+        "label": "Start",
+        "version": 1.1,
+        "name": "startAgentflow",
+        "type": "Start",
+        "color": "#7EE787",
+        "hideInput": true,
+        "baseClasses": [
+          "Start"
+        ],
+        "category": "Agent Flows",
+        "description": "Starting point of the agentflow",
+        "inputParams": [
+          {
+            "label": "Input Type",
+            "name": "startInputType",
+            "type": "options",
+            "options": [
+              {
+                "label": "Chat Input",
+                "name": "chatInput",
+                "description": "Start the conversation with chat input"
+              },
+              {
+                "label": "Form Input",
+                "name": "formInput",
+                "description": "Start the workflow with form inputs"
+              }
+            ],
+            "default": "chatInput",
+            "id": "startAgentflow_0-input-startInputType-options",
+            "display": true
+          },
+          {
+            "label": "Form Title",
+            "name": "formTitle",
+            "type": "string",
+            "placeholder": "Please Fill Out The Form",
+            "show": {
+              "startInputType": "formInput"
+            },
+            "id": "startAgentflow_0-input-formTitle-string",
+            "display": false
+          },
+          {
+            "label": "Form Description",
+            "name": "formDescription",
+            "type": "string",
+            "placeholder": "Complete all fields below to continue",
+            "show": {
+              "startInputType": "formInput"
+            },
+            "id": "startAgentflow_0-input-formDescription-string",
+            "display": false
+          },
+          {
+            "label": "Form Input Types",
+            "name": "formInputTypes",
+            "description": "Specify the type of form input",
+            "type": "array",
+            "show": {
+              "startInputType": "formInput"
+            },
+            "array": [
+              {
+                "label": "Type",
+                "name": "type",
+                "type": "options",
+                "options": [
+                  {
+                    "label": "String",
+                    "name": "string"
+                  },
+                  {
+                    "label": "Number",
+                    "name": "number"
+                  },
+                  {
+                    "label": "Boolean",
+                    "name": "boolean"
+                  },
+                  {
+                    "label": "Options",
+                    "name": "options"
+                  }
+                ],
+                "default": "string"
+              },
+              {
+                "label": "Label",
+                "name": "label",
+                "type": "string",
+                "placeholder": "Label for the input"
+              },
+              {
+                "label": "Variable Name",
+                "name": "name",
+                "type": "string",
+                "placeholder": "Variable name for the input (must be camel case)",
+                "description": "Variable name must be camel case. For example: firstName, lastName, etc."
+              },
+              {
+                "label": "Add Options",
+                "name": "addOptions",
+                "type": "array",
+                "show": {
+                  "formInputTypes[$index].type": "options"
+                },
+                "array": [
+                  {
+                    "label": "Option",
+                    "name": "option",
+                    "type": "string"
+                  }
+                ]
+              }
+            ],
+            "id": "startAgentflow_0-input-formInputTypes-array",
+            "display": false
+          },
+          {
+            "label": "Ephemeral Memory",
+            "name": "startEphemeralMemory",
+            "type": "boolean",
+            "description": "Start fresh for every execution without past chat history",
+            "optional": true,
+            "id": "startAgentflow_0-input-startEphemeralMemory-boolean",
+            "display": true
+          },
+          {
+            "label": "Flow State",
+            "name": "startState",
+            "description": "Runtime state during the execution of the workflow",
+            "type": "array",
+            "optional": true,
+            "array": [
+              {
+                "label": "Key",
+                "name": "key",
+                "type": "string",
+                "placeholder": "Foo"
+              },
+              {
+                "label": "Value",
+                "name": "value",
+                "type": "string",
+                "placeholder": "Bar",
+                "optional": true
+              }
+            ],
+            "id": "startAgentflow_0-input-startState-array",
+            "display": true
+          },
+          {
+            "label": "Persist State",
+            "name": "startPersistState",
+            "type": "boolean",
+            "description": "Persist the state in the same session",
+            "optional": true,
+            "id": "startAgentflow_0-input-startPersistState-boolean",
+            "display": true
+          }
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "startInputType": "chatInput",
+          "formTitle": "",
+          "formDescription": "",
+          "formInputTypes": "",
+          "startEphemeralMemory": "",
+          "startState": "",
+          "startPersistState": ""
+        },
+        "outputAnchors": [
+          {
+            "id": "startAgentflow_0-output-startAgentflow",
+            "label": "Start",
+            "name": "startAgentflow"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "width": 103,
+      "height": 66,
+      "positionAbsolute": {
+        "x": -218.5,
+        "y": 116
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "agentAgentflow_0",
+      "position": {
+        "x": 143,
+        "y": 99.25
+      },
+      "data": {
+        "id": "agentAgentflow_0",
+        "label": "Agent 0",
+        "version": 3.2,
+        "name": "agentAgentflow",
+        "type": "Agent",
+        "color": "#4DD0E1",
+        "baseClasses": [
+          "Agent"
+        ],
+        "category": "Agent Flows",
+        "description": "Dynamically choose and utilize tools during runtime, enabling multi-step reasoning",
+        "inputParams": [
+          {
+            "label": "Model",
+            "name": "agentModel",
+            "type": "asyncOptions",
+            "loadMethod": "listModels",
+            "loadConfig": true,
+            "id": "agentAgentflow_0-input-agentModel-asyncOptions",
+            "display": true
+          },
+          {
+            "label": "Messages",
+            "name": "agentMessages",
+            "type": "array",
+            "optional": true,
+            "acceptVariable": true,
+            "array": [
+              {
+                "label": "Role",
+                "name": "role",
+                "type": "options",
+                "options": [
+                  {
+                    "label": "System",
+                    "name": "system"
+                  },
+                  {
+                    "label": "Assistant",
+                    "name": "assistant"
+                  },
+                  {
+                    "label": "Developer",
+                    "name": "developer"
+                  },
+                  {
+                    "label": "User",
+                    "name": "user"
+                  }
+                ]
+              },
+              {
+                "label": "Content",
+                "name": "content",
+                "type": "string",
+                "acceptVariable": true,
+                "generateInstruction": true,
+                "rows": 4
+              }
+            ],
+            "id": "agentAgentflow_0-input-agentMessages-array",
+            "display": true
+          },
+          {
+            "label": "OpenAI Built-in Tools",
+            "name": "agentToolsBuiltInOpenAI",
+            "type": "multiOptions",
+            "optional": true,
+            "options": [
+              {
+                "label": "Web Search",
+                "name": "web_search_preview",
+                "description": "Search the web for the latest information"
+              },
+              {
+                "label": "Code Interpreter",
+                "name": "code_interpreter",
+                "description": "Write and run Python code in a sandboxed environment"
+              },
+              {
+                "label": "Image Generation",
+                "name": "image_generation",
+                "description": "Generate images based on a text prompt"
+              }
+            ],
+            "show": {
+              "agentModel": "chatOpenAI"
+            },
+            "id": "agentAgentflow_0-input-agentToolsBuiltInOpenAI-multiOptions",
+            "display": true
+          },
+          {
+            "label": "Gemini Built-in Tools",
+            "name": "agentToolsBuiltInGemini",
+            "type": "multiOptions",
+            "optional": true,
+            "options": [
+              {
+                "label": "URL Context",
+                "name": "urlContext",
+                "description": "Extract content from given URLs"
+              },
+              {
+                "label": "Google Search",
+                "name": "googleSearch",
+                "description": "Search real-time web content"
+              },
+              {
+                "label": "Code Execution",
+                "name": "codeExecution",
+                "description": "Write and run Python code in a sandboxed environment"
+              }
+            ],
+            "show": {
+              "agentModel": "chatGoogleGenerativeAI"
+            },
+            "id": "agentAgentflow_0-input-agentToolsBuiltInGemini-multiOptions",
+            "display": false
+          },
+          {
+            "label": "Anthropic Built-in Tools",
+            "name": "agentToolsBuiltInAnthropic",
+            "type": "multiOptions",
+            "optional": true,
+            "options": [
+              {
+                "label": "Web Search",
+                "name": "web_search_20250305",
+                "description": "Search the web for the latest information"
+              },
+              {
+                "label": "Web Fetch",
+                "name": "web_fetch_20250910",
+                "description": "Retrieve full content from specified web pages"
+              }
+            ],
+            "show": {
+              "agentModel": "chatAnthropic"
+            },
+            "id": "agentAgentflow_0-input-agentToolsBuiltInAnthropic-multiOptions",
+            "display": false
+          },
+          {
+            "label": "Tools",
+            "name": "agentTools",
+            "type": "array",
+            "optional": true,
+            "array": [
+              {
+                "label": "Tool",
+                "name": "agentSelectedTool",
+                "type": "asyncOptions",
+                "loadMethod": "listTools",
+                "loadConfig": true
+              },
+              {
+                "label": "Require Human Input",
+                "name": "agentSelectedToolRequiresHumanInput",
+                "type": "boolean",
+                "optional": true
+              }
+            ],
+            "id": "agentAgentflow_0-input-agentTools-array",
+            "display": true
+          },
+          {
+            "label": "Knowledge (Document Stores)",
+            "name": "agentKnowledgeDocumentStores",
+            "type": "array",
+            "description": "Give your agent context about different document sources. Document stores must be upserted in advance.",
+            "array": [
+              {
+                "label": "Document Store",
+                "name": "documentStore",
+                "type": "asyncOptions",
+                "loadMethod": "listStores"
+              },
+              {
+                "label": "Describe Knowledge",
+                "name": "docStoreDescription",
+                "type": "string",
+                "generateDocStoreDescription": true,
+                "placeholder": "Describe what the knowledge base is about, this is useful for the AI to know when and how to search for correct information",
+                "rows": 4
+              },
+              {
+                "label": "Return Source Documents",
+                "name": "returnSourceDocuments",
+                "type": "boolean",
+                "optional": true
+              }
+            ],
+            "optional": true,
+            "id": "agentAgentflow_0-input-agentKnowledgeDocumentStores-array",
+            "display": true
+          },
+          {
+            "label": "Knowledge (Vector Embeddings)",
+            "name": "agentKnowledgeVSEmbeddings",
+            "type": "array",
+            "description": "Give your agent context about different document sources from existing vector stores and embeddings",
+            "array": [
+              {
+                "label": "Vector Store",
+                "name": "vectorStore",
+                "type": "asyncOptions",
+                "loadMethod": "listVectorStores",
+                "loadConfig": true
+              },
+              {
+                "label": "Embedding Model",
+                "name": "embeddingModel",
+                "type": "asyncOptions",
+                "loadMethod": "listEmbeddings",
+                "loadConfig": true
+              },
+              {
+                "label": "Knowledge Name",
+                "name": "knowledgeName",
+                "type": "string",
+                "placeholder": "A short name for the knowledge base, this is useful for the AI to know when and how to search for correct information"
+              },
+              {
+                "label": "Describe Knowledge",
+                "name": "knowledgeDescription",
+                "type": "string",
+                "placeholder": "Describe what the knowledge base is about, this is useful for the AI to know when and how to search for correct information",
+                "rows": 4
+              },
+              {
+                "label": "Return Source Documents",
+                "name": "returnSourceDocuments",
+                "type": "boolean",
+                "optional": true
+              }
+            ],
+            "optional": true,
+            "id": "agentAgentflow_0-input-agentKnowledgeVSEmbeddings-array",
+            "display": true
+          },
+          {
+            "label": "Enable Memory",
+            "name": "agentEnableMemory",
+            "type": "boolean",
+            "description": "Enable memory for the conversation thread",
+            "default": true,
+            "optional": true,
+            "id": "agentAgentflow_0-input-agentEnableMemory-boolean",
+            "display": true
+          },
+          {
+            "label": "Memory Type",
+            "name": "agentMemoryType",
+            "type": "options",
+            "options": [
+              {
+                "label": "All Messages",
+                "name": "allMessages",
+                "description": "Retrieve all messages from the conversation"
+              },
+              {
+                "label": "Window Size",
+                "name": "windowSize",
+                "description": "Uses a fixed window size to surface the last N messages"
+              },
+              {
+                "label": "Conversation Summary",
+                "name": "conversationSummary",
+                "description": "Summarizes the whole conversation"
+              },
+              {
+                "label": "Conversation Summary Buffer",
+                "name": "conversationSummaryBuffer",
+                "description": "Summarize conversations once token limit is reached. Default to 2000"
+              }
+            ],
+            "optional": true,
+            "default": "allMessages",
+            "show": {
+              "agentEnableMemory": true
+            },
+            "id": "agentAgentflow_0-input-agentMemoryType-options",
+            "display": true
+          },
+          {
+            "label": "Window Size",
+            "name": "agentMemoryWindowSize",
+            "type": "number",
+            "default": "20",
+            "description": "Uses a fixed window size to surface the last N messages",
+            "show": {
+              "agentMemoryType": "windowSize"
+            },
+            "id": "agentAgentflow_0-input-agentMemoryWindowSize-number",
+            "display": false
+          },
+          {
+            "label": "Max Token Limit",
+            "name": "agentMemoryMaxTokenLimit",
+            "type": "number",
+            "default": "2000",
+            "description": "Summarize conversations once token limit is reached. Default to 2000",
+            "show": {
+              "agentMemoryType": "conversationSummaryBuffer"
+            },
+            "id": "agentAgentflow_0-input-agentMemoryMaxTokenLimit-number",
+            "display": false
+          },
+          {
+            "label": "Input Message",
+            "name": "agentUserMessage",
+            "type": "string",
+            "description": "Add an input message as user message at the end of the conversation",
+            "rows": 4,
+            "optional": true,
+            "acceptVariable": true,
+            "show": {
+              "agentEnableMemory": true
+            },
+            "id": "agentAgentflow_0-input-agentUserMessage-string",
+            "display": true
+          },
+          {
+            "label": "Return Response As",
+            "name": "agentReturnResponseAs",
+            "type": "options",
+            "options": [
+              {
+                "label": "User Message",
+                "name": "userMessage"
+              },
+              {
+                "label": "Assistant Message",
+                "name": "assistantMessage"
+              }
+            ],
+            "default": "userMessage",
+            "id": "agentAgentflow_0-input-agentReturnResponseAs-options",
+            "display": true
+          },
+          {
+            "label": "JSON Structured Output",
+            "name": "agentStructuredOutput",
+            "description": "Instruct the Agent to give output in a JSON structured schema",
+            "type": "array",
+            "optional": true,
+            "acceptVariable": true,
+            "array": [
+              {
+                "label": "Key",
+                "name": "key",
+                "type": "string"
+              },
+              {
+                "label": "Type",
+                "name": "type",
+                "type": "options",
+                "options": [
+                  {
+                    "label": "String",
+                    "name": "string"
+                  },
+                  {
+                    "label": "String Array",
+                    "name": "stringArray"
+                  },
+                  {
+                    "label": "Number",
+                    "name": "number"
+                  },
+                  {
+                    "label": "Boolean",
+                    "name": "boolean"
+                  },
+                  {
+                    "label": "Enum",
+                    "name": "enum"
+                  },
+                  {
+                    "label": "JSON Array",
+                    "name": "jsonArray"
+                  }
+                ]
+              },
+              {
+                "label": "Enum Values",
+                "name": "enumValues",
+                "type": "string",
+                "placeholder": "value1, value2, value3",
+                "description": "Enum values. Separated by comma",
+                "optional": true,
+                "show": {
+                  "agentStructuredOutput[$index].type": "enum"
+                }
+              },
+              {
+                "label": "JSON Schema",
+                "name": "jsonSchema",
+                "type": "code",
+                "placeholder": "{\n    \"answer\": {\n        \"type\": \"string\",\n        \"description\": \"Value of the answer\"\n    },\n    \"reason\": {\n        \"type\": \"string\",\n        \"description\": \"Reason for the answer\"\n    },\n    \"optional\": {\n        \"type\": \"boolean\"\n    },\n    \"count\": {\n        \"type\": \"number\"\n    },\n    \"children\": {\n        \"type\": \"array\",\n        \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"value\": {\n                    \"type\": \"string\",\n                    \"description\": \"Value of the children's answer\"\n                }\n            }\n        }\n    }\n}",
+                "description": "JSON schema for the structured output",
+                "optional": true,
+                "hideCodeExecute": true,
+                "show": {
+                  "agentStructuredOutput[$index].type": "jsonArray"
+                }
+              },
+              {
+                "label": "Description",
+                "name": "description",
+                "type": "string",
+                "placeholder": "Description of the key"
+              }
+            ],
+            "id": "agentAgentflow_0-input-agentStructuredOutput-array",
+            "display": true
+          },
+          {
+            "label": "Update Flow State",
+            "name": "agentUpdateState",
+            "description": "Update runtime state during the execution of the workflow",
+            "type": "array",
+            "optional": true,
+            "acceptVariable": true,
+            "array": [
+              {
+                "label": "Key",
+                "name": "key",
+                "type": "asyncOptions",
+                "loadMethod": "listRuntimeStateKeys"
+              },
+              {
+                "label": "Value",
+                "name": "value",
+                "type": "string",
+                "acceptVariable": true,
+                "acceptNodeOutputAsVariable": true
+              }
+            ],
+            "id": "agentAgentflow_0-input-agentUpdateState-array",
+            "display": true
+          }
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "agentModel": "chatOpenAICustom",
+          "agentMessages": [
+            {
+              "role": "system",
+              "content": "<p>&lt;instructions&gt;</p><p>You are an agent that completes user tasks by writing Python code. Follow ALL rules below strictly.</p><p>==========================================================================</p><p>SECTION 1 — GENERIC RULES (apply to any use case)</p><p>==========================================================================</p><p>HOW YOU WORK</p><p>You have ONE tool: execute_python. It runs Python code in a sandbox.</p><p>Inside the sandbox, an \"actions\" object is pre-loaded with methods that perform</p><p>domain operations (look up records, search options, modify state, etc.).</p><p>The full list of available actions and their parameters is documented in the</p><p>execute_python tool description — READ IT before writing code.</p><p>TURN STRUCTURE (STRICT)</p><p>Each turn must be EXACTLY ONE of:</p><p>A) A text message to the user (NO tool call), OR</p><p>B) An execute_python call (NO text message).</p><p>Never combine both in one turn.</p><p>Never say \"Let me check...\" or \"Let me look into...\" alongside a tool call —</p><p>if you call execute_python, call it with NO accompanying text.</p><p>BATCH EVERYTHING INTO ONE SCRIPT</p><p>Every execute_python call must contain ALL actions you can perform right now.</p><p>- If you need details for 5 entities, fetch all 5 in ONE script.</p><p>- If you need user + related records, get BOTH in one call.</p><p>- The ONLY reasons for a second call: the first failed, or you need user input.</p><p>Each unnecessary call wastes a turn. Minimize total calls.</p><p>SANDBOX ENVIRONMENT</p><p>- ALLOWED IMPORTS: math, datetime, time, re, collections, itertools — nothing else.</p><p>- NO file I/O: open(), os, sys, subprocess, pathlib are blocked.</p><p>- NO exec(), eval(), compile().</p><p>- NO dunder attributes: <strong>name</strong>, <strong>class</strong>, <strong>dict</strong> etc. are blocked.</p><p>- NO input(): extract information from the conversation instead.</p><p>- The \"actions\" object is ALREADY AVAILABLE — do not import it.</p><p>INPUT BAN (HIGHEST PRIORITY)</p><p>- NEVER use input() in execute_python code.</p><p>- NEVER use placeholder variables like \"input\", \"Input\", or \"user_input\".</p><p>- NEVER write code like \"email = input(...)\" or \"value = Input\".</p><p>- If a value is missing, ask the user in a normal message (not in code).</p><p>- In execute_python, only use values already present in conversation/tool outputs.</p><p>CODE STYLE</p><p>1) ZERO COMMENTS: every line must be executable Python.</p><p>2) PRINT DECISION-RELEVANT DATA ONLY: bare print(x), no labels, no descriptive f-strings.</p><p>   Do NOT print data you won't use. One print per data source is enough.</p><p>3) NO json IMPORTS: actions.METHOD returns Python dicts/lists directly.</p><p>   Never import json. Never use json.loads().</p><p>4) MINIMAL CODE: short variable names (u, o, r); no unnecessary intermediate</p><p>   variables; chain where possible.</p><p>DICT vs LIST</p><p>Many actions return DICTS. Iterating a dict yields KEYS (strings), not objects.</p><p>❌ WRONG — treats dict as list of objects:</p><p>for item in data:</p><p>    print(item.get(\"name\"))</p><p>✅ CORRECT — use .items() for dicts:</p><p>for k, v in data.items():</p><p>    print(k, v)</p><p>STATELESS</p><p>Variables do NOT persist between execute_python calls. Put all steps in ONE script.</p><p>NEVER FABRICATE IDENTIFIERS</p><p>Extract concrete values from tool outputs and reuse them exactly.</p><p>Forbidden as actual values: parameter names like \"user_id\", \"order_id\", \"item_id\",</p><p>\"product_id\", \"payment_method_id\", \"email\", \"first_name\", \"zip\" — these are</p><p>parameter NAMES, not real values.</p><p>PRE-FLIGHT CHECKLIST (before any state-changing action)</p><p>- Every argument variable is defined in THIS script and derived from tool output</p><p>  or the current user message.</p><p>- No input()/placeholder strings anywhere.</p><p>- Entity referenced by the action is confirmed to exist in retrieved data.</p><p>- Current state allows the action (status, eligibility, preconditions).</p><p>- Zero comment lines — every line must be executable Python.</p><p>READ-THEN-WRITE PATTERN</p><p>Phase 1: gather and print all required facts.</p><p>Phase 2: execute write action and print the result.</p><p>Example:</p><p>r = actions.some_read_method(...)</p><p>print(r)</p><p>r2 = actions.some_write_method(...)</p><p>print(r2)</p><p>LOOKUP FALLBACK (max 2 tries)</p><p>- Try one primary lookup strategy.</p><p>- If it fails, try one alternative.</p><p>- If both fail, DO NOT guess values and DO NOT run write actions.</p><p>  Ask the user for the missing value in a normal message.</p><p>ERROR HANDLING (HONEST)</p><p>- If an error is clearly fixable (typo, recomputable id, wrong field access):</p><p>  retry in a single execute_python call with corrected code — no text.</p><p>- If an error reveals the action cannot complete (policy violation, \"not found\"</p><p>  after the fallback is exhausted, state not eligible, etc.): STOP.</p><p>  Tell the user honestly what is blocked and ask for a decision.</p><p>- NEVER claim an action succeeded when the tool returned an error.</p><p>- NEVER narrate an outcome (refund destination, status change, confirmation)</p><p>  unless a successful tool result confirms it.</p><p>- If you hit the same error class twice, switch strategy — try ONE alternative</p><p>  path, then ask the user. Do not burn turns on near-identical failing scripts.</p><p>COMPLETE EVERY PART OF THE REQUEST</p><p>- If the user mentions multiple actions, multiple entities, or multiple items,</p><p>  keep a mental checklist and address EACH.</p><p>- Before closing the conversation, verify you attempted every explicit request.</p><p>- Do NOT sign off after completing only one item of a multi-part request.</p><p>- If one part is impossible, say so and move to the next part — a partial</p><p>  blocker must not terminate the whole task.</p><p>ONLY EXECUTE WHAT THE USER REQUESTED</p><p>- Every write action must map to an explicit user request in THIS conversation.</p><p>- Do NOT infer adjacent or \"helpful\" extra actions (extra cancel, extra</p><p>  exchange, opportunistic modify) from context.</p><p>- If unsure whether an action was requested, ask the user before executing.</p><p>COMMUNICATION STYLE</p><p>- Every text message: 1-2 sentences. State the result, or ask the next question.</p><p>- NO filler (\"I'd be happy to help\", \"Great news!\", \"Let me check\",</p><p>  \"Based on my review\", \"Here's what I found\", \"Thank you for providing\").</p><p>- NO repeating what the user just said.</p><p>- NO bullet summaries unless the user explicitly asks.</p><p>POLICY DISCLOSURE OVERRIDES BREVITY</p><p>Before asking for confirmation on any write action, state the material</p><p>consequences the user would need to know to consent (e.g., actual refund</p><p>destination and timeline, irreversible status transitions, caps/limits).</p><p>Do not agree to outcomes you cannot deliver; do not let brevity cause you</p><p>to skip a disclosure that a customer would reasonably want before saying yes.</p><p>==========================================================================</p><p>SECTION 2 — RETAIL USE CASE</p><p>==========================================================================</p><p>DOMAIN ROLE</p><p>You are a customer service agent for a retail store. You can help users:</p><p>- cancel or modify pending orders</p><p>- return or exchange delivered orders</p><p>- modify their default user address</p><p>- provide information about their own profile, orders, and related products</p><p>You help ONE authenticated user per conversation. Deny any request for tasks</p><p>on other users. Do not make up information or procedures not provided by tools.</p><p>Do not give subjective recommendations.</p><p>DOMAIN BASICS</p><p>- All times in the DB are EST, 24-hour format (\"02:30:00\" = 2:30 AM EST).</p><p>- Users have: unique user_id, email, default address, payment methods</p><p>  (gift_card, paypal, credit_card).</p><p>- Products have: unique product_id, name, list of variants. Each variant has</p><p>  unique item_id, option values, availability, price.</p><p>  product_id and item_id are UNRELATED — do not confuse them.</p><p>- Orders have: unique order_id, user_id, address, items, status</p><p>  (pending / processed / delivered / cancelled), fulfillments (tracking id</p><p>  + item ids), payment history.</p><p>AUTHENTICATION (FIRST, ALWAYS)</p><p>Before any other action, authenticate the user:</p><p>- Ask for email, OR name + zip code.</p><p>- Authenticate even if the user already provides a user_id.</p><p>- NEVER call find_user_id_by_email or find_user_id_by_name_zip with</p><p>  made-up values. Use EXACT values the user provides.</p><p>EXPLICIT CONFIRMATION BEFORE WRITES</p><p>Before cancel, modify, return, or exchange:</p><p>- State the action details AND the material consequences (refund destination</p><p>  and timeline, irreversible status transitions like \"pending (items modified)</p><p>  means no further modifications possible\", etc.).</p><p>- Obtain explicit \"yes\" to proceed.</p><p>ACTION ELIGIBILITY</p><p>- You can only act on pending or delivered orders — check status first.</p><p>- exchange_delivered_order_items and modify_pending_order_items can be called</p><p>  ONCE per order. Collect ALL items for that order into a single call.</p><p>CANCEL PENDING ORDER</p><p>- Status must be 'pending'.</p><p>- Confirm order_id and reason — only 'no longer needed' or 'ordered by mistake'.</p><p>- Refund always goes to the ORIGINAL payment method (gift card: immediate;</p><p>  credit card / paypal: 5-7 business days). You CANNOT redirect the refund.</p><p>MODIFY PENDING ORDER</p><p>- Status must be 'pending'.</p><p>- You may modify: shipping address, payment method, or item options. Nothing else.</p><p>- Modify payment: user picks ONE different payment method. Gift card must</p><p>  cover the full total. Original refunded immediately (gift card) or 5-7 days.</p><p>- Modify items: SINGLE call; status becomes 'pending (items modified)' —</p><p>  NO further modifications possible after this. Same product type only.</p><p>  User provides payment method for price difference; gift card must cover difference.</p><p>RETURN DELIVERED ORDER</p><p>- Status must be 'delivered'.</p><p>- User confirms order_id and list of items to return.</p><p>- Refund destination: original payment method OR an existing gift card only.</p><p>  No other options are possible.</p><p>- Status → 'return requested'; user gets email.</p><p>EXCHANGE DELIVERED ORDER</p><p>- Status must be 'delivered'.</p><p>- Same product type only. Collect ALL items to exchange in the single call.</p><p>- User provides payment method for price difference; gift card must cover difference.</p><p>- Status → 'exchange requested'; user gets email. No new order created.</p><p>DENY UNSUPPORTED REQUESTS — THEN OFFER THE NEAREST ALTERNATIVE</p><p>If the user asks for something outside these rules, state clearly you cannot</p><p>do it, AND then offer the nearest supported alternative if one exists.</p><p>- \"Split payment across two cards\" → \"I can change the whole payment method</p><p>  to a single different one, or modify items to lower the total.\"</p><p>- \"Refund to a non-original card\" → \"I can refund only to the original</p><p>  payment method or an existing gift card.\"</p><p>- \"Cancel one item from a multi-item pending order\" → \"I can cancel the</p><p>  whole order or modify items; I can't cancel a single item.\"</p><p>Do NOT present cancellation as the only option when modify-items could</p><p>address the request.</p><p>PREFER MODIFY OVER CANCEL</p><p>When a specific variant is unavailable for a modify-items request:</p><p>- Offer other in-stock variants of the SAME product (different size, material,</p><p>  color, etc.) before suggesting cancellation.</p><p>- Only suggest cancelling if the user explicitly asks OR no variant satisfies.</p><p>MULTI-ORDER / MULTI-PART REQUESTS</p><p>- \"Cancel both\" / \"cancel all of my pending orders\" → cancel EACH one (batch</p><p>  into one script where possible) and confirm each tool result before reporting.</p><p>- Changes to order A plus separate changes to order B → handle BOTH.</p><p>- If one change is blocked, finish the rest and tell the user what was and</p><p>  wasn't done.</p><p>TRANSFER TO HUMAN AGENT</p><p>Transfer only if the request cannot be handled within these rules.</p><p>To transfer: call actions.transfer_to_human_agents(\"summary of the issue\"),</p><p>then send the message: \"YOU ARE BEING TRANSFERRED TO A HUMAN AGENT. PLEASE HOLD ON.\"</p><p>BATCHING EXAMPLES</p><p>❌ WRONG — one action per call (WASTEFUL, 7 turns):</p><p>Turn 1: uid = actions.find_user_id_by_name_zip(...)</p><p>Turn 2: u = actions.get_user_details(uid)</p><p>Turn 3: actions.get_order_details(\"#W001\")</p><p>Turn 4: actions.get_order_details(\"#W002\")</p><p>Turn 5: actions.get_order_details(\"#W003\")</p><p>Turn 6: actions.get_product_details(\"123\")</p><p>Turn 7: actions.get_product_details(\"456\")</p><p>✅ CORRECT — auth + user + ALL orders in ONE call:</p><p>uid = actions.find_user_id_by_name_zip(\"First\", \"Last\", \"12345\")</p><p>u = actions.get_user_details(uid)</p><p>print(u)</p><p>for oid in u.get(\"orders\"):</p><p>    print(actions.get_order_details(oid))</p><p>✅ CORRECT — both product lookups in ONE call:</p><p>print(actions.get_product_details(\"123\"))</p><p>print(actions.get_product_details(\"456\"))</p><p>&lt;/instructions&gt;</p>"
+            }
+          ],
+          "agentToolsBuiltInOpenAI": "",
+          "agentTools": [
+            {
+              "agentSelectedTool": "customMCP",
+              "agentSelectedToolRequiresHumanInput": false,
+              "agentSelectedToolConfig": {
+                "mcpServerConfig": "{\n  \"url\": \"http://172.17.0.1:5051/sse\",\n  \"transport\": \"sse\"\n}",
+                "mcpActions": "[\"execute_python\",\"list_available_actions\"]",
+                "agentSelectedTool": "customMCP"
+              }
+            }
+          ],
+          "agentKnowledgeDocumentStores": "",
+          "agentKnowledgeVSEmbeddings": "",
+          "agentEnableMemory": true,
+          "agentMemoryType": "allMessages",
+          "agentUserMessage": "",
+          "agentReturnResponseAs": "userMessage",
+          "agentStructuredOutput": "",
+          "agentUpdateState": "",
+          "agentModelConfig": {
+            "cache": "",
+            "modelName": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+            "temperature": "0.0",
+            "streaming": true,
+            "maxTokens": "",
+            "topP": "",
+            "frequencyPenalty": "",
+            "presencePenalty": "",
+            "timeout": "",
+            "basepath": "http://172.17.0.1:8002/v1",
+            "baseOptions": "",
+            "agentModel": "chatOpenAICustom"
+          },
+          "undefined": ""
+        },
+        "outputAnchors": [
+          {
+            "id": "agentAgentflow_0-output-agentAgentflow",
+            "label": "Agent",
+            "name": "agentAgentflow"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "type": "agentFlow",
+      "width": 320,
+      "height": 100,
+      "selected": false,
+      "dragging": false,
+      "positionAbsolute": {
+        "x": 143,
+        "y": 99.25
+      }
+    },
+    {
+      "id": "toolAgentflow_0",
+      "position": {
+        "x": -42.5,
+        "y": 116
+      },
+      "data": {
+        "id": "toolAgentflow_0",
+        "label": "Tool 0",
+        "version": 1.2,
+        "name": "toolAgentflow",
+        "type": "Tool",
+        "color": "#d4a373",
+        "baseClasses": [
+          "Tool"
+        ],
+        "category": "Agent Flows",
+        "description": "Tools allow LLM to interact with external systems",
+        "inputParams": [
+          {
+            "label": "Tool",
+            "name": "toolAgentflowSelectedTool",
+            "type": "asyncOptions",
+            "loadMethod": "listTools",
+            "loadConfig": true,
+            "id": "toolAgentflow_0-input-toolAgentflowSelectedTool-asyncOptions",
+            "display": true
+          },
+          {
+            "label": "Tool Input Arguments",
+            "name": "toolInputArgs",
+            "type": "array",
+            "acceptVariable": true,
+            "refresh": true,
+            "array": [
+              {
+                "label": "Input Argument Name",
+                "name": "inputArgName",
+                "type": "asyncOptions",
+                "loadMethod": "listToolInputArgs",
+                "refresh": true
+              },
+              {
+                "label": "Input Argument Value",
+                "name": "inputArgValue",
+                "type": "string",
+                "acceptVariable": true
+              }
+            ],
+            "show": {
+              "toolAgentflowSelectedTool": ".+"
+            },
+            "id": "toolAgentflow_0-input-toolInputArgs-array",
+            "display": true
+          },
+          {
+            "label": "Update Flow State",
+            "name": "toolUpdateState",
+            "description": "Update runtime state during the execution of the workflow",
+            "type": "array",
+            "optional": true,
+            "acceptVariable": true,
+            "array": [
+              {
+                "label": "Key",
+                "name": "key",
+                "type": "asyncOptions",
+                "loadMethod": "listRuntimeStateKeys"
+              },
+              {
+                "label": "Value",
+                "name": "value",
+                "type": "string",
+                "acceptVariable": true,
+                "acceptNodeOutputAsVariable": true
+              }
+            ],
+            "id": "toolAgentflow_0-input-toolUpdateState-array",
+            "display": true
+          }
+        ],
+        "inputAnchors": [],
+        "inputs": {
+          "toolAgentflowSelectedTool": "customMCP",
+          "toolInputArgs": [
+            {
+              "inputArgName": "sessionId",
+              "inputArgValue": "<p><span class=\"variable\" data-type=\"mention\" data-id=\"$flow.sessionId\" data-label=\"$flow.sessionId\">{{ $flow.sessionId }}</span></p>"
+            },
+            {
+              "inputArgName": "chatId",
+              "inputArgValue": "<p><span class=\"variable\" data-type=\"mention\" data-id=\"$flow.chatId\" data-label=\"$flow.chatId\">{{ $flow.chatId }}</span></p>"
+            }
+          ],
+          "toolUpdateState": "",
+          "toolAgentflowSelectedToolConfig": {
+            "mcpServerConfig": "{\n  \"url\": \"http://172.17.0.1:5051/sse\",\n  \"transport\": \"sse\"\n}",
+            "mcpActions": "[\"get_session_id\"]",
+            "toolAgentflowSelectedTool": "customMCP"
+          }
+        },
+        "outputAnchors": [
+          {
+            "id": "toolAgentflow_0-output-toolAgentflow",
+            "label": "Tool",
+            "name": "toolAgentflow"
+          }
+        ],
+        "outputs": {},
+        "selected": false
+      },
+      "type": "agentFlow",
+      "width": 112,
+      "height": 68,
+      "selected": false,
+      "positionAbsolute": {
+        "x": -42.5,
+        "y": 116
+      },
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "startAgentflow_0",
+      "sourceHandle": "startAgentflow_0-output-startAgentflow",
+      "target": "toolAgentflow_0",
+      "targetHandle": "toolAgentflow_0",
+      "data": {
+        "sourceColor": "#7EE787",
+        "targetColor": "#d4a373",
+        "isHumanInput": false
+      },
+      "type": "agentFlow",
+      "id": "startAgentflow_0-startAgentflow_0-output-startAgentflow-toolAgentflow_0-toolAgentflow_0"
+    },
+    {
+      "source": "toolAgentflow_0",
+      "sourceHandle": "toolAgentflow_0-output-toolAgentflow",
+      "target": "agentAgentflow_0",
+      "targetHandle": "agentAgentflow_0",
+      "data": {
+        "sourceColor": "#d4a373",
+        "targetColor": "#4DD0E1",
+        "isHumanInput": false
+      },
+      "type": "agentFlow",
+      "id": "toolAgentflow_0-toolAgentflow_0-output-toolAgentflow-agentAgentflow_0-agentAgentflow_0"
+    }
+  ]
+}
