@@ -238,17 +238,19 @@ Before you begin, ensure you have the following installed:
 
 - **Docker and Docker Compose** (required for running the application containers)
 - **Docker daemon running** (required for PR Agent's GitHub MCP server container)
-- **Enterprise inference endpoint access** (token-based authentication)
+- **Enterprise Inference endpoint access** (token-based authentication, see below for models and configs)
 
-### Required Model
+#### Deploy Required Models
 
-This application requires the following model to be deployed on your inference endpoint:
+See the table below for supported models, hardware, and gateway configuration.
 
-- **Qwen/Qwen3-4B-Instruct-2507** - Small language model optimized for Intel Xeon processors with 8K context window
+| Model | Xeon w/APISIX/Keycloak | Xeon w/GenAI Gateway | Gaudi w/APISIX/Keycloak | Gaudi w/GenAI Gateway |
+|---|:---:|:---:|:---:|:---:|
+| **Qwen/Qwen3-4B-Instruct-2507** | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 | ✅ Validated on Dell XE7740 |
+
+>**Note** When deploying, the model must have the `--enable-auto-tool-choice` and `--tool-call-parser "hermes"` arguments for the AI agents to use the model endpoint. On Xeon deployments, it is included, but on Gaudi it is not (as of Enterprise Inference release v1.4.0). This needs to be added into the core/helm-charts/vllm folder's `gaudi3_values.yaml` or `gaudi-values.yaml` as a new model config before deploying the model. If the model config is already there, disregard this note.
 
 All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Environment Config, Dependency Analyzer, Planner, Mermaid Generator, and QA Validator) use this model for efficient documentation generation.
-
-**Note:** This model must be available through your GenAI Gateway or APISIX Gateway deployment before running the application.
 
 ### Required API Configuration
 
@@ -257,36 +259,15 @@ All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, En
 This application supports multiple inference deployment patterns:
 
 **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-- **URL format**: `https://api.example.com`
-- To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
-- The API key is the `litellm_master_key` value from the generated `vault.yml` file
+  - URL format: https://api.example.com
+  - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-vault-secrets.sh) script
+  - The API key is the litellm_master_key value from the generated vault.yml file
 
 **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-- **URL format**: `https://api.example.com/Qwen3-4B-Instruct`
-- **Note**: APISIX requires the model name in the URL path (without company/family prefixes)
-- To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
-- The token is generated using Keycloak client credentials
-
-**Configuration requirements:**
-- **INFERENCE_API_ENDPOINT**: URL to your inference service (example: `https://api.example.com`)
-- **INFERENCE_API_TOKEN**: Authentication token/API key for your chosen service
-
-
-### Local Development Configuration
-
-**For Local Testing Only (Optional)**
-
-If you're testing with a local inference endpoint using a custom domain (e.g., `api.example.com` mapped to localhost in your hosts file):
-
-1. Edit `api/.env` and set:
-   ```bash
-   LOCAL_URL_ENDPOINT=api.example.com
-   ```
-   (Use the domain name from your INFERENCE_API_ENDPOINT without `https://`)
-
-2. This allows Docker containers to resolve your local domain correctly.
-
-**Note:** For public domains or cloud-hosted endpoints, leave the default value `not-needed`.
+  - URL format: https://api.example.com/Llama-3.1-8B-Instruct
+  - Note: APISIX requires the model name in the URL path
+  - To generate the APISIX authentication token, use the [generate-token.sh](https://github.com/opea-project/Enterprise-Inference/blob/main/core/scripts/generate-token.sh) script
+  - The token is generated using Keycloak client credentials
 
 ### GitHub Personal Access Token (Optional)
 
@@ -323,152 +304,27 @@ cd Enterprise-Inference/sample_solutions/Docugen-Microagents
 
 ### Set up the Environment
 
-This application requires **two `.env` files** for proper configuration:
-
-1. **Root `.env` file** (for Docker Compose variables)
-2. **`api/.env` file** (for backend application configuration)
-
-#### Step 1: Create Root `.env` File
-
-```bash
-# From the Docugen-Microagents directory
-cat > .env << EOF
-# Docker Compose Configuration
-
-# Local URL Endpoint (only needed for non-public domains)
-# If using a local domain like api.example.com mapped to localhost, set to the domain without https://
-# Otherwise, set to: not-needed
-LOCAL_URL_ENDPOINT=not-needed
-
-BACKEND_PORT=8000
-FRONTEND_PORT=3000
-
-EOF
-```
-
-OR
-
-Copy from the example file and edit with your credentials as required.
+This application requires an `.env` file in the root directory for proper configuration. Create it using [.env.example](./.env.example) with the commands below:
 
 ```bash
 cp .env.example .env
 ```
-
-**Note:** If using a local domain (e.g., `api.example.com` mapped to localhost), replace `not-needed` with your domain name (without `https://`).
-
-#### Step 2: Create `api/.env` File
-
-Copy from the example file and edit with your actual credentials:
-
-```bash
-cp api/.env.example api/.env
-```
-
-Then edit `api/.env` to set your `INFERENCE_API_ENDPOINT` and `INFERENCE_API_TOKEN`.
-
-Or manually create `api/.env` with:
-
-```bash
-# ==========================================
-# Inference API Configuration
-# ==========================================
-# INFERENCE_API_ENDPOINT: URL to your inference service (without /v1 suffix)
-#
-# **GenAI Gateway**: Provide your GenAI Gateway URL and API key
-#   - URL format: https://genai-gateway.example.com
-#   - To generate the GenAI Gateway API key, use the [generate-vault-secrets.sh] script
-#   - The API key is the litellm_master_key value from the generated vault.yml file
-#
-# **APISIX Gateway**: Provide your APISIX Gateway URL and authentication token
-#   - For APISIX, include the model name in the INFERENCE_API_ENDPOINT path
-#   - Example: https://apisix-gateway.example.com/Qwen3-4B-Instruct
-#   - To generate the APISIX authentication token, use the [generate-token.sh] script
-#   - The token is generated using Keycloak client credentials
-#
-# INFERENCE_API_TOKEN: Authentication token/API key for the inference service
-INFERENCE_API_ENDPOINT=https://api.example.com
-INFERENCE_API_TOKEN=your-pre-generated-token-here
-
-# ==========================================
-# Docker Network Configuration
-# ==========================================
-# LOCAL_URL_ENDPOINT: Required if using local domain mapping (e.g., api.example.com -> localhost)
-# Set to your domain name (without https://) or leave as "not-needed" if using public URLs
-LOCAL_URL_ENDPOINT=not-needed
-
-# ==========================================
-# Micro-Agent Model Configuration
-# ==========================================
-# All agents use Qwen3-4B-Instruct (optimized SLM for code analysis)
-# You can customize individual agent models if needed
-
-CODE_EXPLORER_MODEL=Qwen/Qwen3-4B-Instruct-2507
-API_REFERENCE_MODEL=Qwen/Qwen3-4B-Instruct-2507
-CALL_GRAPH_MODEL=Qwen/Qwen3-4B-Instruct-2507
-ERROR_ANALYSIS_MODEL=Qwen/Qwen3-4B-Instruct-2507
-ENV_CONFIG_MODEL=Qwen/Qwen3-4B-Instruct-2507
-DEPENDENCY_ANALYZER_MODEL=Qwen/Qwen3-4B-Instruct-2507
-PLANNER_MODEL=Qwen/Qwen3-4B-Instruct-2507
-MERMAID_MODEL=Qwen/Qwen3-4B-Instruct-2507
-QA_VALIDATOR_MODEL=Qwen/Qwen3-4B-Instruct-2507
-WRITER_MODEL=Qwen/Qwen3-4B-Instruct-2507
-
-# ==========================================
-# Repository Analysis Limits
-# ==========================================
-# All limits are configurable to suit your needs
-TEMP_REPO_DIR=./tmp/repos
-MAX_REPO_SIZE=10737418240    # 10GB in bytes
-MAX_FILE_SIZE=1000000         # 1MB in bytes
-MAX_FILES_TO_SCAN=500         # Maximum number of files to analyze
-MAX_LINES_PER_FILE=500        # Line budget per file (pattern_window strategy extracts ~150-300 lines focusing on key patterns)
-
-# ==========================================
-# Agent Execution Settings
-# ==========================================
-AGENT_TEMPERATURE=0.7         # Model temperature (0.0-1.0)
-AGENT_MAX_TOKENS=1000         # Maximum tokens per agent response
-AGENT_TIMEOUT=300             # Agent timeout in seconds (5 minutes)
-
-# ==========================================
-# GitHub Integration (MCP)
-# ==========================================
-# Required for automatic PR creation
-# Generate token at: https://github.com/settings/tokens
-# Required scopes: repo (full access to repositories)
-GITHUB_TOKEN=your_github_personal_access_token_here
-
-# ==========================================
-# Server Configuration
-# ==========================================
-API_PORT=5001
-HOST=0.0.0.0
-
-# ==========================================
-# CORS Settings
-# ==========================================
-# Add your frontend URL if different from defaults
-CORS_ORIGINS=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"]
-
-# ==========================================
-# Security Configuration
-# ==========================================
-# SSL Verification: Set to false only for development with self-signed certificates
-VERIFY_SSL=true
-```
-
-**Note:** All nine AI agents (Code Explorer, API Reference, Call Graph, Error Analysis, Env Config, Dependency Analyzer, Planner, Mermaid Generator, QA Validator) plus PR Agent use Qwen/Qwen3-4B-Instruct-2507 optimized for Intel Xeon processors
+Then modify it as needed, with special consideration to certain environment variables mentioned below. Read through the .env file for full instructions.
 
 **Important Configuration Notes:**
 
 - **INFERENCE_API_ENDPOINT**: Your actual inference service URL (replace `https://api.example.com`)
-  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/Qwen3-4B-Instruct`)
+  - For APISIX/Keycloak deployments, the model name must be included in the endpoint URL (e.g., `https://api.example.com/Qwen3-4B-Instruct-2507`)
 - **INFERENCE_API_TOKEN**: Your actual pre-generated authentication token
-- **Model Names**: Use the exact model names from your inference service
-- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping
-- **SSL Verification**: set to false only for development with self-signed certificates
+- **LOCAL_URL_ENDPOINT**: Only needed if using local domain mapping (i.e. `api.example.com` mapped to localhost) for Docker containers to resolve correctly.
+  - Use the domain name from INFERENCE_API_ENDPOINT without `https://`
+  - For public domains or cloud-hosted endpoints, leave the default value `not-needed`
+- **Model Names**: Use the exact model name i.e. model card from Hugging Face
+- **VERIFY_SSL**: Controls SSL certificate verification (default: `true`)
+  - Set to `false` only for development environments with self-signed certificates
+  - Keep as `true` for production environments
 
-**Note**: The docker-compose.yml file automatically loads environment variables from both `.env` (root) and `./api/.env` (backend) files.
+**Note**: The docker-compose.yaml file automatically loads environment variables from `.env` for the backend service.
 
 ### Running the Application
 
