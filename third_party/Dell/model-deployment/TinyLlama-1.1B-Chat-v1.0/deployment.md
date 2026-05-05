@@ -1,12 +1,26 @@
-## Step 1: pre-requisite to deploy EI with keycloak on Xeon
+## Step 1: Prerequisites to Deploy TinyLlama Model on Xeon with Keycloak
+
+Ensure the Enterprise Inference stack with Keycloak is already deployed before proceeding.
+
+Edit `core/scripts/generate-token.sh` and set your values before sourcing it:
+
+| Variable                  | Description                                                              |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `BASE_URL`                | Hostname of your cluster (e.g. `api.example.com`), without `https://`   |
+| `KEYCLOAK_ADMIN_USERNAME` | Keycloak admin username                                                  |
+| `KEYCLOAK_PASSWORD`       | Keycloak admin password                                                  |
+| `KEYCLOAK_CLIENT_ID`      | Keycloak client ID configured during EI deployment                       |
+
+Then run:
 
 ```bash
-# Export Hugging Face token
 export HUGGING_FACE_HUB_TOKEN="your_token_here"
 
 cd ~/Enterprise-Inference
 source core/scripts/generate-token.sh
 ```
+
+This exports: `BASE_URL`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`, and `TOKEN`.
 
 ## Step 2: Deploy Tinyllama-1.1b-chat-v1.0 Model
 
@@ -32,7 +46,7 @@ kubectl get pods
 kubectl get apisixroutes
 ```
 
-Excepted Output:
+Expected Output:
 
 ```
 NAME                                        READY   STATUS    RESTARTS
@@ -63,6 +77,8 @@ curl -k https://${BASE_URL}/tinyLlama-1.1B-Chat-v1.0-vllmcpu/v1/completions \
   }'
 ```
 
+If successful, the model will return a completion response.
+
 ## To undeploy the model
 
 ```bash
@@ -78,6 +94,11 @@ helm uninstall tinyllama-1-1b-cpu
 | `--set ingress.enabled=true`                              | Enables Kubernetes **Ingress** to expose the model service externally.                                |
 | `--set ingress.host="replace-ingress"`                    | Public hostname or FQDN for the inference endpoint (maps to your Ingress controller IP).              |
 | `--set ingress.secretname="replace-secret"`               | Kubernetes **TLS Secret** used for HTTPS termination at the ingress layer.                            |
+| `--set oidc.client_id="..."`                              | Keycloak OIDC client ID used for token-based authentication.                                          |
+| `--set oidc.client_secret="..."`                          | Keycloak OIDC client secret corresponding to the client ID.                                           |
+| `--set apisix.enabled=true`                               | Enables **APISIX** as the API gateway for routing and authentication.                                 |
+| `--set tensor_parallel_size="1"`                          | Number of tensor parallel workers. Set to the number of available CPUs/GPUs per node.                |
+| `--set pipeline_parallel_size="1"`                        | Number of pipeline parallel stages. Typically `1` for single-node deployments.                       |
 
 
 
