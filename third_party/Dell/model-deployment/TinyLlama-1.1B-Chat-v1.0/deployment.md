@@ -15,8 +15,9 @@ helm install tinyllama-1-1b-cpu ./core/helm-charts/vllm \
   --values ./core/helm-charts/vllm/xeon-values.yaml \
   --set LLM_MODEL_ID="TinyLlama/TinyLlama-1.1B-Chat-v1.0" \
   --set global.HUGGINGFACEHUB_API_TOKEN="$HUGGING_FACE_HUB_TOKEN" \
-  --set ingress.enabled=false \
-  --set ingress.host="${BASE_HOST}" \
+  --set ingress.enabled=true \
+  --set ingress.secretname=api.example.com \
+  --set ingress.host="${BASE_URL}" \
   --set oidc.client_id="$KEYCLOAK_CLIENT_ID" \
   --set oidc.client_secret="$KEYCLOAK_CLIENT_SECRET" \
   --set apisix.enabled=true \
@@ -27,7 +28,7 @@ helm install tinyllama-1-1b-cpu ./core/helm-charts/vllm \
 ## Step 3: Test the Deployed Model
 
 ```bash
-curl -k ${BASE_URL}/tinyLlama-1.1B-Chat-v1.0-vllmcpu/v1/completions \
+curl -k https://${BASE_URL}/tinyLlama-1.1B-Chat-v1.0-vllmcpu/v1/completions \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
@@ -42,7 +43,7 @@ curl -k ${BASE_URL}/tinyLlama-1.1B-Chat-v1.0-vllmcpu/v1/completions \
 ## To undeploy the model
 
 ```bash
-helm uninstall Tinyllama-1-1b-cpu
+helm uninstall tinyllama-1-1b-cpu
 ```
 
 ## Parameters
