@@ -256,17 +256,22 @@ chmod +x generate-token.sh
 After the script completes successfully, confirm that the token is available in your shell:
 
 ```bash
-echo $BASE_URL
 echo $TOKEN
 ```
 
 If a valid token is returned (long JWT string), the environment is ready for inference testing.
 
+Set the DNS used to deploy Enterprise Inference:
+```bash
+export BASE_URL=https://api.example.com
+```
+
+ Change the model as needed. Note that with Keycloak/APISIX, the model name is included in the URL path. This must match one of the routes from the command `kubectl get apisixroutes`. Run **ONE** of the following commands depending on the hardware platform Enterprise Inference is deployed on.
+
 **Run a test query for Gaudi:**
-> Note: Replace ${BASE_URL} with your DNS
 
 ```bash
-curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
+curl -k ${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions \
 -X POST \
 -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 25, "temperature": 0}' \
 -H 'Content-Type: application/json' \

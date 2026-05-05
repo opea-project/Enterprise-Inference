@@ -46,7 +46,7 @@ This script mounts or unmounts the **Ubuntu 22.04.5 live server ISO** using the 
 ```bash
 export IDRAC_IP=100.67.x.x
 export IDRAC_USER=root
-export IDRAC_PASS=calvin
+export IDRAC_PASS=your-idrac-password
 ```
 **Specify Custom ISO URL**
 
@@ -102,10 +102,10 @@ Example (terraform.tfvars):
 ```bash
 idrac_endpoint     = "https://100.67.x.x"
 idrac_user         = "root"
-idrac_password     = "calvin"
+idrac_password     = "your-idrac-password"
 idrac_ssl_insecure = true
-ubuntu_username    = "user"
-ubuntu_password    = "password"
+ubuntu_username    = "your-username"
+ubuntu_password    = "your-password"
 ```
 
 ### Apply Terraform
@@ -136,8 +136,8 @@ chmod +x deploy-enterprise-inference.sh
 
 ```bash
 sudo ./deploy-enterprise-inference.sh \
--u user \
--p Linux123! \
+-u your-username \
+-p your-password \
 -t hf_xxxxxxxxxxxxx \
 -g gaudi3 \
 -a cluster-url \
@@ -149,7 +149,7 @@ sudo ./deploy-enterprise-inference.sh \
 |--------|----------|----------|-------------|
 | `-u, --username` | Yes (deploy & uninstall) | (none) | Enterprise Inference owner username. Must match the invoking (sudo) user. |
 | `-t, --token` | Yes (deploy only) | (none) | Hugging Face access token used to validate and download selected models. |
-| `-p, --password` | No | `Linux123!` | User sudo password used for Ansible become operations. |
+| `-p, --password` | No | (none) | User sudo password used for Ansible become operations. |
 | `-g, --gpu-type` | No | `gaudi3` | Deployment target type: `gaudi3` or `cpu`. |
 | `-m, --models` | No | `""` (interactive mode) | Choose model ID from [Pre-Integrated Models List](#pre-integrated-models-list) , based on your deployment type (gaudi or cpu) . If not provided, deployment runs interactively. |
 | `-b, --branch` | No | `release-1.4.0` | Git branch of the Enterprise-Inference repository to clone. |
@@ -167,8 +167,8 @@ sudo ./deploy-enterprise-inference.sh \
 The deployment script is resume-safe. If a failure occurs, simply rerun the script with the -r flag:
 ```bash
 sudo ./deploy-enterprise-inference.sh \
--u user \
--p Linux123! \
+-u your-username \
+-p your-password \
 -t hf_XXXXXXXXXXXX \
 -g gaudi3 \
 -a cluster-url \
@@ -272,19 +272,31 @@ Expected:
 
 ### 5. API Health Check
 Validate the inference gateway is reachable.
+
+If deployed with **Keycloak (APISIX)**, first obtain a token:
 ```bash
-curl -k https://api.example.com/health
+source <path-to-Enterprise-Inference>/core/scripts/generate-token.sh
 ```
-Expected:
-{"status":"ok"}
+`TOKEN` will be set automatically.
+
+If deployed with **GenAI Gateway**, use the litellm_master_key from Enterprise-Inference/core/inventory/metadata/vault.yml:
+```bash
+export TOKEN=<your-genai-api-key>
+```
+
+Then run the health check to get the number of healthy and unhealthy model endpoints:
+```bash
+curl -k -s -L https://api.example.com/health \
+  -H "Authorization: Bearer $TOKEN" | jq '{healthy: .healthy_count, unhealthy: .unhealthy_count}'
+```
 
 ---
 
 ### 6. Test Model Inference
 
-if EI is deployed with apisix, follow [Testing EI model with apisix](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference
+If EI is deployed with Keycloak/APISIX, follow [Testing EI model with Keycloak/APISIX](../EI/single-node/user-guide-apisix.md#5-test-the-inference) for generating token and testing the inference.
 
-if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-node/user-guide-genai.md#5-test-the-inference) for generating api-key and testing the inference
+If EI is deployed with GenAI Gateway, follow [Testing EI model with GenAI Gateway](../EI/single-node/user-guide-genai.md#5-test-the-inference) for acquiring the API key and testing the inference.
 
 ---
 
@@ -292,7 +304,9 @@ if EI is deployed with genai, follow [Testing EI model with genai](../EI/single-
 
 ### Pre-Integrated Models List
 
-Enterprise Inference provides a set of pre-integrated and validated models optimized for performance and stability. These models can be deployed directly using the Enterprise Inference catalog.
+Enterprise Inference provides a set of pre-integrated and validated models optimized for performance and stability. These models can be deployed directly using the Enterprise Inference catalog. 
+
+> **Note**: this list is accurate as of `release-1.4.0`.
 
 **Pre-Integrated Gaudi Models**
 
