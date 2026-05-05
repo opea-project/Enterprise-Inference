@@ -1,4 +1,4 @@
-## Step 1: Prerequisites to Deploy Llama-3.1-8B-Instruct Model on Gaudi with Keycloak
+## Step 1: Prerequisites to Deploy Llama-3.1-8B-Instruct Model on Xeon with Keycloak
 
 Ensure the Enterprise Inference stack with Keycloak is already deployed before proceeding.
 
@@ -26,7 +26,7 @@ This exports: `BASE_URL`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`, and `T
 
 ```bash
 helm install vllm-llama-8b ./core/helm-charts/vllm \
-  --values ./core/helm-charts/vllm/gaudi3-values.yaml \
+  --values ./core/helm-charts/vllm/xeon-values.yaml \
   --set LLM_MODEL_ID="meta-llama/Llama-3.1-8B-Instruct" \
   --set global.HUGGINGFACEHUB_API_TOKEN="$HUGGING_FACE_HUB_TOKEN" \
   --set ingress.enabled=true \
