@@ -8,7 +8,7 @@ services:
     ports:
       - "5001:5001"
     env_file:
-      - ./api/.env
+      - .env
     volumes:
       - ./api:/app
     networks:
