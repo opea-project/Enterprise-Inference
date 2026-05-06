@@ -96,7 +96,8 @@ apt-get install -y \
   software-properties-common \
   python3 \
   python3-pip \
-  ansible
+  ansible \
+  db5.3-util
 
 info "Verifying installed tools..."
 for cmd in curl wget git jq skopeo python3 pip3 ansible ansible-galaxy; do
