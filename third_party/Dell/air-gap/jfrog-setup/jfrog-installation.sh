@@ -96,8 +96,7 @@ apt-get install -y \
   software-properties-common \
   python3 \
   python3-pip \
-  ansible \
-  db5.3-util
+  ansible
 
 info "Verifying installed tools..."
 for cmd in curl wget git jq skopeo python3 pip3 ansible ansible-galaxy; do
@@ -156,9 +155,10 @@ else
     if [[ -n "$installer_tgz" ]]; then
       info "Using local installer: $installer_tgz"
     else
-      info "Downloading JFrog Platform Trial installer (latest version)..."
+      JFROG_VERSION="7.111.8"
+      info "Downloading JFrog Platform Trial installer v${JFROG_VERSION}..."
       wget -O jfrog-deb-installer.tar.gz \
-        "https://releases.jfrog.io/artifactory/jfrog-prox/org/artifactory/pro/deb/jfrog-platform-trial-prox/[RELEASE]/jfrog-platform-trial-prox-[RELEASE]-deb.tar.gz"
+        "https://releases.jfrog.io/artifactory/jfrog-prox/org/artifactory/pro/deb/jfrog-platform-trial-prox/${JFROG_VERSION}/jfrog-platform-trial-prox-${JFROG_VERSION}-deb.tar.gz"
       installer_tgz="jfrog-deb-installer.tar.gz"
     fi
 
