@@ -6,7 +6,9 @@ This domain is intentionally non-DB-centric and focused on chainable operational
 """
 
 import argparse
+import ast
 import json
+import operator
 import socket
 import ssl
 import sys
@@ -59,7 +61,7 @@ def _http_get_json(url: str, timeout_sec: int = 8) -> Dict[str, Any]:
             "Accept": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+    with urllib.request.urlopen(request, timeout=timeout_sec) as response:  # nosec B310 - internal helper, callers pass hardcoded _STATUS_APIS URLs
         body = response.read().decode("utf-8", errors="replace")
         return json.loads(body)
 
@@ -113,7 +115,7 @@ def check_http_endpoint(url: str, timeout_sec: int = 8, session_id: str = "") ->
     }
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+        with urllib.request.urlopen(request, timeout=timeout_sec) as response:  # nosec B310 - triage demo tool, not used in production flows
             elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
             body = response.read(400).decode("utf-8", errors="replace")
             result.update(
@@ -484,13 +486,37 @@ def draft_customer_update(
     return message
 
 
+_CALC_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _safe_eval_math(node: ast.AST) -> float:
+    if isinstance(node, ast.Expression):
+        return _safe_eval_math(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, ast.BinOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.left), _safe_eval_math(node.right))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.operand))
+    raise ValueError("Unsupported expression")
+
+
 @mcp.tool()
 def calculate(expression: str, session_id: str = "") -> str:
     """Calculate the result of a mathematical expression."""
     _ = session_id
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 6))
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as e:
+        raise ValueError("Invalid expression") from e
+    return str(round(float(_safe_eval_math(tree)), 6))
 
 
 @mcp.tool()
