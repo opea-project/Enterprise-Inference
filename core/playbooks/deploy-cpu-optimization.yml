@@ -7,6 +7,7 @@
   gather_facts: true
   run_once: true
   vars_files:
+    - "{{ lookup('env', 'PWD') }}/config/vars/inference_common.yml"
     - "{{ lookup('env', 'PWD') }}/config/vars/inference_llm_models.yml"
     - "{{ lookup('env', 'PWD') }}/config/inference_env.yml"
   vars:

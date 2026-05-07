@@ -745,12 +745,14 @@
             {% endif %}
             {% if cpu_playbook == 'true' %}
               --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
+              {% if enable_cpu_balloons | default(false) | bool %}
               --set cpu_balloon_annotation="vllm-balloon"
               --set podLabels.name="vllm"
               --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
               --set memory="{{ optimal_memory_gb | default(8) }}Gi"
               --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
+              {% endif %}
             {% elif gaudi_deployment|lower == "true" %}
               --set tensor_parallel_size={{ huggingface_tensor_parellel_size }}
               --values {{ gaudi_values_file }}
@@ -1998,12 +2000,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2027,6 +2031,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2101,12 +2109,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ model_paralletensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2130,6 +2140,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2203,12 +2217,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2232,6 +2248,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2308,12 +2328,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2337,6 +2359,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2418,12 +2444,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2447,6 +2475,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2523,12 +2555,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2552,6 +2586,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2697,6 +2735,7 @@
       ansible.builtin.shell:
         cmd: "helm list --short | grep 'vllm-'"
       register: inference_models
+      failed_when: inference_models.rc not in [0, 1]
       when: list_model_true == 'true'
     - name: Print Installed Models in Comma Separated Format
       ansible.builtin.debug:

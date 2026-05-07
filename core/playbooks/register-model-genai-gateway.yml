@@ -20,7 +20,8 @@
             restartPolicy: Never
             containers:
             - name: register-model
-              image: curlimages/curl:latest
+              image: docker.io/library/nginx:1.25.2-alpine
+              imagePullPolicy: IfNotPresent
               command: ["/bin/sh", "-c"]
               args:
                 - |

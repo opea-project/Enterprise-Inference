@@ -37,7 +37,7 @@
       tags: always
 
     - name: Create observability namespace
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         name: observability
         api_version: v1
         kind: Namespace
@@ -51,7 +51,7 @@
     - name: Enable OpenShift User Workload Monitoring
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -146,7 +146,7 @@
     # =========================================================================
     - name: Add Bitnami Helm repository
       tags: deploy_logging
-      community.kubernetes.helm_repository:
+      kubernetes.core.helm_repository:
         name: bitnami
         repo_url: https://charts.bitnami.com/bitnami
       when: deploy_logging == "yes"
@@ -167,7 +167,7 @@
       tags: deploy_logging
 
     - name: Install Elasticsearch System (logging)
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: logging-elasticsearch
         chart_ref: bitnami/elasticsearch
         release_namespace: observability
@@ -217,7 +217,7 @@
       tags: deploy_logging
 
     - name: Create Fluent Bit ClusterRoleBinding
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1
@@ -236,7 +236,7 @@
       tags: deploy_logging
 
     - name: Install Fluent Bit
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: logging-fluentbit
         chart_ref: oci://registry-1.docker.io/bitnamicharts/fluent-bit
         release_namespace: observability
@@ -251,7 +251,7 @@
       tags: deploy_logging
       block:
         - name: Update Fluent Bit ConfigMap
-          community.kubernetes.k8s:
+          kubernetes.core.k8s:
             state: present
             src: "{{ remote_helm_charts_base }}/fluentbit/fluentbit-config.yml"
             kind: ConfigMap
@@ -267,14 +267,14 @@
     - name: Add Grafana Helm repo (Loki)
       run_once: true
       tags: deploy_observability
-      community.kubernetes.helm_repository:
+      kubernetes.core.helm_repository:
         name: grafana
         repo_url: https://grafana.github.io/helm-charts
 
     - name: Add OpenTelemetry Helm repo
       run_once: true
       tags: deploy_observability
-      community.kubernetes.helm_repository:
+      kubernetes.core.helm_repository:
         name: open-telemetry
         repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
 
@@ -300,7 +300,7 @@
     - name: Create ClusterRole for OTEL Collector log access
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1
@@ -318,7 +318,7 @@
     - name: Bind OTEL Collector ClusterRole
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1
@@ -412,7 +412,7 @@
     - name: Create Grafana ServiceAccount
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -424,7 +424,7 @@
     - name: Grant Grafana access to Prometheus
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1
@@ -443,7 +443,7 @@
     - name: Deploy Grafana
       run_once: true
       tags: deploy_observability
-      community.kubernetes.helm:
+      kubernetes.core.helm:
         name: grafana
         chart_ref: grafana/grafana
         release_namespace: observability
@@ -524,7 +524,7 @@
     - name: Create Grafana ServiceAccount token secret
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -716,7 +716,7 @@
     - name: Create Grafana Route
       run_once: true
       tags: deploy_observability
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: route.openshift.io/v1
@@ -882,7 +882,7 @@
       tags: deploy_observability
 
     - name: Apply Habana Metrics Service Monitor
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         src: "{{ remote_helm_charts_base }}/habana-exporter/habana-metrics.yml"
       when: gaudi_available

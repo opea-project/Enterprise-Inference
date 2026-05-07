@@ -1,27 +1,69 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
-- name: Ensure Python pip module is installed
+- name: Ensure Python pip module is installed (internet)
   ansible.builtin.package:
     name: python3-pip
     state: present
   become: true
+  when: not airgap_enabled | default(false) | bool
   tags: always
-- name: Install Kubernetes Python SDK
+
+- name: Ensure Python pip module is installed (airgap)
+  ansible.builtin.shell: |
+    python3 -m pip --version &>/dev/null && exit 0
+    apt-get install -y --fix-missing python3-pip 2>&1 || true
+  args:
+    executable: /bin/bash
+  become: true
+  when: airgap_enabled | default(false) | bool
+  tags: always
+- name: Install Kubernetes Python SDK (internet)
   ansible.builtin.pip:
     name: kubernetes
     state: present
   become: true
   ignore_errors: true
   register: pip_install_result
+  when: not airgap_enabled | default(false) | bool
   tags: always
-- name: Install Kubernetes Python SDK Fallback
+
+- name: Install Kubernetes Python SDK (airgap via JFrog)
+  ansible.builtin.pip:
+    name: kubernetes
+    state: present
+    extra_args: >-
+      --index-url http://{{ jfrog_username }}:{{ jfrog_password }}@{{ jfrog_url | regex_replace('^https?://', '') }}/api/pypi/ei-pypi-virtual/simple
+      --trusted-host {{ jfrog_url | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}
+  become: true
+  ignore_errors: true
+  register: pip_install_result
+  when: airgap_enabled | default(false) | bool
+  tags: always
+
+- name: Install Kubernetes Python SDK Fallback (internet)
   ansible.builtin.pip:
     name: kubernetes
     state: present
     extra_args: "--break-system-packages"
   become: true
-  when: pip_install_result is failed
+  when:
+    - not airgap_enabled | default(false) | bool
+    - pip_install_result is failed
+  tags: always
+
+- name: Install Kubernetes Python SDK Fallback (airgap via JFrog)
+  ansible.builtin.pip:
+    name: kubernetes
+    state: present
+    extra_args: >-
+      --break-system-packages
+      --index-url http://{{ jfrog_username }}:{{ jfrog_password }}@{{ jfrog_url | regex_replace('^https?://', '') }}/api/pypi/ei-pypi-virtual/simple
+      --trusted-host {{ jfrog_url | regex_replace('^https?://', '') | regex_replace('/.*$', '') }}
+  become: true
+  when:
+    - airgap_enabled | default(false) | bool
+    - pip_install_result is failed
   tags: always
 - name: Deploy fix script for kubernetes SDK no_proxy bug
   ansible.builtin.copy:
@@ -61,54 +103,57 @@
   changed_when: _no_proxy_fix.rc == 2
   failed_when: _no_proxy_fix.rc not in [0, 2]
   tags: always
-- name: Deploy fix script for kubernetes SDK no_proxy bug
-  ansible.builtin.copy:
-    dest: /tmp/_fix_k8s_no_proxy.py
-    mode: '0644'
-    content: |
-      import re, sys, os
-      path = sys.argv[1]
-      with open(path, 'r') as f:
-          original = f.read()
-      # Remove the duplicate self.no_proxy = None that appears after the no_proxy
-      # env-loading block (bug introduced in kubernetes SDK >= 34.x by code generator).
-      # Pattern: the env-loading line is followed within 3 lines by a bare self.no_proxy = None
-      fixed = re.sub(
-          r'(if os\.getenv\("no_proxy"\)[^\n]+\n(?:.*\n){1,3}?)(\s+self\.no_proxy = None\n)',
-          r'\1',
-          original
-      )
-      if fixed == original:
-          print("OK: no duplicate no_proxy line found, nothing to do")
-          sys.exit(0)
-      with open(path, 'w') as f:
-          f.write(fixed)
-      print("FIXED: removed duplicate self.no_proxy = None from " + path)
-      sys.exit(2)
-  become: true
-  tags: always
-- name: Fix kubernetes SDK no_proxy bug (duplicate self.no_proxy = None after env-loading block)
-  ansible.builtin.shell: |
-    set -e
-    KUBE_CFG=$(python3 -c "import kubernetes, os; print(os.path.join(os.path.dirname(kubernetes.__file__), 'client', 'configuration.py'))" 2>/dev/null) || exit 0
-    python3 /tmp/_fix_k8s_no_proxy.py "$KUBE_CFG"
-  args:
-    executable: /bin/bash
-  become: true
-  register: _no_proxy_fix
-  changed_when: _no_proxy_fix.rc == 2
-  failed_when: _no_proxy_fix.rc not in [0, 2]
-  tags: always
-- name: Install Deployment Client
+- name: Install Deployment Client (internet)
   ansible.builtin.shell: |
     curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   args:
     executable: /bin/bash
   become: true
+  when: not airgap_enabled | default(false) | bool
   tags: always
-- name: Ensure jq is installed
+
+- name: Install Deployment Client (airgap via JFrog)
+  ansible.builtin.shell: |
+    if ! command -v helm &>/dev/null; then
+      curl -sfL -u {{ jfrog_username }}:{{ jfrog_password }} \
+        {{ jfrog_url }}/ei-generic-binaries/get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz \
+        -o /tmp/helm.tar.gz && \
+      tar xzf /tmp/helm.tar.gz -C /tmp && \
+      mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+      chmod +x /usr/local/bin/helm && \
+      rm -f /tmp/helm.tar.gz
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  when: airgap_enabled | default(false) | bool
+  tags: always
+- name: Ensure jq is installed (internet)
   ansible.builtin.package:
     name: jq
     state: present
   become: true
+  when: not airgap_enabled | default(false) | bool
+  tags: always
+
+- name: Ensure jq is installed (airgap via JFrog)
+  ansible.builtin.shell: |
+    if command -v jq &>/dev/null; then exit 0; fi
+    cd /tmp
+    for pkg in libonig5 libjq1 jq; do
+      deb=$(curl -s -u {{ jfrog_username }}:{{ jfrog_password }} \
+        "{{ jfrog_url }}/ei-generic-binaries/apt-debs/" | grep -o "${pkg}[^\"]*\.deb" | head -1)
+      if [ -z "$deb" ]; then
+        echo "ERROR: could not find $pkg deb in JFrog"
+        exit 1
+      fi
+      curl -sfL -u {{ jfrog_username }}:{{ jfrog_password }} \
+        -o "/tmp/${deb}" \
+        "{{ jfrog_url }}/ei-generic-binaries/apt-debs/${deb}"
+      dpkg -i "/tmp/${deb}" || true
+    done
+  args:
+    executable: /bin/bash
+  become: true
+  when: airgap_enabled | default(false) | bool
   tags: always

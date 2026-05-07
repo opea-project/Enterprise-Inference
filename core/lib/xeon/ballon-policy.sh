@@ -12,11 +12,12 @@ deploy_nri_balloons_playbook() {
             exit 1
         fi
         
-        if [ "$deploy_nri_balloon_policy" == "yes" ] || [ "$cpu_or_gpu" == "c" ]; then
+        if [ "$deploy_nri_balloon_policy" == "yes" ]; then
             echo "${GREEN}Deploying CPU optimization with topology detection and NRI balloon policy${NC}"
             ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cpu-optimization.yml \
                 --extra-vars "cpu_playbook=true" \
-                --extra-vars "kubernetes_platform=${kubernetes_platform}"
+                --extra-vars "kubernetes_platform=${kubernetes_platform}" \
+                --extra-vars "airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"
             if [ $? -eq 0 ]; then
                 echo "${GREEN}CPU optimization deployed successfully${NC}"
             else

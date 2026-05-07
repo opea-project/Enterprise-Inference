@@ -16,7 +16,8 @@ add_inference_nodes_playbook() {
 
     invoke_prereq_workflows "$@"     
 
-    ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root 
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/cluster.yml --become --become-user=root \
+        --extra-vars "airgap_enabled=${airgap_enabled} jfrog_url=${jfrog_url} jfrog_username=${jfrog_username} jfrog_password=${jfrog_password}"
     
 }
 
