@@ -1,0 +1,221 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Default values for sglang.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+# Enabling HPA will:
+# - Ignore above replica count, as it will be controlled by HPA
+# - Add example HPA scaling rules with custom metrics thresholds
+# - Require custom metrics ConfigMap available in the main application chart
+autoscaling:
+  maxReplicas: 4
+  enabled: false
+
+# empty for CPU (longer latencies are tolerated before HPA scaling unaccelerated service)
+accelDevice: ""
+
+port: 2080
+shmSize: 1Gi
+image:
+  repository: lmsysorg/sglang
+  # Uncomment the following line to set desired image pull policy if needed, as one of Always, IfNotPresent, Never.
+  # pullPolicy: ""
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.5.11-xeon"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+# CPU Balloon configuration for NRI resource policy
+#cpu_balloon_annotation: ""
+
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  seccompProfile:
+    type: RuntimeDefault
+#  readOnlyRootFilesystem: true
+#  allowPrivilegeEscalation: false
+#  runAsNonRoot: true
+#  runAsUser: 1000
+#  capabilities:
+#    drop:
+#    - ALL
+#  seccompProfile:
+#    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+
+pvc:
+  enabled: true
+
+apisix:
+  enabled: false
+
+ingress:
+  enabled: false # Set to true to enable the Ingress resource
+  host: ""
+  namespace: default
+  secretname: ""
+
+route:
+  enabled: false
+  host: ""
+  tls:
+    termination: "edge"
+    insecureEdgeTerminationPolicy: "Redirect"
+
+# Platform type: openshift or vanilla kubernetes
+platform: vanilla
+
+oidc:
+  realm: master
+  client_id: ""
+  client_secret: ""
+  discovery: http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration
+  introspection_endpoint: http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect
+  use_jwks: true
+
+
+extraCmdArgs: []
+
+# livenessProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 4600  # Start liveness checks after 1 hour (safe buffer)
+#   periodSeconds: 60
+#   failureThreshold: 60  # Allows up to 30 minutes of failures before restart
+
+# readinessProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 4600  # Only mark ready after 1 hour
+#   periodSeconds: 60
+
+# startupProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 3600
+#   periodSeconds: 10
+#   failureThreshold: 7200  # Allows up to 2 hours (10s * 7200 = 72000s)
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  failureThreshold: 98
+# startupProbe:
+#   httpGet:
+#     path: /health
+#     port: http
+#   initialDelaySeconds: 120
+#   periodSeconds: 30
+#   failureThreshold: 79
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: ei-inference-eligible
+          operator: In
+          values: ["true"]
+
+LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
+SERVED_MODEL_NAME: ""
+# Environment variables for sglang (set in configmap):
+# https://docs.sglang.ai/en/latest/getting_started/installation.html#environment-variables
+sglang_CPU_KVCACHE_SPACE: "40"
+sglang_RPC_TIMEOUT: "100000"
+sglang_ALLOW_LONG_MAX_MODEL_LEN: "1"
+sglang_ENGINE_ITERATION_TIMEOUT_S: "120"
+sglang_CPU_NUM_OF_RESERVED_CPU: "0"
+sglang_CONFIGURE_LOGGING: 1
+sglang_NO_USAGE_STATS: 1
+sglang_CPU_SGL_KERNEL: "1"
+DO_NOT_TRACK: 1
+
+# CPU optimization settings (can be updated by automation)
+cpu_optimization_enabled: false
+max_num_batched_tokens: "2048"
+max_num_seqs: "256"
+
+# Parallelism configuration (root level for global access)
+tensor_parallel_size: "2"
+pipeline_parallel_size: "1"
+
+svcmonitor:
+  enabled: false
+
+global:
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: ""
+  HUGGINGFACEHUB_API_TOKEN: ""
+  # service account name to be shared with all parent/child charts.
+  # If set, it will overwrite serviceAccount.name.
+  # If set, and serviceAccount.create is false, it will assume this service account is already created by others.
+  sharedSAName: ""
+
+  # Choose where to save your downloaded models
+  # Set modelUseHostPath for local directory, this is good for one node test. Example:
+  # modelUseHostPath: /mnt/opea-models
+  # Set modelUsePVC for PersistentVolumeClaim(PVC), which is suitable for multinode deployment. Example:
+  # modelUsePVC: model-volume
+  # You can only set one of the following var, the behavior is not defined is both are set.
+  # By default, both var are set to empty, the model will be downloaded and saved to a tmp volume.
+  modelUseHostPath: ""
+  modelUsePVC: ""
+
+  # Install Prometheus serviceMonitor for service
+  monitoring: false
+
+  # Prometheus Helm install release name for serviceMonitor
+  prometheusRelease: observability
+# Fine-tuning integration: when enabled, an init container fetches the fine-tuned
+# model tarball from MinIO before sglang starts, and extra args are passed to sglang.
+finetune:
+  enabled: false
+  fileId: ""
+  extractPath: "/models"
+  images:
+    minioMc:
+      repository: "alpine"
+      tag: "latest"
+      pullPolicy: "IfNotPresent"
+  minioCredentialsSecret: "minio-internal-creds"

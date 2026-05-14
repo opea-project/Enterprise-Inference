@@ -1,0 +1,20 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if .Values.svcmonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sglang.fullname" . }}-service
+  labels:
+    release: {{ .Values.global.prometheusRelease }}
+spec:
+spec:
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "sglang.fullname" . }}
+  endpoints:
+  - port: "sglang"
+{{- end }}
