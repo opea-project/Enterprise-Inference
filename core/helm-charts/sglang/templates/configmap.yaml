@@ -17,10 +17,7 @@ data:
   TORCHINDUCTOR_CACHE_DIR: "/tmp"
   NUMBA_CACHE_DIR: "/tmp"
   HF_HOME: "/data"
-  OUTLINES_CACHE_DIR: "/tmp/.cache/outlines"  
-  {{- if .Values.runtime }}
-  runtime: {{ .Values.runtime | quote}}
-  {{- end }}
+  OUTLINES_CACHE_DIR: "/tmp/.cache/outlines"  
 
   {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict).configMapValues | default .Values.defaultModelConfigs.configMapValues }}
   {{- range $key, $value := $modelConfig }}

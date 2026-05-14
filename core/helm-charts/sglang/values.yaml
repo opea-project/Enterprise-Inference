@@ -160,20 +160,10 @@ LLM_MODEL_ID: Intel/neural-chat-7b-v3-3
 SERVED_MODEL_NAME: ""
 # Environment variables for sglang (set in configmap):
 # https://docs.sglang.ai/en/latest/getting_started/installation.html#environment-variables
-sglang_CPU_KVCACHE_SPACE: "40"
-sglang_RPC_TIMEOUT: "100000"
-sglang_ALLOW_LONG_MAX_MODEL_LEN: "1"
-sglang_ENGINE_ITERATION_TIMEOUT_S: "120"
-sglang_CPU_NUM_OF_RESERVED_CPU: "0"
-sglang_CONFIGURE_LOGGING: 1
-sglang_NO_USAGE_STATS: 1
-sglang_CPU_SGL_KERNEL: "1"
-DO_NOT_TRACK: 1
+
 
 # CPU optimization settings (can be updated by automation)
 cpu_optimization_enabled: false
-max_num_batched_tokens: "2048"
-max_num_seqs: "256"
 
 # Parallelism configuration (root level for global access)
 tensor_parallel_size: "2"

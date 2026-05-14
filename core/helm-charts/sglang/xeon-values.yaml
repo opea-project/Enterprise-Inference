@@ -41,12 +41,8 @@ affinity:
           values: ["true"]
 
 # vLLM CPU environment variables
-SGLANG_CPU_SGL_KERNEL: "1"
-SGLANG_NO_USAGE_STATS: 1
-DO_NOT_TRACK: 1
 
 LLM_MODEL_ID: ""
-
 
 modelConfigs:
   "meta-llama/Llama-3.1-8B-Instruct":
