@@ -27,7 +27,7 @@ max_model_len: 8192
 # vLLM CPU image configuration
 image:
   repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
-  tag: "v0.10.2"
+  tag: "v0.21.0"
   pullPolicy: IfNotPresent
 
 # Node affinity for Xeon inference nodes
@@ -74,7 +74,6 @@ modelConfigs:
         "2048",
         "--max-num-seqs",
         "256",
-        "--disable-log-requests",
         "--enable-auto-tool-choice",
         "--tool-call-parser", "llama3_json",
       ]
@@ -137,7 +136,6 @@ modelConfigs:
         "2048",
         "--max-num-seqs",
         "256",
-        "--disable-log-requests",        
       ]
     tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
     pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
@@ -167,7 +165,6 @@ modelConfigs:
         "2048",
         "--max-num-seqs",
         "256",
-        "--disable-log-requests",       
       ]
     tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
     pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
