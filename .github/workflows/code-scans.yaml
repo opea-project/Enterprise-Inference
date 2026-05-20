@@ -52,7 +52,7 @@ jobs:
         continue-on-error: true
         with:
           scan-type: 'image'
-          image-ref: 'public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.10.2'
+          image-ref: 'public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.21.0'
           severity: 'HIGH,CRITICAL'
           exit-code: 0
           format: 'table'
