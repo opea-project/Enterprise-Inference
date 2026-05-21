@@ -1,0 +1,173 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Default values for the sglang Helm chart
+# Tuned for lmsysorg/sglang:v0.5.11-xeon serving openai/gpt-oss-20b on a Xeon CPU node.
+
+nameOverride: ""
+fullnameOverride: ""
+
+namespace: default
+replicaCount: 1
+
+image:
+  repository: lmsysorg/sglang
+  tag: "v0.5.11-xeon"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels:
+  app: sglang
+
+# SGLang processes write to HF cache + shared memory; do not lock the root FS.
+podSecurityContext:
+  runAsNonRoot: false
+  fsGroup: 0
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+# ---- Model ----
+# modelSource is the HuggingFace model ID passed to --model-path.
+# For gpt-oss-20b the default below should work on a Xeon node with >= 64Gi RAM.
+modelSource: "openai/gpt-oss-20b"
+# Logical name used in URL paths, service names, and the OpenAI `model` field.
+modelName: "gpt-oss-20b"
+
+# HuggingFace Hub token. gpt-oss-20b is publicly downloadable, but private/gated
+# variants need a token. Either:
+#   1. --set huggingface.token=$HF_TOKEN (chart will create the secret), or
+#   2. pre-create:  kubectl create secret generic hf-token-secret --from-literal=token=<token>
+huggingface:
+  token: ""
+  secretName: "hf-token-secret"
+  secretKey: "token"
+
+# ---- Server / launch flags ----
+server:
+  # Container port sglang.launch_server binds to (default upstream is 30000).
+  port: 30000
+  host: "0.0.0.0"
+  # Force CPU device for the xeon image.
+  device: "cpu"
+  # data-parallel / tensor-parallel sizes; CPU build typically runs tp=1, dp=1.
+  tpSize: 1
+  dpSize: 1
+  # Optional: context length cap. Leave empty to use the model default.
+  contextLength: ""
+  # Optional: max running requests in flight.
+  maxRunningRequests: ""
+  # dtype: bfloat16 is the recommended dtype for Xeon SGLang.
+  dtype: "bfloat16"
+  # Trust remote code from HF (gpt-oss requires this).
+  trustRemoteCode: true
+  # Any extra command-line flags appended verbatim, e.g. ["--mem-fraction-static", "0.85"].
+  extraArgs: []
+
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 600
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 120
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 30
+
+# ---- Resources ----
+# gpt-oss-20b in bfloat16 is ~40GB weights + KV cache + activations.
+# These are starting points; tune to your Xeon node.
+resources:
+  requests:
+    cpu: "16"
+    memory: "64Gi"
+  limits:
+    cpu: "32"
+    memory: "96Gi"
+
+# SGLang uses /dev/shm heavily for inter-process tensor sharing on CPU.
+shm:
+  enabled: true
+  sizeLimit: "16Gi"
+
+# ---- Storage (HuggingFace cache) ----
+# PVC keeps the downloaded weights across pod restarts so you don't re-pull
+# ~40GB every time.
+storage:
+  persistentVolume:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 80Gi
+    existingClaim: ""
+    deleteOnUninstall: true
+  emptyDir:
+    enabled: false
+    sizeLimit: 80Gi
+
+# Mount point inside the container for the HF cache (HF_HOME).
+hfCacheMountPath: "/root/.cache/huggingface"
+
+# ---- Service ----
+service:
+  type: ClusterIP
+  port: 30000
+  annotations: {}
+  labels: {}
+
+# ---- OIDC + APISIX + Ingress ----
+# Mirrors the OVMS chart so the auth-apisix stack picks this up the same way.
+oidc:
+  enabled: true
+  realm: master
+  clientId: "my-client-id"
+  clientSecret: "tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR"
+  discovery: "http://keycloak.default.svc.cluster.local/realms/master/.well-known/openid-configuration"
+  introspectionEndpoint: "http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token/introspect"
+
+apisixRoute:
+  enabled: true
+  namespace: default
+  name: ""
+  host: "api.example.com"
+
+ingress:
+  enabled: true
+  className: nginx
+  namespace: auth-apisix
+  host: "api.example.com"
+  secretname: "api.example.com"
+
+secrets:
+  enabled: false
+  data: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+extraVolumes: []
+extraVolumeMounts: []
+extraEnv: []
+extraEnvFrom: []
