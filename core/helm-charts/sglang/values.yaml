@@ -1,8 +1,19 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-# Default values for the sglang Helm chart
-# Tuned for lmsysorg/sglang:v0.5.11-xeon serving openai/gpt-oss-20b on a Xeon CPU node.
+# Default values for the sglang Helm chart.
+# Targets lmsysorg/sglang:v0.5.11-xeon on an Intel Xeon (AMX) CPU node.
+#
+# IMPORTANT — quantization support on this image:
+#   The Xeon CPU build of sglang supports a small, explicit subset of
+#   quantization methods (see CPU_QUANTIZATION_METHODS in
+#   sglang/srt/layers/quantization/__init__.py):
+#       fp8, w8a8_int8, compressed-tensors, awq, gptq
+#   It does NOT support mxfp4, which is the native quantization of
+#   openai/gpt-oss-{20b,120b}. Those models require a CUDA/HIP sglang
+#   image (e.g. lmsysorg/sglang:v0.5.11-cuda) on a GPU host. To serve
+#   gpt-oss on CPU, use llama.cpp/Ollama/vLLM-CPU on a GGUF variant,
+#   not this chart. See README.md for the supported-model list.
 
 nameOverride: ""
 fullnameOverride: ""
@@ -26,7 +37,7 @@ podAnnotations: {}
 podLabels:
   app: sglang
 
-# SGLang processes write to HF cache + shared memory; do not lock the root FS.
+# SGLang writes to HF cache + /dev/shm; do not lock the root FS.
 podSecurityContext:
   runAsNonRoot: false
   fsGroup: 0
@@ -39,16 +50,17 @@ securityContext:
   readOnlyRootFilesystem: false
 
 # ---- Model ----
-# modelSource is the HuggingFace model ID passed to --model-path.
-# For gpt-oss-20b the default below should work on a Xeon node with >= 64Gi RAM.
-modelSource: "openai/gpt-oss-20b"
-# Logical name used in URL paths, service names, and the OpenAI `model` field.
-modelName: "gpt-oss-20b"
+# Default is Qwen3-8B because it is bf16 (no quantization gate), modest in
+# size, and listed as a supported CPU model in sglang docs. Override
+# modelSource/modelName for other models.
+modelSource: "Qwen/Qwen3-8B"
+modelName: "qwen3-8b"
 
-# HuggingFace Hub token. gpt-oss-20b is publicly downloadable, but private/gated
-# variants need a token. Either:
-#   1. --set huggingface.token=$HF_TOKEN (chart will create the secret), or
-#   2. pre-create:  kubectl create secret generic hf-token-secret --from-literal=token=<token>
+# HuggingFace Hub token. Required for gated repos (e.g. meta-llama/*).
+# Either:
+#   1. --set huggingface.token=$HF_TOKEN   (chart creates the secret), or
+#   2. pre-create:  kubectl create secret generic hf-token-secret \
+#                     --from-literal=token=<token>
 huggingface:
   token: ""
   secretName: "hf-token-secret"
@@ -56,23 +68,59 @@ huggingface:
 
 # ---- Server / launch flags ----
 server:
-  # Container port sglang.launch_server binds to (default upstream is 30000).
   port: 30000
   host: "0.0.0.0"
+
   # Force CPU device for the xeon image.
   device: "cpu"
-  # data-parallel / tensor-parallel sizes; CPU build typically runs tp=1, dp=1.
+
+  # Tensor parallel rank count. CPU build typically runs tp=1.
+  # Set >1 only when binding ranks to separate NUMA domains via
+  # cpuEngine.ompThreadsBind.
   tpSize: 1
-  dpSize: 1
-  # Optional: context length cap. Leave empty to use the model default.
-  contextLength: ""
-  # Optional: max running requests in flight.
-  maxRunningRequests: ""
-  # dtype: bfloat16 is the recommended dtype for Xeon SGLang.
+  # Data parallel rank count. Omit (leave empty) unless you know you want
+  # multiple replicas of the model loaded in one process.
+  dpSize: ""
+
+  # dtype: bfloat16 is the recommended dtype on Xeon AMX. Leave empty to
+  # let sglang infer from the checkpoint.
   dtype: "bfloat16"
-  # Trust remote code from HF (gpt-oss requires this).
+
+  # --quantization. Must be one of: fp8 | w8a8_int8 | compressed-tensors |
+  # awq | gptq, OR leave empty to use whatever is declared in the model
+  # config.json. Anything else (mxfp4, modelopt_fp4, etc.) will be rejected
+  # by sglang at startup.
+  quantization: ""
+
+  # Trust model code from HF (required by some recent models).
   trustRemoteCode: true
-  # Any extra command-line flags appended verbatim, e.g. ["--mem-fraction-static", "0.85"].
+
+  # Recommended for CPU per sglang docs/platforms/cpu_server.md
+  disableOverlapSchedule: true
+
+  # --enable-torch-compile can give a sizeable speedup on Xeon but slows
+  # cold start substantially. Off by default; flip on for benchmarks.
+  enableTorchCompile: false
+  torchCompileMaxBs: 4
+
+  # Optional caps. Leave empty to use the model default.
+  contextLength: ""
+  maxRunningRequests: ""
+
+  # --max-total-tokens caps KV cache size in tokens. STRONGLY recommended on
+  # Kubernetes — sglang reads host memory via psutil and ignores cgroup
+  # limits, so without this it tries to claim ~85-93% of the *node's* RAM
+  # for KV cache and gets OOMKilled. Sized below for 32Ki context * a few
+  # in-flight requests on an 8B bf16 model.
+  maxTotalTokens: 32768
+
+  # --mem-fraction-static. Leave empty to keep sglang's default (0.85+).
+  # On k8s, prefer maxTotalTokens above. If you must use a fraction,
+  # remember it is a fraction of host RAM, not the pod limit.
+  memFractionStatic: ""
+
+  # Any extra command-line flags appended verbatim, e.g.
+  #   extraArgs: ["--mem-fraction-static", "0.85"]
   extraArgs: []
 
   livenessProbe:
@@ -94,16 +142,30 @@ server:
     timeoutSeconds: 10
     failureThreshold: 30
 
+# ---- CPU engine tuning ----
+# The image already bakes ENV SGLANG_USE_CPU_ENGINE=1 and LD_PRELOAD into
+# the runtime, but we set them explicitly here so the chart is
+# self-documenting and survives image-tag changes.
+cpuEngine:
+  enabled: true
+  # Per-rank core binding for SGLang's OMP threads. Format: pipe-separated
+  # per-rank ranges, e.g. "0-31|32-63" for a 2-rank tp on a 64-core node.
+  # Leave empty to let SGLang use defaults.
+  ompThreadsBind: ""
+  # LD_PRELOAD baked into xeon.Dockerfile. Set to "" to drop it entirely
+  # (only do this if you know why).
+  ldPreload: "/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:/usr/lib/x86_64-linux-gnu/libtbbmalloc.so:/opt/.venv/lib/libiomp5.so"
+
 # ---- Resources ----
-# gpt-oss-20b in bfloat16 is ~40GB weights + KV cache + activations.
-# These are starting points; tune to your Xeon node.
+# Starting points for Qwen3-8B (bf16, ~16Gi weights). For larger models
+# bump both requests and limits.
 resources:
   requests:
     cpu: "16"
-    memory: "64Gi"
+    memory: "32Gi"
   limits:
     cpu: "32"
-    memory: "96Gi"
+    memory: "64Gi"
 
 # SGLang uses /dev/shm heavily for inter-process tensor sharing on CPU.
 shm:
@@ -111,19 +173,18 @@ shm:
   sizeLimit: "16Gi"
 
 # ---- Storage (HuggingFace cache) ----
-# PVC keeps the downloaded weights across pod restarts so you don't re-pull
-# ~40GB every time.
+# PVC keeps downloaded weights across pod restarts.
 storage:
   persistentVolume:
     enabled: true
     storageClass: ""
     accessMode: ReadWriteOnce
-    size: 80Gi
+    size: 60Gi
     existingClaim: ""
     deleteOnUninstall: true
   emptyDir:
     enabled: false
-    sizeLimit: 80Gi
+    sizeLimit: 60Gi
 
 # Mount point inside the container for the HF cache (HF_HOME).
 hfCacheMountPath: "/root/.cache/huggingface"

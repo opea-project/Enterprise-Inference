@@ -38,7 +38,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          command: ["python3", "-m", "sglang.launch_server"]
+          command: ["/opt/.venv/bin/python3", "-m", "sglang.launch_server"]
           args:
             - "--model-path={{ .Values.modelSource }}"
             - "--served-model-name={{ .Values.modelName }}"
@@ -46,18 +46,36 @@ spec:
             - "--port={{ .Values.server.port }}"
             - "--device={{ .Values.server.device }}"
             - "--tp-size={{ .Values.server.tpSize }}"
+            {{- if .Values.server.dpSize }}
             - "--dp-size={{ .Values.server.dpSize }}"
+            {{- end }}
             {{- if .Values.server.dtype }}
             - "--dtype={{ .Values.server.dtype }}"
             {{- end }}
+            {{- if .Values.server.quantization }}
+            - "--quantization={{ .Values.server.quantization }}"
+            {{- end }}
             {{- if .Values.server.trustRemoteCode }}
             - "--trust-remote-code"
+            {{- end }}
+            {{- if .Values.server.disableOverlapSchedule }}
+            - "--disable-overlap-schedule"
+            {{- end }}
+            {{- if .Values.server.enableTorchCompile }}
+            - "--enable-torch-compile"
+            - "--torch-compile-max-bs={{ .Values.server.torchCompileMaxBs }}"
             {{- end }}
             {{- if .Values.server.contextLength }}
             - "--context-length={{ .Values.server.contextLength }}"
             {{- end }}
             {{- if .Values.server.maxRunningRequests }}
             - "--max-running-requests={{ .Values.server.maxRunningRequests }}"
+            {{- end }}
+            {{- if .Values.server.maxTotalTokens }}
+            - "--max-total-tokens={{ .Values.server.maxTotalTokens }}"
+            {{- end }}
+            {{- if .Values.server.memFractionStatic }}
+            - "--mem-fraction-static={{ .Values.server.memFractionStatic }}"
             {{- end }}
             {{- range .Values.server.extraArgs }}
             - {{ . | quote }}
@@ -73,6 +91,18 @@ spec:
               value: "{{ .Values.hfCacheMountPath }}/hub"
             - name: TRANSFORMERS_CACHE
               value: "{{ .Values.hfCacheMountPath }}/hub"
+            {{- if .Values.cpuEngine.enabled }}
+            - name: SGLANG_USE_CPU_ENGINE
+              value: "1"
+            {{- if .Values.cpuEngine.ldPreload }}
+            - name: LD_PRELOAD
+              value: {{ .Values.cpuEngine.ldPreload | quote }}
+            {{- end }}
+            {{- if .Values.cpuEngine.ompThreadsBind }}
+            - name: SGLANG_CPU_OMP_THREADS_BIND
+              value: {{ .Values.cpuEngine.ompThreadsBind | quote }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.huggingface.token }}
             - name: HF_TOKEN
               valueFrom:
