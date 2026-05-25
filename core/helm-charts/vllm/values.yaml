@@ -21,7 +21,7 @@ accelDevice: ""
 port: 2080
 shmSize: 1Gi
 image:
-  repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
+  repository: vllm/vllm-openai-cpu
   # Uncomment the following line to set desired image pull policy if needed, as one of Always, IfNotPresent, Never.
   # pullPolicy: ""
   # Overrides the image tag whose default is the chart appVersion.

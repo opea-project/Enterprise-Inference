@@ -116,7 +116,7 @@ The `models.json` file contains all configuration:
 ```json
 {
   "docker": {
-    "image": "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.11.2",
+    "image": "vllm/vllm-openai-cpu:v0.21.0",
     "port": "8000:8000",
     "environment": { ... },
     "volumes": [ ... ]
