@@ -9,7 +9,7 @@ This section provides common issues observed when running inference against mode
 
 ### 1. Gateway Timeout (504) on Inference Requests
 
-**Context:** Model deployed via Helm commands. Inference request sent through the ingress stack (ingress-nginx → APISIX → vLLM service).
+**Context:** Model deployed via Helm commands. Inference request sent through the ingress stack (ingress-nginx -> APISIX -> vLLM service).
 
 **Error:** Inference requests return `504 Gateway Timeout` after 60 seconds:
 
@@ -20,7 +20,7 @@ upstream timed out (110: Operation timed out) ... 60.001
 
 **Cause:**
 
-CPU-based model inference (`vllm-cpu`) generates tokens at ~0.3–0.4 tokens/s. Responses requiring more than ~24 tokens exceed the default 60s upstream timeout enforced by ingress-nginx and APISIX.
+CPU-based model inference (`vllm-cpu`) generates tokens at ~0.3-0.4 tokens/s. Responses requiring more than ~24 tokens exceed the default 60s upstream timeout enforced by ingress-nginx and APISIX.
 
 **Fix:**
 
@@ -75,5 +75,5 @@ Re-run the inference request and confirm a `200 OK` response is returned within 
 **Notes:**
 
 - The nginx ingress annotation takes effect immediately; no pod restart required.
-- For GPU-based deployments this timeout is rarely needed as throughput is significantly higher (30–50 tokens/s vs 0.3–0.4 tokens/s on CPU).
+- For GPU-based deployments this timeout is rarely needed as throughput is significantly higher (30-50 tokens/s vs 0.3-0.4 tokens/s on CPU).
 - If requests still time out after increasing both timeouts, reduce `max_tokens` in the request payload to limit response length.
