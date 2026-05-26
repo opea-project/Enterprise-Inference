@@ -22,6 +22,8 @@ source core/scripts/generate-token.sh
 
 This exports: `BASE_URL`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`, and `TOKEN`.
 
+> **Lab / single-node setups:** `generate-token.sh` hits `https://${BASE_URL}/token` and assumes that hostname resolves on port 443 with a real TLS cert — production OPEA clusters on Dell hardware. If you're testing on a single-node k3s box where `api.example.com` is not in DNS and nginx is on a NodePort, fetch the token via the cluster-internal path documented in [`../sglang-troubleshooting.md` issue #7](../sglang-troubleshooting.md#7-401-unauthorized-from-apisix-with-a-valid-looking-token) instead. The rest of the steps are identical.
+
 ## Step 2: Build the Patched SGLang Image
 
 gpt-oss-20b ships natively in MXFP4 quantization, and the upstream `lmsysorg/sglang:v0.5.12-xeon` image cannot serve it on CPU (MXFP4 is GPU-gated, sinks attention is unsupported on the CPU backends, and the published `sgl-kernel` shared library is missing the AVX-512-BF16 compile flags needed for any bf16 matmul).
@@ -65,13 +67,12 @@ kubectl get pods
 kubectl get apisixroutes
 ```
 
-Expected Output:
+Expected output (the sglang pod is what matters here; your existing Keycloak / APISIX / ingress pods will appear in the listing too, with names that depend on how those components were deployed in your cluster):
 
 ```
 NAME                                          READY   STATUS    RESTARTS
-keycloak-0                                    1/1     Running   0
-keycloak-postgresql-0                         1/1     Running   0
 sglang-gpt-oss-20b-<hash>-<hash>              1/1     Running   0
+...                                           1/1     Running   0   # keycloak, apisix, ingress-nginx, etc.
 ```
 
 > Note: First pod start takes ~4-5 minutes (downloading ~12 GB of weights from Hugging Face, then dequantizing MXFP4 → bf16 in memory). Subsequent restarts are fast because the cache PVC persists the weights.
