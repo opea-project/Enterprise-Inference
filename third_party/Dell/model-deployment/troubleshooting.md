@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This section provides common issues observed when running inference against models deployed via Helm commands on Intel® AI for Enterprise Inference — along with step-by-step resolutions.
+This section provides common issues observed when running inference against models deployed via Helm commands on Intel® AI for Enterprise Inference, along with step-by-step resolutions.
 
 **Issues:**
   1. [Gateway Timeout (504) on Inference Requests](#1-gateway-timeout-504-on-inference-requests)
@@ -24,7 +24,7 @@ CPU-based model inference (`vllm-cpu`) generates tokens at ~0.3–0.4 tokens/s. 
 
 **Fix:**
 
-**Step 1 — Increase the nginx ingress timeout**
+**Step 1 - Increase the nginx ingress timeout**
 
 Apply to both the `default` and `auth-apisix` namespaces. To find ingress names:
 
@@ -42,7 +42,7 @@ kubectl annotate ingress <ingress-name> -n <namespace> \
   --overwrite
 ```
 
-**Step 2 — Increase the APISIX route timeout**
+**Step 2 - Increase the APISIX route timeout**
 
 To find the route name:
 
@@ -74,6 +74,6 @@ Re-run the inference request and confirm a `200 OK` response is returned within 
 
 **Notes:**
 
-- The nginx ingress annotation takes effect immediately — no pod restart required.
+- The nginx ingress annotation takes effect immediately; no pod restart required.
 - For GPU-based deployments this timeout is rarely needed as throughput is significantly higher (30–50 tokens/s vs 0.3–0.4 tokens/s on CPU).
 - If requests still time out after increasing both timeouts, reduce `max_tokens` in the request payload to limit response length.
