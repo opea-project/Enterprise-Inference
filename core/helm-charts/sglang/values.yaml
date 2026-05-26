@@ -22,8 +22,13 @@ namespace: default
 replicaCount: 1
 
 image:
-  repository: lmsysorg/sglang
-  tag: "v0.5.11-xeon"
+  # Patched image built from image-build/ — required for gpt-oss-on-CPU
+  # (fix1..fix8) and the Phase 2 precision-debug flags (fix9-debug,
+  # fix10-debug). Use `image-build/build-and-import.sh` to build + import
+  # into k3s containerd. Switch back to `lmsysorg/sglang:v0.5.11-xeon` for
+  # non-gpt-oss models that don't need the patch stack.
+  repository: enterprise-inference/sglang
+  tag: "v0.5.12-xeon-fix10-debug"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -211,6 +216,11 @@ apisixRoute:
   namespace: default
   name: ""
   host: "api.example.com"
+  # IngressClass that the APISIX ingress controller v2 watches. Required
+  # so the controller picks up this ApisixRoute and syncs it into APISIX's
+  # runtime route table. Set to "" to omit the field (e.g. for older
+  # controller versions that auto-discover).
+  ingressClassName: "apisix"
 
 ingress:
   enabled: true
@@ -230,5 +240,21 @@ priorityClassName: ""
 
 extraVolumes: []
 extraVolumeMounts: []
-extraEnv: []
+# extraEnv: extra environment variables exposed to the sglang container.
+#
+# For gpt-oss-on-CPU the patched image needs the correct MXFP4 nibble order
+# to decode weights properly (without this the model serves but emits
+# random-vocab garbage):
+#   - MXFP4_NIBBLE_ORDER=low_first    fix7 dequant nibble order
+#
+# Other debug flags exposed by the patched image (default off, here for
+# reference):
+#   - FP32_PROMOTE_MOE=1              fix10-debug: per-expert MoE in fp32
+#   - ALLOW_FP32_MXFP4=1              fix9-debug: bypass dtype=bfloat16 force
+#   - MXFP4_OUT_DTYPE=float32|float16 fix9-debug2: dequant output dtype
+#
+# For non-gpt-oss models, override with `extraEnv: []`.
+extraEnv:
+  - name: MXFP4_NIBBLE_ORDER
+    value: "low_first"
 extraEnvFrom: []

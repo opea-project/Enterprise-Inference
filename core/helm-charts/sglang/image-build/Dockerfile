@@ -106,6 +106,40 @@ RUN /opt/.venv/bin/python3 /tmp/enable-gpt-oss-cpu-dequant-v2.py && rm /tmp/enab
 COPY enable-gpt-oss-cpu-moe-v2.py /tmp/enable-gpt-oss-cpu-moe-v2.py
 RUN /opt/.venv/bin/python3 /tmp/enable-gpt-oss-cpu-moe-v2.py && rm /tmp/enable-gpt-oss-cpu-moe-v2.py
 
+# ---- 9) DEBUG: allow --dtype float32 with mxfp4 (for precision-drift A/B) ----
+# server_args.py hard-forces dtype=bfloat16 for mxfp4 models. Gate that behind
+# ALLOW_FP32_MXFP4=1 so we can A/B bf16 vs fp32 for Phase 2 numerical
+# investigation. Not for production — fp32 is 2x memory and significantly
+# slower than the bf16 path.
+COPY enable-fp32-override-debug.py /tmp/enable-fp32-override-debug.py
+RUN /opt/.venv/bin/python3 /tmp/enable-fp32-override-debug.py && rm /tmp/enable-fp32-override-debug.py
+
+# ---- 10) DEBUG: make MXFP4-CPU dequant output dtype env-controlled ----
+# fix7's _process_weights_for_cpu hardcoded bf16 output. With fix9-debug
+# allowing --dtype half, the dequant output dtype needs to match the rest
+# of the model's compute dtype. Drive it from MXFP4_OUT_DTYPE env var.
+COPY enable-dequant-dtype-debug.py /tmp/enable-dequant-dtype-debug.py
+RUN /opt/.venv/bin/python3 /tmp/enable-dequant-dtype-debug.py && rm /tmp/enable-dequant-dtype-debug.py
+
+# ---- 11) DEBUG: fp32 promotion inside moe_forward_native per-expert loop ----
+# Phase 2 confirmed bf16 intermediate precision is a contributor to long-form
+# drift (fp16 shifted the drift point ~30%). Option 1 in REMAINING_WORK.md:
+# keep layer weights/KV in their native dtype, but compute the per-expert
+# forward in fp32 — both F.linear matmuls, biases, and the swiglu chain —
+# casting back only at the expert output boundary. Gated behind
+# FP32_PROMOTE_MOE=1 so the image is safe to run with the flag off.
+COPY enable-fp32-moe-promotion-debug.py /tmp/enable-fp32-moe-promotion-debug.py
+RUN /opt/.venv/bin/python3 /tmp/enable-fp32-moe-promotion-debug.py && rm /tmp/enable-fp32-moe-promotion-debug.py
+
+# ---- 12) DEBUG: allow --kv-cache-dtype float32 end-to-end ----
+# Phase 2 Option 2 — add float32 to the argparse choices, map it through
+# configure_kv_cache_dtype, and fix torch_native_backend's dtype-mismatch
+# handler so it upcasts Q to fp32 instead of silently downcasting K/V back
+# to bf16. With anything other than float32/fp32 selected, all three sites
+# are byte-identical to upstream.
+COPY enable-fp32-kv-cache-debug.py /tmp/enable-fp32-kv-cache-debug.py
+RUN /opt/.venv/bin/python3 /tmp/enable-fp32-kv-cache-debug.py && rm /tmp/enable-fp32-kv-cache-debug.py
+
 # Mirror the upstream env vars so behavior is unchanged
 ENV SGLANG_USE_CPU_ENGINE=1
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:/usr/lib/x86_64-linux-gnu/libtbbmalloc.so:/opt/.venv/lib/libiomp5.so

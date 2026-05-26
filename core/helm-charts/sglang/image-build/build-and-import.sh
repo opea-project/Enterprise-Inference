@@ -5,7 +5,7 @@
 # Run with: sudo bash core/helm-charts/sglang/image-build/build-and-import.sh
 set -euo pipefail
 
-IMAGE_TAG="${IMAGE_TAG:-enterprise-inference/sglang:v0.5.12-xeon-fix8}"
+IMAGE_TAG="${IMAGE_TAG:-enterprise-inference/sglang:v0.5.12-xeon-fix11-debug}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "==> Ensuring docker is installed"

@@ -10,6 +10,9 @@ metadata:
   labels:
     {{- include "sglang.labels" . | nindent 4 }}
 spec:
+  {{- if .Values.apisixRoute.ingressClassName }}
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName }}
+  {{- end }}
   http:
     - name: {{ .Values.modelName }}-route
       match:
