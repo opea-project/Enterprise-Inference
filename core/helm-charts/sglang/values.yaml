@@ -55,11 +55,14 @@ securityContext:
   readOnlyRootFilesystem: false
 
 # ---- Model ----
-# Default is Qwen3-8B because it is bf16 (no quantization gate), modest in
-# size, and listed as a supported CPU model in sglang docs. Override
-# modelSource/modelName for other models.
-modelSource: "Qwen/Qwen3-8B"
-modelName: "qwen3-8b"
+# Required. Set both at install time:
+#   --set modelSource=<huggingface/org/model>  (HF repo, passed to --model-path)
+#   --set modelName=<release-friendly-name>    (served name; used in route URI)
+# The chart has no default model: `helm install` fails loudly if either
+# is empty. For a model-specific recipe (e.g. gpt-oss-20b), use the
+# bundled values file (see README).
+modelSource: ""
+modelName: ""
 
 # HuggingFace Hub token. Required for gated repos (e.g. meta-llama/*).
 # Either:

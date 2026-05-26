@@ -1,18 +1,19 @@
 # SGLang Helm Chart — Intel Xeon CPU
 
-## 📋 Overview
+## Overview
 
 Deploys [SGLang](https://github.com/sgl-project/sglang) on a Kubernetes
 cluster as a model-agnostic inference server on Intel Xeon CPU nodes,
 including the OPEA-standard nginx-ingress → APISIX → Keycloak (OIDC)
 auth chain.
 
-The chart ships with `Qwen/Qwen3-8B` as a sensible default model and
-supports any Hugging Face model SGLang can load on CPU. Model-specific
-recipes (helm command, values overrides, model card) live under
-`third_party/Dell/model-deployment/<model-name>/`. Notable example:
-**gpt-oss-20b**, which required a patched SGLang image to work on CPU
-(see [Noteworthy: gpt-oss-20b](#-noteworthy-gpt-oss-20b) below).
+The chart has **no built-in default model** — `modelSource` and
+`modelName` must be supplied at install time, either via `--set` or a
+values file. Model-specific recipes (helm command, values overrides,
+model card) live under `third_party/Dell/model-deployment/<model-name>/`.
+Notable example: **gpt-oss-20b**, which required a patched SGLang image
+to work on CPU (see [Noteworthy: gpt-oss-20b](#noteworthy-gpt-oss-20b)
+below).
 
 The chart targets a **patched** SGLang image (`enterprise-inference/sglang:v0.5.12-xeon-fix11-debug`).
 The most important patch (fix1) rebuilds `sgl-kernel` with the correct
@@ -24,16 +25,16 @@ gpt-oss-specific and are runtime no-ops for other models. The image is
 built once via a self-contained Dockerfile and imported directly into
 k3s containerd — no registry required.
 
-## ✨ Features
+## Features
 
-- **Model-agnostic SGLang on Xeon CPU** — defaults to Qwen3-8B; any HF model SGLang supports works
+- **Model-agnostic SGLang on Xeon CPU** — any HF model SGLang supports loads through the same chart
 - **Patched image** that unblocks bf16 inference on Xeon (every model benefits) and adds MXFP4 + sinks-attention support for gpt-oss
 - **OPEA-standard auth chain**: TLS at nginx, OIDC bearer validation at APISIX, token issuance by Keycloak
 - **No external registry**: image builds locally and imports into k3s containerd
 - **OpenAI-compatible API**: `/v1/chat/completions`, `/v1/models`, `/v1/completions`
 - **Chart-only delivery**: same standalone pattern as `core/helm-charts/ovms`, not yet wired into the Ansible playbooks
 
-## 📦 Prerequisites
+## Prerequisites
 
 - **Operating System**: Ubuntu 22.04+
 - **Hardware**: Intel Xeon with AVX-512-BF16 / AMX-BF16 (Sapphire Rapids, Emerald Rapids, Granite Rapids)
@@ -47,10 +48,10 @@ k3s containerd — no registry required.
 
 > **Note:** On a stock OPEA cluster, k3s, nginx-ingress, APISIX, and Keycloak
 > are already in place via the project's Ansible playbooks — skip straight to
-> 🛠️ **Build the Image**. The "From-Scratch Bootstrap" appendix at the bottom is only
+> **Build the Image**. The "From-Scratch Bootstrap" appendix at the bottom is only
 > for people standing up a fresh single-node box from zero.
 
-## 🛠️ Build the Image
+## Build the Image
 
 ```bash
 git clone https://github.com/cld2labs/Enterprise-Inference.git
@@ -72,35 +73,36 @@ sudo k3s ctr images ls | grep enterprise-inference/sglang
 # docker.io/enterprise-inference/sglang:v0.5.12-xeon-fix11-debug
 ```
 
-## 🚀 Deploy a Model
+## Deploy a Model
 
-### Default model (Qwen3-8B)
+`modelSource` and `modelName` are required at install time. The chart
+template fails fast if either is empty.
 
-```bash
-helm install qwen3-8b ./core/helm-charts/sglang
-```
-
-The chart defaults to `Qwen/Qwen3-8B` with bf16 weights through the
-patched image's fixed `sgl-kernel`. Any HF model SGLang supports on
-CPU can be deployed by overriding `modelSource` and `modelName`.
-
-### Custom model
+### Generic install
 
 ```bash
 helm install <release-name> ./core/helm-charts/sglang \
   --set modelSource="<huggingface/org/model>" \
   --set modelName="<release-friendly-name>" \
-  --set huggingface.token="$HF_TOKEN"   # only if gated
+  --set huggingface.token="$HF_TOKEN"   # only if the model is gated
 ```
 
 ### Model-specific recipes
 
-Models that need extra configuration ship with their own values file and
-deployment guide:
+Models that need additional configuration ship with their own values file
+and deployment guide:
 
 | Model | Values file | Deployment guide |
 | ----- | ----------- | ---------------- |
 | `openai/gpt-oss-20b` | `gpt-oss-20b-values.yaml` | `third_party/Dell/model-deployment/gpt-oss-20b/deployment.md` |
+
+Use the values file as the source of truth and override anything
+environment-specific via `--set`:
+
+```bash
+helm install gpt-oss-20b ./core/helm-charts/sglang \
+  --values ./core/helm-charts/sglang/gpt-oss-20b-values.yaml
+```
 
 Wait for the pod (first start downloads the weights — duration depends
 on model size and network):
@@ -111,7 +113,7 @@ kubectl logs -l app=sglang --tail=5
 # expect: INFO: Uvicorn running on http://0.0.0.0:30000
 ```
 
-## 🎯 Inference
+## Inference
 
 ### Smoke test (no auth, via port-forward)
 
@@ -164,7 +166,7 @@ curl -sSk https://localhost:30443/<modelName>-sglang/v1/chat/completions \
 | `/v1/completions` | OpenAI-compatible text completions |
 | `/health` | Liveness probe |
 
-## ⚙️ Configuration
+## Configuration
 
 ### Key values
 
@@ -173,8 +175,8 @@ curl -sSk https://localhost:30443/<modelName>-sglang/v1/chat/completions \
 | `image.repository` | `enterprise-inference/sglang` | Patched image (set to `lmsysorg/sglang` to use upstream, but bf16 inference will crash) |
 | `image.tag` | `v0.5.12-xeon-fix11-debug` | Pinned to the validated build |
 | `image.pullPolicy` | `IfNotPresent` | Set to `Never` if the image is only in local containerd |
-| `modelSource` | `Qwen/Qwen3-8B` | HuggingFace repo to load |
-| `modelName` | `qwen3-8b` | Served name (also used in route URI) |
+| `modelSource` | _(required)_ | HuggingFace repo to load (chart fails to render if empty) |
+| `modelName` | _(required)_ | Served name (also used in route URI; chart fails if empty) |
 | `server.dtype` | `bfloat16` | Compute dtype |
 | `server.extraArgs` | `[]` | Extra CLI flags to `sglang serve` |
 | `server.maxTotalTokens` | `32768` | Caps KV-cache memory (SGLang reads host RAM, not cgroup limits) |
@@ -198,7 +200,7 @@ The complete configuration surface is documented inline in `values.yaml`.
 These were used during a precision investigation A/B; see commit history
 on `cld2labs/sglang-gpt-oss` for context.
 
-## 🩹 What's Patched
+## What's Patched
 
 The image-build directory contains a series of small Python patches
 applied to SGLang's installed source at image build time:
@@ -225,7 +227,7 @@ for models that don't trigger them (e.g. a Qwen3 deployment never enters
 the MXFP4 dequant path or the sinks-attention wrapper), so leaving them
 baked into the image carries no cost for other models.
 
-## ⭐ Noteworthy: gpt-oss-20b
+## Noteworthy: gpt-oss-20b
 
 `openai/gpt-oss-20b` is the most complex model this chart serves and the
 driver for most of the patch stack above. Specifically:
@@ -259,7 +261,7 @@ parameter reference — is in
   `--tp-size=2` to split across NUMA nodes should give multi-x speedup
   but the patch stack has not been validated under TP.
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 See [`third_party/Dell/model-deployment/sglang-troubleshooting.md`](../../third_party/Dell/model-deployment/sglang-troubleshooting.md)
 for a symptom-indexed guide covering:
@@ -286,7 +288,7 @@ helm uninstall <release-name>
 kubectl delete pvc -l app.kubernetes.io/instance=<release-name>   # frees the model cache
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 core/helm-charts/sglang/
@@ -307,21 +309,20 @@ third_party/Dell/model-deployment/
     └── deployment.md             # gpt-oss-20b deployment guide
 ```
 
-## 📚 References
+## References
 
 - [SGLang documentation](https://docs.sglang.io)
 - [SGLang CPU server guide](https://docs.sglang.io/docs/hardware-platforms/cpu_server)
 - [OpenAI gpt-oss model card](https://huggingface.co/openai/gpt-oss-20b)
-- [Qwen3-8B model card](https://huggingface.co/Qwen/Qwen3-8B)
 
 ---
 
-## 📎 Appendix: From-Scratch Bootstrap
+## Appendix: From-Scratch Bootstrap
 
 Use this only if you're standing up a fresh single-node box without OPEA's
 Ansible-driven cluster setup. On a stock OPEA cluster, k3s, nginx-ingress,
 APISIX, and Keycloak are already in place and you can skip directly to
-🛠️ **Build the Image**.
+**Build the Image**.
 
 ### A.1 k3s + Helm
 
@@ -433,4 +434,4 @@ kubectl create secret tls api-example-com-tls \
   --cert=/tmp/tls.crt --key=/tmp/tls.key -n default
 ```
 
-Now proceed to 🛠️ **Build the Image** and 🚀 **Deploy a Model** above.
+Now proceed to **Build the Image** and **Deploy a Model** above.
