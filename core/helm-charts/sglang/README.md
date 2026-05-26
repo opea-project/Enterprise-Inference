@@ -94,14 +94,14 @@ and deployment guide:
 
 | Model | Values file | Deployment guide |
 | ----- | ----------- | ---------------- |
-| `openai/gpt-oss-20b` | `gpt-oss-20b-values.yaml` | `third_party/Dell/model-deployment/gpt-oss-20b/deployment.md` |
+| `openai/gpt-oss-20b` | `third_party/Dell/model-deployment/gpt-oss-20b/values.yaml` | `third_party/Dell/model-deployment/gpt-oss-20b/deployment.md` |
 
 Use the values file as the source of truth and override anything
 environment-specific via `--set`:
 
 ```bash
 helm install gpt-oss-20b ./core/helm-charts/sglang \
-  --values ./core/helm-charts/sglang/gpt-oss-20b-values.yaml
+  --values ./third_party/Dell/model-deployment/gpt-oss-20b/values.yaml
 ```
 
 Wait for the pod (first start downloads the weights — duration depends
@@ -295,7 +295,6 @@ core/helm-charts/sglang/
 ├── README.md                     # this file
 ├── Chart.yaml
 ├── values.yaml                   # full configuration surface
-├── gpt-oss-20b-values.yaml       # canonical override for gpt-oss-20b
 ├── templates/                    # Helm templates (Deployment, Service, PVC, Ingress, ApisixRoute, Secret)
 └── image-build/
     ├── Dockerfile                # FROM lmsysorg/sglang:v0.5.12-xeon + 11 patch steps
@@ -306,7 +305,8 @@ third_party/Dell/model-deployment/
 ├── sglang-troubleshooting.md     # symptom-indexed troubleshooting for the SGLang chart
 └── gpt-oss-20b/
     ├── model-card.md             # gpt-oss-20b model card
-    └── deployment.md             # gpt-oss-20b deployment guide
+    ├── deployment.md             # gpt-oss-20b deployment guide
+    └── values.yaml               # canonical chart overrides for gpt-oss-20b
 ```
 
 ## References

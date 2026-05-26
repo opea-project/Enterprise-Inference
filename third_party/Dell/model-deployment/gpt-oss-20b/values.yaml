@@ -1,0 +1,49 @@
+# Override values for gpt-oss-20b on Intel Xeon CPU via the patched
+# SGLang image. Use with the model-agnostic chart at
+# core/helm-charts/sglang.
+#
+# Usage:
+#   helm install gpt-oss-20b ./core/helm-charts/sglang \
+#     --values ./third_party/Dell/model-deployment/gpt-oss-20b/values.yaml
+#
+# Short-form generation (max_tokens <= 200) through the full auth-routed
+# chain is solid. Long-form generation past ~150 tokens is a documented
+# limitation of the pure-Python CPU MoE path — see
+# third_party/Dell/model-deployment/sglang-troubleshooting.md.
+
+modelSource: openai/gpt-oss-20b
+modelName: gpt-oss-20b
+
+image:
+  repository: enterprise-inference/sglang
+  tag: v0.5.12-xeon-fix11-debug
+  pullPolicy: Never
+
+server:
+  dtype: bfloat16
+  extraArgs:
+    - --attention-backend
+    - torch_native
+    - --reasoning-parser
+    - gpt-oss
+    - --tool-call-parser
+    - gpt-oss
+
+resources:
+  requests:
+    memory: 48Gi
+  limits:
+    memory: 128Gi
+
+storage:
+  persistentVolume:
+    size: 40Gi
+
+ingress:
+  enabled: true
+
+apisixRoute:
+  enabled: true
+
+oidc:
+  enabled: true

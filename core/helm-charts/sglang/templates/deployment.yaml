@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{- if not .Values.modelSource }}
-{{- fail "modelSource is required. Set --set modelSource=<huggingface/org/model> (e.g. openai/gpt-oss-20b) or use a model-specific values file like gpt-oss-20b-values.yaml." }}
+{{- fail "modelSource is required. Set --set modelSource=<huggingface/org/model> (e.g. openai/gpt-oss-20b) or use a model-specific values file (see third_party/Dell/model-deployment/<model-name>/values.yaml)." }}
 {{- end }}
 {{- if not .Values.modelName }}
 {{- fail "modelName is required. Set --set modelName=<release-friendly-name> (e.g. gpt-oss-20b)." }}

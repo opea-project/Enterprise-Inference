@@ -43,11 +43,11 @@ For a detailed breakdown of what each patch does, see `core/helm-charts/sglang/R
 
 ## Step 3: Deploy gpt-oss-20b Model
 
-The chart ships with a canonical values file for this model at `core/helm-charts/sglang/gpt-oss-20b-values.yaml`.
+The canonical values file for this model lives alongside this deployment guide at `third_party/Dell/model-deployment/gpt-oss-20b/values.yaml`.
 
 ```bash
 helm install sglang-gpt-oss-20b ./core/helm-charts/sglang \
-  --values ./core/helm-charts/sglang/gpt-oss-20b-values.yaml \
+  --values ./third_party/Dell/model-deployment/gpt-oss-20b/values.yaml \
   --set modelSource="openai/gpt-oss-20b" \
   --set huggingface.token="$HUGGING_FACE_HUB_TOKEN" \
   --set ingress.enabled=true \
@@ -120,7 +120,7 @@ kubectl delete pvc -l app.kubernetes.io/instance=sglang-gpt-oss-20b   # frees th
 
 | Parameter                                                          | Description                                                                                       |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `--values ./core/helm-charts/sglang/gpt-oss-20b-values.yaml`      | Canonical values file for this model. Pins the patched image, sets bf16, wires the Harmony reasoning and tool-call parsers, sizes resources. |
+| `--values ./third_party/Dell/model-deployment/gpt-oss-20b/values.yaml`      | Canonical values file for this model. Pins the patched image, sets bf16, wires the Harmony reasoning and tool-call parsers, sizes resources. |
 | `--set modelSource="openai/gpt-oss-20b"`                           | Defines the target model from **Hugging Face** to deploy.                                         |
 | `--set huggingface.token="..."`                                    | Authenticates access to gated or private Hugging Face models. The gpt-oss repo is public, so this is optional but harmless. |
 | `--set ingress.enabled=true`                                       | Enables Kubernetes **Ingress** to expose the model service externally.                            |
