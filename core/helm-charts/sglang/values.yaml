@@ -242,18 +242,16 @@ extraVolumes: []
 extraVolumeMounts: []
 # extraEnv: extra environment variables exposed to the sglang container.
 #
-# For gpt-oss-on-CPU the patched image needs the correct MXFP4 nibble order
-# to decode weights properly (without this the model serves but emits
-# random-vocab garbage):
-#   - MXFP4_NIBBLE_ORDER=low_first    fix7 dequant nibble order
+# MXFP4_NIBBLE_ORDER=low_first is read only by the patched image's MXFP4
+# dequant path and is a runtime no-op for non-MXFP4 models. It is required
+# for any MXFP4 model loaded on CPU (e.g. openai/gpt-oss-*) — without it
+# the model serves but emits random-vocab garbage.
 #
-# Other debug flags exposed by the patched image (default off, here for
-# reference):
-#   - FP32_PROMOTE_MOE=1              fix10-debug: per-expert MoE in fp32
-#   - ALLOW_FP32_MXFP4=1              fix9-debug: bypass dtype=bfloat16 force
-#   - MXFP4_OUT_DTYPE=float32|float16 fix9-debug2: dequant output dtype
-#
-# For non-gpt-oss models, override with `extraEnv: []`.
+# Other debug flags exposed by the patched image (off by default; set
+# only when reproducing a precision investigation):
+#   - FP32_PROMOTE_MOE=1              per-expert MoE forward in fp32
+#   - ALLOW_FP32_MXFP4=1              allow --dtype float32 with mxfp4 models
+#   - MXFP4_OUT_DTYPE=float32|float16 dequant output dtype
 extraEnv:
   - name: MXFP4_NIBBLE_ORDER
     value: "low_first"
