@@ -22,13 +22,18 @@ namespace: default
 replicaCount: 1
 
 image:
-  # Patched image built from image-build/ — required for gpt-oss-on-CPU
-  # (fix1..fix8) and the Phase 2 precision-debug flags (fix9-debug,
-  # fix10-debug). Use `image-build/build-and-import.sh` to build + import
-  # into k3s containerd. Switch back to `lmsysorg/sglang:v0.5.11-xeon` for
-  # non-gpt-oss models that don't need the patch stack.
+  # Patched image built from image-build/. fix1 (sgl-kernel rebuild with
+  # -mavx512bf16) benefits any bf16 model on Xeon; fix2..fix8 add MXFP4
+  # + sinks-attention support specifically for gpt-oss and are runtime
+  # no-ops for other models; fix9..fix11 are precision-debug knobs (off
+  # by default). Build + import with `image-build/build-and-import.sh`.
+  #
+  # IMPORTANT: `tag` below MUST match the IMAGE_TAG in build-and-import.sh
+  # exactly. With `pullPolicy: IfNotPresent` (the right setting for a
+  # locally-imported image), a tag mismatch causes the kubelet to try a
+  # docker.io pull and ImagePullBackOff on a private/non-existent image.
   repository: enterprise-inference/sglang
-  tag: "v0.5.12-xeon-fix10-debug"
+  tag: "v0.5.12-xeon-fix11-debug"
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
