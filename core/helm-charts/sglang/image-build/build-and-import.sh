@@ -32,6 +32,25 @@ echo "==> Detected container runtime: $RUNTIME"
 
 case "$RUNTIME" in
   nerdctl)
+    # nerdctl needs buildkitd to run `nerdctl build`. On OPEA-deployed
+    # clusters buildkit isn't installed by default; install + start it
+    # if missing.
+    if ! command -v buildctl >/dev/null 2>&1; then
+      echo "==> Installing buildkit (required by nerdctl build)"
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y buildkit
+    fi
+    if ! pgrep -x buildkitd >/dev/null 2>&1; then
+      echo "==> Starting buildkitd in the background"
+      systemctl enable --now buildkit 2>/dev/null \
+        || nohup buildkitd >/var/log/buildkitd.log 2>&1 &
+      # give it a couple seconds to come up
+      for i in 1 2 3 4 5; do
+        [ -S /run/buildkit/buildkitd.sock ] && break
+        sleep 1
+      done
+    fi
+
     # nerdctl builds directly into containerd's image store. Pin namespace
     # to k8s.io so kubelet can find the image without a separate import.
     echo "==> Building $IMAGE_TAG via nerdctl (namespace k8s.io)"
