@@ -23,14 +23,14 @@ every bf16 forward pass crashes with `tinygemm_kernel_nn: scalar path
 not implemented!` regardless of model. The remaining patches are
 gpt-oss-specific and are runtime no-ops for other models. The image is
 built once via a self-contained Dockerfile and imported directly into
-k3s containerd — no registry required.
+the local containerd image store — no registry required.
 
 ## Features
 
 - **Model-agnostic SGLang on Xeon CPU** — any HF model SGLang supports loads through the same chart
 - **Patched image** that unblocks bf16 inference on Xeon (every model benefits) and adds MXFP4 + sinks-attention support for gpt-oss
 - **OPEA-standard auth chain**: TLS at nginx, OIDC bearer validation at APISIX, token issuance by Keycloak
-- **No external registry**: image builds locally and imports into k3s containerd
+- **No external registry**: image builds locally into the cluster's containerd image store (works on both kubeadm/containerd and k3s)
 - **OpenAI-compatible API**: `/v1/chat/completions`, `/v1/models`, `/v1/completions`
 - **Chart-only delivery**: same standalone pattern as `core/helm-charts/ovms`, not yet wired into the Ansible playbooks
 
@@ -40,7 +40,7 @@ k3s containerd — no registry required.
 - **Hardware**: Intel Xeon with AVX-512-BF16 / AMX-BF16 (Sapphire Rapids, Emerald Rapids, Granite Rapids)
 - **Memory**: ≥ 64 GiB RAM for mid-size models (gpt-oss-20b uses ~25 GiB dequantized + KV cache)
 - **Disk**: ≥ 100 GiB free on the root partition
-- **Kubernetes**: 1.24+ (k3s is fine; this chart was validated on single-node k3s)
+- **Kubernetes**: 1.24+ — validated on kubeadm/containerd (the cluster `inference-stack-deploy.sh` produces) and on k3s
 - **Helm**: 3+
 - **NodePorts free on the host**: 30080, 30443 (nginx), 32080 (APISIX)
 - **HuggingFace token** for gated models (e.g. `meta-llama/*`); not required for open models like `openai/gpt-oss-20b` or `Qwen/Qwen3-8B`
@@ -61,17 +61,26 @@ git checkout cld2labs/sglang-gpt-oss
 sudo bash core/helm-charts/sglang/image-build/build-and-import.sh
 ```
 
-First run takes ~5–10 minutes (installs docker.io if missing, compiles
-27 C++ files in `sgl-kernel` with the right BF16 flags, runs 11 Python
-patch scripts against SGLang's in-image source, and imports the result
-into k3s containerd).
+First run takes ~5–10 minutes. The script auto-detects the runtime:
 
-Verify:
+- **kubeadm + containerd** (OPEA Ansible-deployed clusters): builds via
+  `nerdctl` directly into containerd's `k8s.io` namespace. Installs
+  `buildkit` from upstream GitHub on demand if it isn't already present.
+- **k3s**: installs `docker.io` on demand, builds, then
+  `docker save | k3s ctr images import -`.
+
+In both cases the image lands where kubelet pulls from. Verify with
+whichever tool matches your runtime:
 
 ```bash
+# kubeadm / containerd
+sudo nerdctl --namespace k8s.io images | grep enterprise-inference/sglang
+
+# k3s
 sudo k3s ctr images ls | grep enterprise-inference/sglang
-# docker.io/enterprise-inference/sglang:v0.5.12-xeon-fix11-debug
 ```
+
+Either way the expected line is `enterprise-inference/sglang:v0.5.12-xeon-fix11-debug`.
 
 ## Deploy a Model
 
@@ -295,7 +304,7 @@ core/helm-charts/sglang/
 ├── templates/                    # Helm templates (Deployment, Service, PVC, Ingress, ApisixRoute, Secret)
 └── image-build/
     ├── Dockerfile                # FROM lmsysorg/sglang:v0.5.12-xeon + 11 patch steps
-    ├── build-and-import.sh       # one-shot build + import into k3s containerd
+    ├── build-and-import.sh       # one-shot build + load into local containerd (kubeadm or k3s)
     └── enable-*.py               # patch scripts applied at image build time
 
 third_party/Dell/model-deployment/

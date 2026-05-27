@@ -47,19 +47,27 @@ published `sgl-kernel` shared library is missing the AVX-512-BF16
 compile flags needed for any bf16 matmul).
 
 The SGLang chart ships a one-shot build script that produces a patched
-image and imports it directly into k3s containerd. No external registry
-is required.
+image and loads it directly into the local containerd image store. No
+external registry is required.
 
 ```bash
 sudo bash core/helm-charts/sglang/image-build/build-and-import.sh
 ```
 
-First run takes ~5-10 minutes. Verify:
+First run takes ~5-10 minutes. The script auto-detects the runtime —
+`nerdctl` on a kubeadm/containerd cluster (what `inference-stack-deploy.sh`
+produces) or `k3s ctr` on a k3s cluster. Verify with whichever matches
+your cluster:
 
 ```bash
+# kubeadm / containerd
+sudo nerdctl --namespace k8s.io images | grep enterprise-inference/sglang
+
+# k3s
 sudo k3s ctr images ls | grep enterprise-inference/sglang
-# docker.io/enterprise-inference/sglang:v0.5.12-xeon-fix11-debug
 ```
+
+Either should report `enterprise-inference/sglang:v0.5.12-xeon-fix11-debug`.
 
 For a detailed breakdown of what each patch does, see
 `core/helm-charts/sglang/README.md` (section: What's Patched).
