@@ -1,14 +1,15 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-# Xeon CPU-optimized override values for vLLM deployments
+# Xeon CPU-optimized override values for SGLang deployments
 # This file contains lean, CPU-specific overrides for Intel Xeon processors
 # Base values are inherited from values.yaml
 
 # CPU deployment - no accelerator device
+# Currently SGLang support for Xeon only model deployment, keep accelDevice empty to disable GPU/accelerator usage
 accelDevice: ""
 
-# CPU Balloon configuration for NRI resource policy
+# CPU Balloon configuration for NRI resource policy for SGLang not supported, keep annotation empty to disable ballooning
 cpu_balloon_annotation: ""
 
 
@@ -16,13 +17,6 @@ resources:
   requests:
     cpu: "{{ .Values.cpu }}"
     memory: "{{ .Values.memory }}"
-
-# CPU-specific configurations
-block_size: 128
-max_num_seqs: 256
-max_seq_len_to_capture: 2048
-d_type: "bfloat16"
-max_model_len: 8192
 
 # SGLang CPU image configuration
 image:
@@ -40,7 +34,7 @@ affinity:
           operator: In
           values: ["true"]
 
-# vLLM CPU environment variables
+# SGLang CPU environment variables
 
 LLM_MODEL_ID: ""
 
@@ -53,6 +47,7 @@ modelConfigs:
         "--disable-overlap-schedule",
         "--device",
         "cpu",
+        "--enable-torch-compile",
         "--host",
         "0.0.0.0"
       ]
@@ -67,82 +62,14 @@ modelConfigs:
         "--disable-overlap-schedule",
         "--device",
         "cpu",
+        "--enable-torch-compile",
         "--host",
         "0.0.0.0"
       ]
     tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
     pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
 
-  "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B":
-    configMapValues: {}
-    extraCmdArgs:
-      [
-        "--trust-remote-code",
-        "--disable-overlap-schedule",
-        "--device",
-        "cpu",
-        "--host",
-        "0.0.0.0"
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
-    configMapValues: {}
-    extraCmdArgs:
-      [
-        "--trust-remote-code",
-        "--disable-overlap-schedule",
-        "--device",
-        "cpu",
-        "--host",
-        "0.0.0.0"
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  "Qwen/Qwen3-1.7B":
-    configMapValues: {}
-    extraCmdArgs:
-      [
-        "--trust-remote-code",
-        "--disable-overlap-schedule",
-        "--device",
-        "cpu",
-        "--host",
-        "0.0.0.0"
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  "Qwen/Qwen3-4B-Instruct-2507":
-    configMapValues: {}
-    extraCmdArgs:
-      [
-        "--trust-remote-code",
-        "--disable-overlap-schedule",
-        "--device",
-        "cpu",
-        "--host",
-        "0.0.0.0"
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
-
-  # Qwen/Qwen3-Coder-30B-A3B-Instruct — MoE tool-calling model (~80 GB RAM)
-  "Qwen/Qwen3-Coder-30B-A3B-Instruct":
-    configMapValues: {}
-    extraCmdArgs:
-      [
-        "--trust-remote-code",
-        "--disable-overlap-schedule",
-        "--device",
-        "cpu",
-        "--host",
-        "0.0.0.0"
-      ]
-    tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
-    pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"
+# Default model configuration applied to all models if specific model config not defined and are supported by SGLang, can be overridden by specific modelConfigs if needed
 
 defaultModelConfigs:
   configMapValues: {}
@@ -152,6 +79,7 @@ defaultModelConfigs:
         "--disable-overlap-schedule",
         "--device",
         "cpu",
+        "--enable-torch-compile",
         "--host",
         "0.0.0.0"
       ]
