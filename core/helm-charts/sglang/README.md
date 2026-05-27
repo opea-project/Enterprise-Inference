@@ -315,10 +315,20 @@ third_party/Dell/model-deployment/
 
 ## Appendix: From-Scratch Bootstrap
 
-Use this only if you're standing up a fresh single-node box without OPEA's
-Ansible-driven cluster setup. On a stock OPEA cluster, k3s, nginx-ingress,
-APISIX, and Keycloak are already in place and you can skip directly to
-**Build the Image**.
+An Enterprise Inference cluster brought up with the OPEA Ansible
+playbooks already has k3s, nginx-ingress, APISIX, Keycloak, the
+Keycloak edge routes, and the OIDC client provisioned for you — skip
+this appendix entirely and go straight to **Build the Image**. The
+deployment guide is the same regardless of how the cluster was
+bootstrapped.
+
+This appendix produces the same cluster shape by hand for cases where
+the Ansible playbooks haven't been run: k3s + nginx + Keycloak + APISIX
+(with the GatewayProxy/IngressClass wiring), the TLS secret in both
+namespaces that need it, a `KC_HOSTNAME`-pinned Keycloak, the
+`/realms`, `/admin`, and `/token` edge Ingresses, and the
+`my-client-id` OIDC client. After it runs, `generate-token.sh` and the
+model deploy work identically to the OPEA flow.
 
 ### A.1 k3s + Helm
 
