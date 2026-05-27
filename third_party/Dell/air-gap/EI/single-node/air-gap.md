@@ -307,4 +307,108 @@ have not been tested and are not supported in this configuration.
 
 ---
 
+### Deploying Without Airgap (Internet-Connected Mode)
+
+Use this path when your VM has direct internet access. All images, binaries, and model weights are pulled from the internet — no JFrog required.
+
+#### Step 1 - Clone the Repository
+
+```bash
+git clone https://github.com/cld2labs/Enterprise-Inference.git
+cd Enterprise-Inference
+git checkout cld2labs/airgap
+```
+
+#### Step 2 - Configure `inference-config.cfg`
+
+```bash
+vi ~/Enterprise-Inference/core/inventory/inference-config.cfg
+```
+
+Key values to set:
+
+```
+cluster_url=api.example.com
+cert_file=~/certs/cert.pem
+key_file=~/certs/key.pem
+keycloak_client_id=my-client-id
+keycloak_admin_user=your-keycloak-admin-user
+keycloak_admin_password=changeme
+hugging_face_token=<your-huggingface-token>
+hugging_face_token_falcon3=<your-huggingface-token>
+cpu_or_gpu=cpu
+deploy_kubernetes_fresh=on
+deploy_ingress_controller=on
+deploy_keycloak_apisix=on
+deploy_llm_models=on
+airgap_enabled=off
+jfrog_url=
+jfrog_username=
+jfrog_password=
+```
+
+Apply the single-node inventory and set the deployment user:
+
+```bash
+cp ~/Enterprise-Inference/docs/examples/single-node/hosts.yaml \
+   ~/Enterprise-Inference/core/inventory/hosts.yaml
+
+sed -i -E "/^[[:space:]]*master1:/,/^[[:space:]]{2}children:/ \
+  s/^([[:space:]]*ansible_user:[[:space:]]*).*/\1$(whoami)/" \
+  ~/Enterprise-Inference/core/inventory/hosts.yaml
+```
+
+Generate SSL certificates and add the hosts entry:
+
+```bash
+mkdir -p ~/certs
+openssl req -x509 -newkey rsa:4096 -keyout ~/certs/key.pem -out ~/certs/cert.pem \
+  -days 365 -nodes -subj '/CN=api.example.com'
+
+echo "$(hostname -I | awk '{print $1}') api.example.com" | sudo tee -a /etc/hosts
+```
+
+#### Step 3 - Run the Deployment
+
+```bash
+cd ~/Enterprise-Inference/core
+chmod +x inference-stack-deploy.sh
+./inference-stack-deploy.sh
+```
+
+Monitor pods while the deployment runs:
+
+```bash
+kubectl get pods -A -w
+kubectl logs <vllm-pod-name> --tail=20 | grep -v "OMP tid"
+```
+
+Expected pod states when complete:
+
+```
+keycloak-0                    1/1 Running
+keycloak-postgresql-0         1/1 Running
+vllm-llama-3b-cpu-*           1/1 Running
+```
+
+#### Step 4 - Test Inference
+
+```bash
+cd ~/Enterprise-Inference/core
+. scripts/generate-token.sh
+
+curl -k https://${BASE_URL}/Llama-3.2-3B-Instruct-vllmcpu/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "model": "meta-llama/Llama-3.2-3B-Instruct",
+    "prompt": "What is Deep Learning?",
+    "max_tokens": 25,
+    "temperature": 0
+  }'
+```
+
+---
+
 For troubleshooting common failures, see [air-gap-troubleshooting.md](air-gap-troubleshooting.md).
