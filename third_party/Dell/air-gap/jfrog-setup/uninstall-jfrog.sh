@@ -113,6 +113,11 @@ for pkg in "${JFROG_PACKAGES[@]}"; do
   fi
 done
 
+info "Removing PostgreSQL installed by JFrog..."
+systemctl stop postgresql 2>/dev/null || true
+apt-get remove --purge -y postgresql postgresql-* 2>/dev/null || true
+rm -rf /var/lib/postgresql /etc/postgresql /etc/postgresql-common
+success "PostgreSQL removed"
 info "Running apt autoremove..."
 apt-get autoremove -y
 
