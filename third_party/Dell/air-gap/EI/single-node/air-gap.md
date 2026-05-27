@@ -110,7 +110,7 @@ From a machine with access to both the repo and VM2, clone the repository and ch
 ```bash
 git clone https://github.com/cld2labs/Enterprise-Inference.git
 cd Enterprise-Inference
-git checkout ei/airgapped
+git checkout cld2labs/airgap
 ```
 
 Then copy it to VM2:
