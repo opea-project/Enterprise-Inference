@@ -92,17 +92,14 @@ helm install <release-name> ./core/helm-charts/sglang \
 Models that need additional configuration ship with their own values file
 and deployment guide:
 
-| Model | Values file | Deployment guide |
-| ----- | ----------- | ---------------- |
-| `openai/gpt-oss-20b` | `third_party/Dell/model-deployment/gpt-oss-20b/values.yaml` | `third_party/Dell/model-deployment/gpt-oss-20b/deployment.md` |
+| Model | Deployment guide |
+| ----- | ---------------- |
+| `openai/gpt-oss-20b` | `third_party/Dell/model-deployment/gpt-oss-20b/deployment.md` |
 
-Use the values file as the source of truth and override anything
-environment-specific via `--set`:
-
-```bash
-helm install gpt-oss-20b ./core/helm-charts/sglang \
-  --values ./third_party/Dell/model-deployment/gpt-oss-20b/values.yaml
-```
+The deployment guide carries the full `helm install` command line for
+that model — all model-specific flags (parsers, attention backend,
+extraArgs) come through as `--set` overrides. The chart's own
+`values.yaml` stays model-agnostic.
 
 Wait for the pod (first start downloads the weights — duration depends
 on model size and network):
@@ -305,8 +302,7 @@ third_party/Dell/model-deployment/
 ├── sglang-troubleshooting.md     # symptom-indexed troubleshooting for the SGLang chart
 └── gpt-oss-20b/
     ├── model-card.md             # gpt-oss-20b model card
-    ├── deployment.md             # gpt-oss-20b deployment guide
-    └── values.yaml               # canonical chart overrides for gpt-oss-20b
+    └── deployment.md             # gpt-oss-20b deployment guide (carries the full helm command)
 ```
 
 ## References
@@ -386,7 +382,11 @@ EOF
 kubectl wait --for=condition=ready pod -l app=keycloak --timeout=300s
 ```
 
-Create the OIDC client (`my-client-id` with the secret the chart expects):
+Create the OIDC client. The `clientId` and `secret` here must exactly
+match what you'll later pass to the chart via `--set oidc.clientId=...`
+and `--set oidc.clientSecret=...`. The values below are the lab defaults
+used by the gpt-oss-20b deployment guide — substitute your own for any
+non-test deployment.
 
 ```bash
 ADMIN=$(kubectl run kc-admin --rm -i --restart=Never --quiet \
@@ -395,15 +395,35 @@ ADMIN=$(kubectl run kc-admin --rm -i --restart=Never --quiet \
     -d "client_id=admin-cli" -d "username=admin" -d "password=admin" -d "grant_type=password"' \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 
+CLIENT_ID=my-client-id
+CLIENT_SECRET=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR
+
 kubectl run kc-create --rm -i --restart=Never --quiet \
   --image=curlimages/curl:8.10.1 -- \
   sh -c "curl -sS -X POST -H 'Authorization: Bearer $ADMIN' \
     -H 'Content-Type: application/json' \
     http://keycloak.default.svc.cluster.local/admin/realms/master/clients \
-    -d '{\"clientId\":\"my-client-id\",\"secret\":\"<your-client-secret>\",\"serviceAccountsEnabled\":true,\"publicClient\":false,\"directAccessGrantsEnabled\":true}'"
+    -d '{\"clientId\":\"${CLIENT_ID}\",\"secret\":\"${CLIENT_SECRET}\",\"serviceAccountsEnabled\":true,\"publicClient\":false,\"directAccessGrantsEnabled\":true}'"
+```
+
+Verify the client was created:
+
+```bash
+kubectl run kc-check --rm -i --restart=Never --quiet \
+  --image=curlimages/curl:8.10.1 -- \
+  sh -c "curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
+    -d 'client_id=${CLIENT_ID}' -d 'client_secret=${CLIENT_SECRET}' -d 'grant_type=client_credentials'" \
+  | head -c 80
+# expect: JSON with "access_token":"..."
 ```
 
 ### A.4 APISIX
+
+The Apache APISIX chart installs the dataplane + etcd + ingress
+controller. On v2 of the ingress controller (current as of this writing)
+you additionally need a `GatewayProxy` CR and an `IngressClass` whose
+`parameters` reference it — without those, the controller silently drops
+every `ApisixRoute` and the chart's route ends up unreachable.
 
 ```bash
 helm repo add apisix https://charts.apiseven.com
@@ -414,24 +434,91 @@ helm install auth-apisix apisix/apisix \
   --set ingress-controller.config.apisix.serviceNamespace=auth-apisix
 
 kubectl wait --for=condition=ready pod -n auth-apisix --all --timeout=300s
+
+# Grab the admin key the chart generated for the dataplane
+ADMIN_KEY=$(helm get values auth-apisix -n auth-apisix --all \
+  | python3 -c "import sys,yaml; print(yaml.safe_load(sys.stdin)['apisix']['admin']['credentials']['admin'])")
+echo "APISIX admin key: $ADMIN_KEY"
+
+# Create the GatewayProxy that the ingress controller will use as its
+# dataplane handle.
+kubectl apply -f - <<EOF
+apiVersion: apisix.apache.org/v1alpha1
+kind: GatewayProxy
+metadata:
+  name: apisix-proxy
+  namespace: auth-apisix
+spec:
+  provider:
+    type: ControlPlane
+    controlPlane:
+      endpoints:
+        - http://auth-apisix-admin.auth-apisix.svc.cluster.local:9180
+      auth:
+        type: AdminKey
+        adminKey:
+          value: "${ADMIN_KEY}"
+EOF
+
+# Patch the IngressClass `apisix` (which the chart created) to point at
+# the GatewayProxy we just made.
+kubectl patch ingressclass apisix --type='merge' -p '{
+  "spec": {
+    "parameters": {
+      "apiGroup": "apisix.apache.org",
+      "kind": "GatewayProxy",
+      "name": "apisix-proxy",
+      "namespace": "auth-apisix",
+      "scope": "Namespace"
+    }
+  }
+}'
+
+# Verify
+kubectl get gatewayproxy -n auth-apisix
+kubectl get ingressclass apisix -o jsonpath='{.spec.parameters}{"\n"}'
 ```
 
-APISIX v2 ingress controller also requires a `GatewayProxy` CRD and an
-updated `IngressClass parameters` link before it will accept routes;
-see the in-cluster `kubectl describe apisixroute` output for guidance
-if the controller returns "Route Not Found" for an otherwise valid
-ApisixRoute.
-
 ### A.5 TLS cert for `api.example.com`
+
+The chart's `--set ingress.secretName=${BASE_URL}` references a TLS
+Secret whose name equals the hostname (so for the lab default, the
+Secret is named `api.example.com`). The Secret must live in the same
+namespace as the Ingress that consumes it. The chart's Ingress template
+puts the Ingress in `auth-apisix` so that nginx terminates TLS and
+forwards to the APISIX gateway service in the same namespace — so the
+TLS Secret goes there too.
 
 ```bash
 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
   -keyout /tmp/tls.key -out /tmp/tls.crt \
-  -subj "/CN=api.example.com" \
+  -subj "/CN=api.example.com/O=enterprise-inference-test" \
   -addext "subjectAltName=DNS:api.example.com"
 
-kubectl create secret tls api-example-com-tls \
-  --cert=/tmp/tls.crt --key=/tmp/tls.key -n default
+kubectl create secret tls api.example.com \
+  --cert=/tmp/tls.crt --key=/tmp/tls.key \
+  -n auth-apisix
 ```
+
+### A.6 Local hostname resolution (lab only)
+
+In production, the cluster's load-balancer IP for `api.example.com` is
+in real DNS. On a single-node lab the hostname is only used as an SNI
+selector for the self-signed cert and as the `Host:` header — it doesn't
+need to be resolvable. The simplest setup is `--resolve` on every `curl`:
+
+```bash
+curl --resolve api.example.com:30443:127.0.0.1 https://api.example.com:30443/...
+```
+
+If you'd rather not pass `--resolve` every time, add an `/etc/hosts`
+entry instead:
+
+```bash
+echo "127.0.0.1 api.example.com" | sudo tee -a /etc/hosts
+```
+
+(With the `/etc/hosts` route you still have to remember the NodePort —
+nginx is on `:30443`, not `:443`.)
 
 Now proceed to **Build the Image** and **Deploy a Model** above.
