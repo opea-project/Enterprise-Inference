@@ -369,7 +369,14 @@ spec:
         - { name: KEYCLOAK_ADMIN,          value: admin }
         - { name: KEYCLOAK_ADMIN_PASSWORD, value: admin }
         - { name: KC_HTTP_RELATIVE_PATH,   value: "/" }
-        - { name: KC_PROXY,                value: edge }
+        - { name: KC_PROXY_HEADERS,        value: xforwarded }
+        # Pin the issuer hostname so tokens are always stamped with the
+        # cluster-internal name, no matter which edge hostname the
+        # request came in on. APISIX validates the `iss` claim against
+        # this hostname (chart's oidc.discovery default).
+        - { name: KC_HOSTNAME,             value: "http://keycloak.default.svc.cluster.local" }
+        - { name: KC_HOSTNAME_STRICT,      value: "false" }
+        - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "false" }
         ports: [{ containerPort: 8080, name: http }]
 ---
 apiVersion: v1
@@ -384,9 +391,9 @@ kubectl wait --for=condition=ready pod -l app=keycloak --timeout=300s
 
 Create the OIDC client. The `clientId` and `secret` here must exactly
 match what you'll later pass to the chart via `--set oidc.clientId=...`
-and `--set oidc.clientSecret=...`. The values below are the lab defaults
-used by the gpt-oss-20b deployment guide — substitute your own for any
-non-test deployment.
+and `--set oidc.clientSecret=...`. The values below are the appendix
+defaults used by the gpt-oss-20b deployment guide — substitute your
+own for any non-test deployment.
 
 ```bash
 ADMIN=$(kubectl run kc-admin --rm -i --restart=Never --quiet \
@@ -482,12 +489,12 @@ kubectl get ingressclass apisix -o jsonpath='{.spec.parameters}{"\n"}'
 ### A.5 TLS cert for `api.example.com`
 
 The chart's `--set ingress.secretName=${BASE_URL}` references a TLS
-Secret whose name equals the hostname (so for the lab default, the
-Secret is named `api.example.com`). The Secret must live in the same
-namespace as the Ingress that consumes it. The chart's Ingress template
-puts the Ingress in `auth-apisix` so that nginx terminates TLS and
-forwards to the APISIX gateway service in the same namespace — so the
-TLS Secret goes there too.
+Secret whose name equals the hostname (so for the appendix default, the
+Secret is named `api.example.com`). nginx requires the Secret in the
+same namespace as the Ingress that consumes it. We need it in two
+places: `auth-apisix` (where the chart-created Ingress for the model
+lives) and `default` (where the Keycloak-edge Ingresses in A.7 will
+live).
 
 ```bash
 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
@@ -496,29 +503,108 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
   -addext "subjectAltName=DNS:api.example.com"
 
 kubectl create secret tls api.example.com \
-  --cert=/tmp/tls.crt --key=/tmp/tls.key \
-  -n auth-apisix
+  --cert=/tmp/tls.crt --key=/tmp/tls.key -n auth-apisix
+kubectl create secret tls api.example.com \
+  --cert=/tmp/tls.crt --key=/tmp/tls.key -n default
 ```
 
-### A.6 Local hostname resolution (lab only)
+### A.6 Hostname resolution for `${BASE_URL}`
 
-In production, the cluster's load-balancer IP for `api.example.com` is
-in real DNS. On a single-node lab the hostname is only used as an SNI
-selector for the self-signed cert and as the `Host:` header — it doesn't
-need to be resolvable. The simplest setup is `--resolve` on every `curl`:
-
-```bash
-curl --resolve api.example.com:30443:127.0.0.1 https://api.example.com:30443/...
-```
-
-If you'd rather not pass `--resolve` every time, add an `/etc/hosts`
-entry instead:
+`generate-token.sh` and the inference curls in the deployment guide
+both hit `https://${BASE_URL}/...` directly, so the host running those
+commands must resolve `api.example.com`. In a production EI deployment
+this is real DNS pointing at the load balancer; for a self-bootstrapped
+cluster, an `/etc/hosts` entry pointing at the node is enough.
 
 ```bash
 echo "127.0.0.1 api.example.com" | sudo tee -a /etc/hosts
 ```
 
-(With the `/etc/hosts` route you still have to remember the NodePort —
-nginx is on `:30443`, not `:443`.)
+nginx in this appendix is on NodePort 30443 (not 443), so set
+`BASE_URL` with the port for the EI scripts to find it:
+
+```bash
+export BASE_URL=api.example.com:30443
+```
+
+### A.7 Keycloak edge routes
+
+`generate-token.sh` issues two HTTP requests against `${BASE_URL}` —
+first against `/realms/master/protocol/openid-connect/token` and
+`/admin/realms/master/clients/...` (via `keycloak-fetch-client-secret.sh`,
+to log in as the admin user and read the OIDC client secret), then
+against `/token` (to exchange `client_credentials` for an access token).
+On an EI cluster the Ansible playbooks publish all three behind nginx;
+when bootstrapping by hand we publish them with two Ingresses below.
+
+```bash
+# Pass-through Ingress for /realms/* and /admin/* — these go straight to
+# Keycloak's endpoints unmodified.
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-edge
+  namespace: default
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts: [api.example.com]
+    secretName: api.example.com
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /realms
+        pathType: Prefix
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+EOF
+
+# Rewriting Ingress for /token → /realms/master/protocol/openid-connect/token.
+# In its own Ingress because the rewrite-target annotation applies to
+# every path in the Ingress that holds it.
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-token
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /realms/master/protocol/openid-connect/token
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts: [api.example.com]
+    secretName: api.example.com
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /token
+        pathType: Exact
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+EOF
+```
+
+Verify the routes work end-to-end (assuming you've done A.6):
+
+```bash
+# Should return the realm's public JWKS / configuration
+curl -k https://api.example.com:30443/realms/master/.well-known/openid-configuration \
+  | python3 -c "import sys,json; c=json.load(sys.stdin); print('issuer:', c['issuer'])"
+
+# Should return an access token for the OIDC client created in A.3
+curl -k -s -X POST https://api.example.com:30443/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=my-client-id" \
+  -d "client_secret=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR" \
+  | python3 -c "import sys,json; t=json.load(sys.stdin); print('token len:', len(t.get('access_token','')))"
+```
 
 Now proceed to **Build the Image** and **Deploy a Model** above.

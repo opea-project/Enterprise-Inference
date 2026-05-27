@@ -9,7 +9,7 @@ This section provides common issues observed when running inference against mode
 4. [Pod startup fails with "scalar path not implemented!"](#4-pod-startup-fails-with-scalar-path-not-implemented)
 5. [Model serves but emits random-vocab gibberish in `content`](#5-model-serves-but-emits-random-vocab-gibberish-in-content)
 6. [Long-form responses degrade into broken tokens after ~150 tokens](#6-long-form-responses-degrade-into-broken-tokens-after-150-tokens)
-7. [401 Unauthorized from APISIX with a valid-looking token](#7-401-unauthorized-from-apisix-with-a-valid-looking-token)
+7. [401 Unauthorized from APISIX with a valid-looking token](#7-401-unauthorized-from-apisix-with-a-valid-looking-token-issuer-mismatch)
 
 ---
 
@@ -149,22 +149,26 @@ This is documented under "Known Limitations" in `core/helm-charts/sglang/README.
 
 ---
 
-### 7. 401 Unauthorized from APISIX with a valid-looking token
+### 7. 401 Unauthorized from APISIX with a valid-looking token (issuer mismatch)
 
-**Context:** Token was successfully obtained from Keycloak, but the auth-routed inference call returns `401 Unauthorized` from APISIX (response body mentions "openresty").
+**Context:** Token was successfully obtained from Keycloak (via `source generate-token.sh` or equivalent), but the inference call returns `401 Unauthorized` from APISIX (response body mentions "openresty").
 
-**Cause:** APISIX's OIDC plugin validates the token's `iss` (issuer) claim against the configured discovery URL. If the token was fetched via `kubectl port-forward localhost:18080`, Keycloak stamped the issuer as `http://127.0.0.1:18080/...`, but APISIX checks against `http://keycloak.default.svc.cluster.local/...` and rejects the mismatch.
+**Cause:** APISIX's OIDC plugin runs in `bearer_only` mode and validates the token's `iss` (issuer) claim against the issuer returned by the OIDC discovery URL the chart was configured with. If Keycloak was deployed without a fixed `KC_HOSTNAME`, it stamps the issuer based on the incoming request's host header — so a token fetched via `https://api.example.com:30443/token` carries `iss=https://api.example.com:30443/realms/master`, but the chart's default discovery URL is `http://keycloak.default.svc.cluster.local/realms/master`. The two don't match and APISIX rejects.
 
-**Fix:** Fetch the token from inside the cluster so the issuer matches:
+**Fix:** Pin Keycloak's issuer at deploy time by setting `KC_HOSTNAME` on the Keycloak Deployment to the cluster-internal hostname the chart's `oidc.discovery` value points at. The appendix in `core/helm-charts/sglang/README.md` (A.3) shows the env vars; the relevant ones are:
 
-```bash
-TOKEN=$(kubectl run keycloak-tok --rm -i --restart=Never --quiet \
-  --image=curlimages/curl:8.10.1 -- \
-  sh -c 'curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
-    -d "client_id='"$KEYCLOAK_CLIENT_ID"'" \
-    -d "client_secret='"$KEYCLOAK_CLIENT_SECRET"'" \
-    -d "grant_type=client_credentials"' \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+```yaml
+- { name: KC_HOSTNAME,             value: "http://keycloak.default.svc.cluster.local" }
+- { name: KC_HOSTNAME_STRICT,      value: "false" }
+- { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "false" }
 ```
 
-For production deployments, configure Keycloak with `KC_HOSTNAME=<external-hostname>` so it always issues tokens with a stable, externally-resolvable issuer.
+After updating the Deployment (`kubectl apply` the manifest from A.3 again, then wait for the new pod), re-source `generate-token.sh` to fetch a fresh token. Verify the issuer claim is now cluster-internal:
+
+```bash
+echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null \
+  | python3 -c "import json,sys; print('iss =', json.loads(sys.stdin.read())['iss'])"
+# expect: iss = http://keycloak.default.svc.cluster.local/realms/master
+```
+
+The mismatched-issuer 401 cannot happen on a production EI cluster — the Ansible playbooks set `KC_HOSTNAME` to the cluster's external hostname and the chart's `oidc.discovery` is set to the matching URL — but it's a common stumble for someone bootstrapping by hand from the appendix.
