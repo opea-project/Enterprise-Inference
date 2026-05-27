@@ -118,15 +118,20 @@ apisixRoute:
 ## Optimized Model List
 A list of popular LLMs are optimized and run efficiently on CPU, including the most notable open-source models like Llama series, Qwen series, and DeepSeek series like DeepSeek-R1 and DeepSeek-V3.1-Terminus.
 
-| Model Name | BF16 | W8A8_INT8 | FP8 |
-| --- | --- | --- | --- |
-| DeepSeek-R1 | | meituan/DeepSeek-R1-Channel-INT8 | deepseek-ai/DeepSeek-R1 |
-| DeepSeek-V3.1-Terminus | | IntervitensInc/DeepSeek-V3.1-Terminus-Channel-int8 | deepseek-ai/DeepSeek-V3.1-Terminus |
-| Llama-3.2-3B | meta-llama/Llama-3.2-3B-Instruct | RedHatAI/Llama-3.2-3B-quantized.w8a8 | |
-| Llama-3.1-8B | meta-llama/Llama-3.1-8B-Instruct | RedHatAI/Meta-Llama-3.1-8B-quantized.w8a8 | |
-| QwQ-32B | | RedHatAI/QwQ-32B-quantized.w8a8 | |
-| DeepSeek-Distilled-Llama | | RedHatAI/DeepSeek-R1-Distill-Llama-70B-quantized.w8a8 | |
-| Qwen3-235B | | | Qwen/Qwen3-235B-A22B-FP8 |
+| Model Name | BF16 | W8A8_INT8 | FP8 | AWQ_INT4 |
+| --- | --- | --- | --- | --- |
+| Llama-3.1-8B | meta-llama/Llama-3.1-8B-Instruct | RedHatAI/Meta-Llama-3.1-8B-Instruct-quantized.w8a8 | RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8 | hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 |
+| Llama-3.2-11B-Vision | meta-llama/Llama-3.2-11B-Vision-Instruct | | | |
+| Llama-3.2-3B | meta-llama/Llama-3.2-3B-Instruct | RedHatAI/Llama-3.2-3B-quantized.w8a8 | RedHatAI/Llama-3.2-3B-Instruct-FP8 | AMead10/Llama-3.2-3B-Instruct-AWQ |
+| Llama-3.3-70B | meta-llama/Llama-3.3-70B-Instruct | CalamitousFelicitousness/Llama-3.3-70B-Instruct-W8A8-INT8 | clowman/Llama-3.3-70B-Instruct-FP8-W128 | lambda/Llama-3.3-70B-Instruct-AWQ-4bit |
+| Llama-4-Scout-17B | meta-llama/Llama-4-Scout-17B-16E-Instruct | Quantized with Intel AutoRound | | |
+| DeepSeek-R1-0528 | | Conexis/DeepSeek-R1-0528-Channel-INT8 | deepseek-ai/DeepSeek-R1-0528 | QuixiAI/DeepSeek-R1-0528-AWQ |
+| Qwen3-235B-A22B-Instruct-2507 | Qwen/Qwen3-235B-A22B-Instruct-2507 | | Qwen/Qwen3-235B-A22B-Instruct-2507-FP8 | QuantTrio/Qwen3-235B-A22B-Instruct-2507-AWQ |
+| Qwen3-Omni-30B-A3B-Thinking | Qwen/Qwen3-Omni-30B-A3B-Thinking | | | |
+| Qwen3.5-397B-A17B | Qwen/Qwen3.5-397B-A17B | | Qwen/Qwen3.5-397B-A17B-FP8 | |
+| Qwen3.5-35B-A3B | Qwen/Qwen3.5-35B-A3B | | Qwen/Qwen3.5-35B-A3B-FP8 | |
+| Qwen3.5-2B | Qwen/Qwen3.5-2B | | | |
+| gemma-3-12b-it | google/gemma-3-12b-it | | RedHatAI/gemma-3-12b-it-FP8-dynamic | pytorch/gemma-3-12b-it-AWQ-INT4 |
 
 > **Note:** The model identifiers listed in the table above have been verified on 6th Gen Intel® Xeon® P-core platforms.
 
