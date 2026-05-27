@@ -32,23 +32,31 @@ echo "==> Detected container runtime: $RUNTIME"
 
 case "$RUNTIME" in
   nerdctl)
-    # nerdctl needs buildkitd to run `nerdctl build`. On OPEA-deployed
-    # clusters buildkit isn't installed by default; install + start it
-    # if missing.
+    # nerdctl needs buildkitd to run `nerdctl build`. buildkit isn't in
+    # Ubuntu apt — install from upstream GitHub releases (~30 MB).
     if ! command -v buildctl >/dev/null 2>&1; then
-      echo "==> Installing buildkit (required by nerdctl build)"
-      apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y buildkit
+      BUILDKIT_VERSION="${BUILDKIT_VERSION:-v0.18.1}"
+      echo "==> Installing buildkit ${BUILDKIT_VERSION} from GitHub releases"
+      tmpdir=$(mktemp -d)
+      curl -fsSL \
+        "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
+        | tar -xz -C "$tmpdir"
+      install -m 0755 "$tmpdir/bin/buildctl"  /usr/local/bin/buildctl
+      install -m 0755 "$tmpdir/bin/buildkitd" /usr/local/bin/buildkitd
+      rm -rf "$tmpdir"
     fi
     if ! pgrep -x buildkitd >/dev/null 2>&1; then
       echo "==> Starting buildkitd in the background"
-      systemctl enable --now buildkit 2>/dev/null \
-        || nohup buildkitd >/var/log/buildkitd.log 2>&1 &
-      # give it a couple seconds to come up
-      for i in 1 2 3 4 5; do
+      mkdir -p /run/buildkit
+      nohup /usr/local/bin/buildkitd >/var/log/buildkitd.log 2>&1 &
+      for i in 1 2 3 4 5 6 7 8 9 10; do
         [ -S /run/buildkit/buildkitd.sock ] && break
         sleep 1
       done
+      [ -S /run/buildkit/buildkitd.sock ] || {
+        echo "buildkitd did not come up; see /var/log/buildkitd.log" >&2
+        exit 1
+      }
     fi
 
     # nerdctl builds directly into containerd's image store. Pin namespace
