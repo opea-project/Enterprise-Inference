@@ -418,6 +418,22 @@ kubectl patch pv <pv-name> --type=json \
 
 ---
 
+### Option 5 (Remove Model using deployment name) reports success but does not remove the model
+
+**Symptom**: The script prints `Inference LLM Model is removed successfully` but `kubectl get deployments` still shows the model running.
+
+**Root cause**: The script appends `-cpu` to the deployment name you provide. If you enter the full name as shown in `kubectl get deployments` (e.g. `vllm-qwen-3-1-7b-cpu`), the script looks for `vllm-qwen-3-1-7b-cpu-cpu`, which does not exist. It finds nothing to remove, skips silently, and still exits with a success message.
+
+**Fix**: Enter the deployment name **without the `-cpu` suffix**. For example, if `kubectl get deployments` shows `vllm-qwen-3-1-7b-cpu`, enter `vllm-qwen-3-1-7b`:
+
+```
+Enter the deployment name of the model you wish to deprovision: vllm-qwen-3-1-7b
+```
+
+The script will append `-cpu` internally and correctly target `vllm-qwen-3-1-7b-cpu` for removal.
+
+---
+
 ## 5. NRI Balloon Policy Issues
 
 ### NRI auto-enabled despite `deploy_nri_balloon_policy=no`
