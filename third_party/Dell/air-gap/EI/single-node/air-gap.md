@@ -337,12 +337,19 @@ the **only models that are confirmed to work** in an airgapped deployment. Other
 may work if their weights and tokenizer files are uploaded to JFrog manually, but they
 have not been tested and are not supported in this configuration.
 
+**Deployed from Enterprise Inference (pre-configured in the deployment):**
+
 | Model | HuggingFace ID | Approximate size | JFrog setup step |
 |---|---|---|---|
 | Llama 3.2 3B Instruct | `meta-llama/Llama-3.2-3B-Instruct` | ~6.5 GB | Step 3i |
+| Qwen3 1.7B | `Qwen/Qwen3-1.7B` | ~3.4 GB | Step 3l |
+
+**Deployed from HuggingFace:**
+
+| Model | HuggingFace ID | Approximate size | JFrog setup step |
+|---|---|---|---|
 | Qwen3 0.6B | `Qwen/Qwen3-0.6B` | ~1.2 GB | Step 3j |
 | Qwen3 4B | `Qwen/Qwen3-4B` | ~7.6 GB | Step 3k |
-| Qwen3 1.7B | `Qwen/Qwen3-1.7B` | ~3.4 GB | Step 3l |
 
 > [!IMPORTANT]
 > Only the models listed above have been validated in airgap mode. Deploying a model not
