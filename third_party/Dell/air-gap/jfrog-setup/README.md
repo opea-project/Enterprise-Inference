@@ -284,6 +284,41 @@ guide](../EI/single-node/air-gap.md) to configure VM2 and run the EI stack.
 
 ---
 
+## Uninstall
+
+To remove JFrog Artifactory and everything installed by `jfrog-installation.sh`, run the uninstall script on VM1:
+
+```bash
+cd ~/Enterprise-Inference/third_party/Dell/air-gap/jfrog-setup
+chmod +x uninstall-jfrog.sh
+sudo ./uninstall-jfrog.sh
+```
+
+The script will ask for confirmation before removing anything. It removes:
+
+- JFrog Artifactory and Xray services (stopped, disabled, and uninstalled)
+- JFrog data and configuration directories (`/opt/jfrog`, `/etc/opt/jfrog`, `/var/opt/jfrog`)
+- Helm binary
+- The `fs.inotify.max_user_instances` sysctl setting added during install
+- All apt packages installed by `jfrog-installation.sh` (curl, wget, git, jq, skopeo, ansible, python3, etc.)
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `--keep-data` | Remove JFrog software but keep `/opt/jfrog` data (useful if you plan to reinstall) |
+| `--keep-packages` | Skip removal of apt packages. Use this if other tools on VM1 depend on curl, git, python3, etc. |
+
+```bash
+sudo ./uninstall-jfrog.sh --keep-packages   # remove JFrog only, keep system packages
+sudo ./uninstall-jfrog.sh --keep-data       # remove JFrog software but preserve data
+```
+
+> [!WARNING]
+> The default run (no flags) removes all apt packages installed during setup, including `curl`, `git`, `python3`, and `ansible`. If VM1 is used for other purposes, use `--keep-packages` to avoid breaking other tools.
+
+---
+
 ## Troubleshooting
 
 <details>
