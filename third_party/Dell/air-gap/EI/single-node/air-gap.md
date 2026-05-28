@@ -101,6 +101,16 @@ curl -s --max-time 5 https://google.com && echo "FAIL - internet still open" || 
 curl -s --max-time 5 http://<VM1-IP>:8082/artifactory/api/system/ping && echo "OK - JFrog reachable" || echo "FAIL - JFrog unreachable"
 ```
 
+### Re-enable internet (if needed)
+
+If you need to restore internet access on VM2 — for example, to troubleshoot or reconfigure — flush the OUTPUT rules and save:
+
+```bash
+sudo iptables -F OUTPUT
+sudo netfilter-persistent save
+curl -s --max-time 5 https://google.com && echo "INTERNET RESTORED" || echo "FAIL - internet still blocked"
+```
+
 ---
 
 ## Step 2 - Copy the Enterprise Inference Repo to VM2
