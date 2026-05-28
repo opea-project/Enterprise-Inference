@@ -223,7 +223,42 @@ chmod +x inference-stack-deploy.sh
 ./inference-stack-deploy.sh
 ```
 
-The deployment will:
+### Select Option 1 — Provision Enterprise Inference Cluster
+
+When the menu appears, select **option 1**:
+
+```
+----------------------------------------------------------
+|  Intel AI for Enterprise Inference                      |
+|---------------------------------------------------------|
+| 1) Provision Enterprise Inference Cluster               |
+| 2) Decommission Existing Cluster                        |
+| 3) Update Deployed Inference Cluster                    |
+| 4) Brownfield Deployment of Enterprise Inference        |
+|---------------------------------------------------------|
+Please choose an option (1, 2, 3 or 4):
+> 1
+```
+
+### Select a model
+
+The script will display a list of available CPU models. For the first deployment, select **Llama 3.2 3B Instruct** (option 22):
+
+```
+Available Models for CPU Deployment:
+21. meta-llama/Llama-3.1-8B-Instruct
+22. meta-llama/Llama-3.2-3B-Instruct
+23. deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+...
+Enter the number of the CPU model you want to deploy/remove: 22
+```
+
+> [!NOTE]
+> Llama 3.2 3B Instruct is the recommended starting model for airgap deployments. It is
+> the smallest validated model and completes loading fastest, making it ideal for verifying
+> the deployment before adding larger models.
+
+The deployment will then:
 1. Install prerequisites (pip from JFrog PyPI, Ansible collections from JFrog)
 2. Download Kubespray from JFrog
 3. Deploy Kubernetes via Kubespray (all binaries and images from JFrog)
@@ -245,7 +280,7 @@ Expected pod states when complete:
 ```
 keycloak-0                    1/1 Running
 keycloak-postgresql-0         1/1 Running
-vllm-llama-8b-cpu-*           1/1 Running
+vllm-llama-3-2-3b-cpu-*       1/1 Running
 ```
 
 ---
@@ -262,19 +297,19 @@ cd ~/Enterprise-Inference/core
 ### Verify models are available
 
 ```bash
-curl -s http://api.example.com:32353/Llama-3.1-8B-Instruct-vllmcpu/v1/models \
+curl -s http://api.example.com:32353/Llama-3.2-3B-Instruct-vllmcpu/v1/models \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ### Test inference
 
 ```bash
-curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions \
+curl -k https://${BASE_URL}/Llama-3.2-3B-Instruct-vllmcpu/v1/completions \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "model": "meta-llama/Llama-3.2-3B-Instruct",
     "prompt": "What is Deep Learning?",
     "max_tokens": 25,
     "temperature": 0
@@ -408,6 +443,73 @@ curl -k https://${BASE_URL}/Llama-3.2-3B-Instruct-vllmcpu/v1/completions \
     "temperature": 0
   }'
 ```
+
+---
+
+### Deploying a Model Using a HuggingFace Model Card ID
+
+Use this option to deploy any model available on HuggingFace that is not in the default model list. The cluster must already be deployed before using this flow.
+
+> [!NOTE]
+> This requires `airgap_enabled=off` and internet access on the deployment VM. In airgap mode, only the models listed in the [Validated Models in Airgap Mode](#validated-models-in-airgap-mode) table are supported.
+
+#### Run the deploy script
+
+```bash
+cd ~/Enterprise-Inference/core
+./inference-stack-deploy.sh
+```
+
+#### Select Update → Manage LLM Models → Deploy Model from Hugging Face
+
+```
+> 3   (Update Deployed Inference Cluster)
+> 2   (Manage LLM Models)
+> 4   (Deploy Model from Hugging Face)
+```
+
+#### Enter the HuggingFace model card ID
+
+When prompted, enter the full HuggingFace model ID. For example:
+
+```
+Enter the HuggingFace model card ID: meta-llama/Llama-3.2-3B-Instruct
+```
+
+The model ID must match exactly as it appears on the HuggingFace model card (case-sensitive). For gated models such as Llama, your HuggingFace token must have read access and you must have accepted the model's license agreement on HuggingFace before deploying.
+
+#### Confirm and monitor
+
+Confirm the deployment when prompted. Then monitor the pod until it is running:
+
+```bash
+kubectl get pods -w
+kubectl logs <vllm-pod-name> --tail=20 | grep -v "OMP tid"
+```
+
+The pod name will reflect the model name. Once the pod shows `1/1 Running`, the model is ready to serve requests.
+
+#### Test the deployed model
+
+Generate a token and send an inference request using the model's HuggingFace ID:
+
+```bash
+cd ~/Enterprise-Inference/core
+. scripts/generate-token.sh
+
+curl -k https://${BASE_URL}/<model-route>/v1/completions \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "model": "meta-llama/Llama-3.2-3B-Instruct",
+    "prompt": "What is Deep Learning?",
+    "max_tokens": 100,
+    "temperature": 0
+  }'
+```
+
+Replace `<model-route>` with the route name assigned to the model (visible in `kubectl get apisixroutes`).
 
 ---
 
