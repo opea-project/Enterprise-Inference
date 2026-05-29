@@ -732,10 +732,48 @@
             name: "{{huggingface_model_deployment_name}}-ingress"
             state: absent
           tags: "install-{{ huggingface_model_deployment_name }}"
+        - name: Download "{{ huggingface_model_id }}" weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            MODEL_ID="{{ huggingface_model_id }}"
+            JFROG_FOLDER="${MODEL_ID#*/}"
+            HOST_DIR="/opt/ei-models/${MODEL_ID}"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — upload the model first: ./jfrog-setup.sh --step 3x --hf-token <token>"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: "install-{{ huggingface_model_deployment_name }}"
         - name: Deploy LLM model "{{ huggingface_model_id }}"
           ansible.builtin.command: >-
             helm upgrade --install "{{huggingface_model_deployment_name}}" "{{ remote_helm_charts_base }}/vllm"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/{{ huggingface_model_id }}"
+            --set SERVED_MODEL_NAME="{{ huggingface_model_id }}"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="{{ huggingface_model_id }}"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
