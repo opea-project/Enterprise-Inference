@@ -32,7 +32,8 @@ data:
   DO_NOT_TRACK: {{ .Values.DO_NOT_TRACK | quote}}
   {{- end }}
 
-  {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict).configMapValues | default .Values.defaultModelConfigs.configMapValues }}
+  {{- $perModelConfig := (index .Values.modelConfigs $modelName | default dict).configMapValues | default dict }}
+  {{- $modelConfig := merge $perModelConfig (.Values.defaultModelConfigs.configMapValues | default dict) }}
   {{- range $key, $value := $modelConfig }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

@@ -226,6 +226,7 @@
       command: >
         helm repo update
       run_once: true
+      when: not airgap_enabled | default(false) | bool
                    
     - name: Create TLS secret for GenAI Gateway
       kubernetes.core.k8s:

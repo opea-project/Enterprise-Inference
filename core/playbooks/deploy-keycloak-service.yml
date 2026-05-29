@@ -32,4 +32,4 @@
       changed_when: false
     - name: Synchronize repositories
       ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != ""
+      when: helm_repo_list.stdout != "" and not airgap_enabled | default(false) | bool

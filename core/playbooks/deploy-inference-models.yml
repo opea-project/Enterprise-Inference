@@ -769,6 +769,10 @@
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
             {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
+            {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
           register: helm_upgrade_install_model_deployment
@@ -2319,11 +2323,48 @@
             namespace: auth-apisix
             name: vllm-llama-3-2-3b-cpu-ingress
             state: absent
+        - name: Download meta-llama/Llama-3.2-3B-Instruct weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            JFROG_FOLDER="Meta-Llama-3.2-3B-Instruct"
+            HOST_DIR="/opt/ei-models/meta-llama/Llama-3.2-3B-Instruct"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — check JFrog URL, credentials, and that the model was uploaded"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-llama-3-2-3b
         - name: Deploy CPU based LLM model Llama-3.2-3B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-3-2-3b-cpu "{{ remote_helm_charts_base }}/vllm"
             --values "{{ xeon_values_file }}"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/meta-llama/Llama-3.2-3B-Instruct"
+            --set SERVED_MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="meta-llama/Llama-3.2-3B-Instruct"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
@@ -2435,11 +2476,48 @@
             namespace: auth-apisix
             name: vllm-qwen-3-1-7b-cpu-ingress
             state: absent
+        - name: Download Qwen/Qwen3-1.7B weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            JFROG_FOLDER="Qwen3-1.7B"
+            HOST_DIR="/opt/ei-models/Qwen/Qwen3-1.7B"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — check JFrog URL, credentials, and that the model was uploaded"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-1-7b
         - name: Deploy CPU based LLM model Qwen-3-1-7B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen-3-1-7b-cpu "{{ remote_helm_charts_base }}/vllm"
             --values "{{ xeon_values_file }}"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/Qwen/Qwen3-1.7B"
+            --set SERVED_MODEL_NAME="Qwen/Qwen3-1.7B"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="Qwen/Qwen3-1.7B"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
@@ -2694,6 +2772,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force

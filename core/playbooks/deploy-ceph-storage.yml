@@ -33,17 +33,19 @@
         executable: /bin/bash
       become: true
       run_once: true
-      when: helm_check.rc != 0
+      when: helm_check.rc != 0 and not airgap_enabled | default(false) | bool
 
     - name: Add rook-release Helm repo
       ansible.builtin.command: helm repo add rook-release https://charts.rook.io/release
       register: helm_repo
       changed_when: "'has been added' in helm_repo.stdout or 'already exists' in helm_repo.stdout"
       run_once: true
+      when: not airgap_enabled | default(false) | bool
 
     - name: Update Helm repositories
       ansible.builtin.command: helm repo update
       run_once: true
+      when: not airgap_enabled | default(false) | bool
 
     - name: Install/upgrade rook-ceph operator
       ansible.builtin.command: >

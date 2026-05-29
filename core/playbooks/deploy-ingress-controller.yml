@@ -32,7 +32,7 @@
       changed_when: false
     - name: Update Helm repositories to fetch the latest charts
       ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != ""
+      when: helm_repo_list.stdout != "" and not airgap_enabled | default(false) | bool
 
     - name: Retrieving the Number of Infrastructure Nodes (ei-infra-eligible)
       ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true -o jsonpath='{.items[*].metadata.name}' | wc -w

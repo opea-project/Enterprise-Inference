@@ -25,6 +25,7 @@
       kubernetes.core.helm_repository:
         name: prometheus-community
         repo_url: https://prometheus-community.github.io/helm-charts
+      when: not airgap_enabled | default(false) | bool
       tags: deploy_observability
     - name: Transfer Dependency files
       ansible.builtin.copy:
@@ -43,7 +44,7 @@
       tags: always
     - name: Synchronize Observability repositories
       ansible.builtin.shell: helm repo update
-      when: helm_repo_list_observability.stdout != ""
+      when: helm_repo_list_observability.stdout != "" and not airgap_enabled | default(false) | bool
       tags: always
     - name: Create Config for Gaudi Grafana Dashboard
       run_once: true
@@ -242,7 +243,7 @@
       kubernetes.core.helm_repository:
         name: bitnami
         repo_url: https://charts.bitnami.com/bitnami
-      when: deploy_logging == "yes"
+      when: deploy_logging == "yes" and not airgap_enabled | default(false) | bool
 
     - name: Check if Helm repositories exist Observability
       ansible.builtin.command: helm repo list
@@ -257,6 +258,7 @@
       when:
         - deploy_logging == "yes"
         - helm_repo_list_observability.stdout != ""
+        - not airgap_enabled | default(false) | bool
       tags: deploy_logging
 
     - name: Install Elasticsearch System
@@ -337,7 +339,7 @@
         values_files: "{{ remote_helm_charts_base }}/fluentbit/fluebit-values.yml"
         chart_version: "2.5.5"
       run_once: true
-      when: deploy_logging == "yes"
+      when: deploy_logging == "yes" and not airgap_enabled | default(false) | bool
       tags: deploy_logging
 
     - name: Update Fluent Bit ConfigMap
@@ -363,6 +365,7 @@
       kubernetes.core.helm_repository:
         name: grafana
         repo_url: https://grafana.github.io/helm-charts
+      when: not airgap_enabled | default(false) | bool
 
     - name: Add OpenTelemetry Helm repo
       run_once: true
@@ -370,6 +373,7 @@
       kubernetes.core.helm_repository:
         name: open-telemetry
         repo_url: https://open-telemetry.github.io/opentelemetry-helm-charts
+      when: not airgap_enabled | default(false) | bool
 
     - name: Transfer Dependency Files
       ansible.builtin.copy:

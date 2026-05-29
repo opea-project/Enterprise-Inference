@@ -320,7 +320,7 @@
   ansible.builtin.command: helm repo update
   delegate_to: "{{ groups['kube_control_plane'][0] }}"
   run_once: true
-  when: not vllm_balloon_exists or balloon_needs_update | default(false)
+  when: (not vllm_balloon_exists or balloon_needs_update | default(false)) and not airgap_enabled | default(false) | bool
   tags:
     - install
 

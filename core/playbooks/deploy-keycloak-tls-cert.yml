@@ -397,7 +397,7 @@
 
     - name: Update Helm repositories for APISIX
       ansible.builtin.command: helm repo update
-      when: deploy_apisix == "yes"
+      when: deploy_apisix == "yes" and not airgap_enabled | default(false) | bool
       changed_when: false
 
     - name: Synchronize dependencies for APISIX (internet)

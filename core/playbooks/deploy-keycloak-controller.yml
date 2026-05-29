@@ -33,7 +33,7 @@
       changed_when: false
     - name: Synchronize repositories
       ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != "" and delete_pv_on_purge == "no"
+      when: helm_repo_list.stdout != "" and delete_pv_on_purge == "no" and not airgap_enabled | default(false) | bool
     - name: Remove existing Keycloak PersistentVolume data directory
       ansible.builtin.file:
         path: /mnt/local-path-provisioner/
