@@ -2033,6 +2033,12 @@
             name: vllm-llama-8b-cpu-ingress
             state: absent
           ignore_errors: yes
+        - name: JFrog pre-check for Meta-Llama-3.1-8B-Instruct
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Meta-Llama-3.1-8B-Instruct"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-llama-8b
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2142,6 +2148,12 @@
             namespace: auth-apisix
             name: vllm-deepseek-r1-qwen32b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for DeepSeek-R1-Distill-Qwen-32B
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "DeepSeek-R1-Distill-Qwen-32B"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-deepseek-r1-distill-qwen-32b
         - name: Deploy CPU based LLM model Deepseek R1 Distill Qwen 32b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-qwen32b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2250,6 +2262,12 @@
             namespace: auth-apisix
             name: vllm-deepseek-r1-llama-8b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for DeepSeek-R1-Distill-Llama-8B
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "DeepSeek-R1-Distill-Llama-8B"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-deepseek-r1-distill-llama8b
         - name: Deploy CPU based LLM model Deepseek R1 Distill Llama 8B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2662,6 +2680,12 @@
             namespace: auth-apisix
             name: vllm-cpu-qwen-3-4b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for Qwen3-4B-Instruct-2507
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Qwen3-4B-Instruct-2507"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-4b
         - name: Deploy CPU based LLM model  Qwen-3-4B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen-3-4b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2772,6 +2796,12 @@
             namespace: auth-apisix
             name: vllm-qwen3-coder-30b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for Qwen3-Coder-30B-A3B-Instruct
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Qwen3-Coder-30B-A3B-Instruct"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-coder-30b
         - name: Deploy CPU based LLM model Qwen3-Coder-30B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen3-coder-30b-cpu "{{ remote_helm_charts_base }}/vllm"
