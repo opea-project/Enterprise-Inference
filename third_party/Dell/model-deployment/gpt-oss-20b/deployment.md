@@ -123,15 +123,6 @@ NAME                                       HOSTS
 sglang-gpt-oss-20b-apisixroute             api.example.com
 ```
 
-The ApisixRoute has a default 60 s upstream timeout, which is shorter
-than CPU inference at ~4 tokens/s can complete. Bump it before sending
-real requests:
-
-```bash
-kubectl patch apisixroute sglang-gpt-oss-20b-apisixroute --type='json' \
-  -p='[{"op":"add","path":"/spec/http/0/timeout","value":{"connect":"5s","read":"600s","send":"600s"}}]'
-```
-
 ## Step 5: Test the Deployed Model
 
 ```bash
@@ -155,6 +146,8 @@ curl -k https://${BASE_URL}/gpt-oss-20b-sglang/v1/chat/completions \
 If successful, the model returns a chat-completion response with the
 answer in `choices[0].message.content` and the model's internal
 reasoning in `choices[0].message.reasoning_content`.
+
+> If the request times out with a 504, CPU inference at ~4 tokens/s can exceed the default 60 s upstream timeout for longer responses. See [Gateway Timeout (504)](../sglang-troubleshooting.md#1-gateway-timeout-504-on-inference-requests) in the troubleshooting guide to bump both the nginx and APISIX timeouts.
 
 ### A Note on `max_tokens`
 
