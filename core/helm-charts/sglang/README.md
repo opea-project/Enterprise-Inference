@@ -34,7 +34,30 @@ the local containerd image store — no registry required.
 - **OpenAI-compatible API**: `/v1/chat/completions`, `/v1/models`, `/v1/completions`
 - **Chart-only delivery**: same standalone pattern as `core/helm-charts/ovms`, not yet wired into the Ansible playbooks
 
-## Prerequisites
+---
+
+## Which Scenario Applies to You?
+
+| | Scenario 1 | Scenario 2 |
+|---|---|---|
+| **Cluster setup** | OPEA Ansible playbooks already run | Fresh box — no existing cluster |
+| **k3s / nginx / APISIX / Keycloak** | Already provisioned | You set them up manually |
+| **Starting point** | Go to [Prerequisites](#prerequisites) | Go to [Scenario 2: k3s Bootstrap](#scenario-2-k3s-bootstrap-standalone-setup) |
+| **Converges at** | [Build the Image](#build-the-image) | [Build the Image](#build-the-image) |
+
+Both scenarios use the same chart, the same image, and the same `helm install` command.
+They differ only in how the cluster and auth stack are set up beforehand.
+
+---
+
+## Scenario 1: EI Deployment (OPEA Ansible Cluster)
+
+Use this path when your cluster was provisioned by the OPEA Ansible playbooks.
+k3s, nginx-ingress, APISIX, Keycloak, the Keycloak edge routes, and the OIDC
+client are already in place. Skip straight to **Prerequisites** and then
+**Build the Image**.
+
+### Prerequisites
 
 - **Operating System**: Ubuntu 22.04+
 - **Hardware**: Intel Xeon with AVX-512-BF16 / AMX-BF16 (Sapphire Rapids, Emerald Rapids, Granite Rapids)
@@ -46,12 +69,311 @@ the local containerd image store — no registry required.
 - **HuggingFace token** for gated models (e.g. `meta-llama/*`); not required for open models like `openai/gpt-oss-20b` or `Qwen/Qwen3-8B`
 - **Sudo access** for the one-shot image build
 
-> **Note:** On a stock OPEA cluster, k3s, nginx-ingress, APISIX, and Keycloak
-> are already in place via the project's Ansible playbooks — skip straight to
-> **Build the Image**. The "From-Scratch Bootstrap" appendix at the bottom is only
-> for people standing up a fresh single-node box from zero.
+---
+
+## Scenario 2: k3s Bootstrap (Standalone Setup)
+
+Use this path when you are starting from a **fresh single-node Ubuntu box**
+with no existing Kubernetes cluster. The steps below reproduce the same
+cluster shape the OPEA Ansible playbooks produce: k3s + nginx + Keycloak +
+APISIX (with GatewayProxy/IngressClass wiring), the TLS secret in both
+namespaces that need it, a `KC_HOSTNAME`-pinned Keycloak, the `/realms`,
+`/admin`, and `/token` edge Ingresses, and the `my-client-id` OIDC client.
+
+After completing this scenario, `generate-token.sh` and the model deploy
+work identically to the OPEA Ansible flow — both scenarios converge at
+**Build the Image** below.
+
+### S2.1 k3s + Helm
+
+```bash
+sudo bash scripts/bootstrap-k3s.sh
+export KUBECONFIG=$HOME/.kube/config
+kubectl get nodes -o wide
+helm version --short
+```
+
+The script installs k3s (`--disable traefik`), symlinks `kubectl`, copies
+kubeconfig to `~/.kube/config`, and installs Helm 3.
+
+### S2.2 nginx-ingress
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=NodePort \
+  --set controller.service.nodePorts.http=30080 \
+  --set controller.service.nodePorts.https=30443 \
+  --set controller.admissionWebhooks.enabled=false \
+  --set controller.ingressClassResource.default=true
+
+kubectl wait --for=condition=ready pod -n ingress-nginx \
+  -l app.kubernetes.io/component=controller --timeout=120s
+```
+
+### S2.3 Keycloak (dev mode)
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: keycloak, namespace: default }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:26.0
+        args: ["start-dev"]
+        env:
+        - { name: KEYCLOAK_ADMIN,          value: admin }
+        - { name: KEYCLOAK_ADMIN_PASSWORD, value: admin }
+        - { name: KC_HTTP_RELATIVE_PATH,   value: "/" }
+        - { name: KC_PROXY_HEADERS,        value: xforwarded }
+        # Pin the issuer hostname so tokens are always stamped with the
+        # cluster-internal name, no matter which edge hostname the
+        # request came in on. APISIX validates the `iss` claim against
+        # this hostname (chart's oidc.discovery default).
+        - { name: KC_HOSTNAME,             value: "http://keycloak.default.svc.cluster.local" }
+        - { name: KC_HOSTNAME_STRICT,      value: "false" }
+        - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "false" }
+        ports: [{ containerPort: 8080, name: http }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: keycloak, namespace: default }
+spec:
+  selector: { app: keycloak }
+  ports: [{ port: 80, targetPort: 8080 }]
+EOF
+kubectl wait --for=condition=ready pod -l app=keycloak --timeout=300s
+```
+
+Create the OIDC client. The `clientId` and `secret` here must exactly
+match what you'll later pass to the chart via `--set oidc.clientId=...`
+and `--set oidc.clientSecret=...`. The values below are the defaults used
+by the gpt-oss-20b deployment guide — substitute your own for any
+non-test deployment.
+
+```bash
+ADMIN=$(kubectl run kc-admin --rm -i --restart=Never --quiet \
+  --image=curlimages/curl:8.10.1 -- \
+  sh -c 'curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
+    -d "client_id=admin-cli" -d "username=admin" -d "password=admin" -d "grant_type=password"' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+
+CLIENT_ID=my-client-id
+CLIENT_SECRET=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR
+
+kubectl run kc-create --rm -i --restart=Never --quiet \
+  --image=curlimages/curl:8.10.1 -- \
+  sh -c "curl -sS -X POST -H 'Authorization: Bearer $ADMIN' \
+    -H 'Content-Type: application/json' \
+    http://keycloak.default.svc.cluster.local/admin/realms/master/clients \
+    -d '{\"clientId\":\"${CLIENT_ID}\",\"secret\":\"${CLIENT_SECRET}\",\"serviceAccountsEnabled\":true,\"publicClient\":false,\"directAccessGrantsEnabled\":true}'"
+```
+
+Verify the client was created:
+
+```bash
+kubectl run kc-check --rm -i --restart=Never --quiet \
+  --image=curlimages/curl:8.10.1 -- \
+  sh -c "curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
+    -d 'client_id=${CLIENT_ID}' -d 'client_secret=${CLIENT_SECRET}' -d 'grant_type=client_credentials'" \
+  | head -c 80
+# expect: JSON with "access_token":"..."
+```
+
+### S2.4 APISIX
+
+The Apache APISIX chart installs the dataplane + etcd + ingress
+controller. On v2 of the ingress controller (current as of this writing)
+you additionally need a `GatewayProxy` CR and an `IngressClass` whose
+`parameters` reference it — without those, the controller silently drops
+every `ApisixRoute` and the chart's route ends up unreachable.
+
+```bash
+helm repo add apisix https://charts.apiseven.com
+helm install auth-apisix apisix/apisix \
+  -n auth-apisix --create-namespace \
+  --set service.type=NodePort \
+  --set ingress-controller.enabled=true \
+  --set ingress-controller.config.apisix.serviceNamespace=auth-apisix
+
+kubectl wait --for=condition=ready pod -n auth-apisix --all --timeout=300s
+
+# Grab the admin key the chart generated for the dataplane
+ADMIN_KEY=$(helm get values auth-apisix -n auth-apisix --all \
+  | python3 -c "import sys,yaml; print(yaml.safe_load(sys.stdin)['apisix']['admin']['credentials']['admin'])")
+echo "APISIX admin key: $ADMIN_KEY"
+
+# Create the GatewayProxy that the ingress controller will use as its
+# dataplane handle.
+kubectl apply -f - <<EOF
+apiVersion: apisix.apache.org/v1alpha1
+kind: GatewayProxy
+metadata:
+  name: apisix-proxy
+  namespace: auth-apisix
+spec:
+  provider:
+    type: ControlPlane
+    controlPlane:
+      endpoints:
+        - http://auth-apisix-admin.auth-apisix.svc.cluster.local:9180
+      auth:
+        type: AdminKey
+        adminKey:
+          value: "${ADMIN_KEY}"
+EOF
+
+# Patch the IngressClass `apisix` (which the chart created) to point at
+# the GatewayProxy we just made.
+kubectl patch ingressclass apisix --type='merge' -p '{
+  "spec": {
+    "parameters": {
+      "apiGroup": "apisix.apache.org",
+      "kind": "GatewayProxy",
+      "name": "apisix-proxy",
+      "namespace": "auth-apisix",
+      "scope": "Namespace"
+    }
+  }
+}'
+
+# Verify
+kubectl get gatewayproxy -n auth-apisix
+kubectl get ingressclass apisix -o jsonpath='{.spec.parameters}{"\n"}'
+```
+
+### S2.5 TLS cert for `api.example.com`
+
+The chart's `--set ingress.secretName=${BASE_URL}` references a TLS
+Secret whose name equals the hostname. nginx requires the Secret in the
+same namespace as the Ingress that consumes it. We need it in two
+places: `auth-apisix` (where the chart-created Ingress for the model
+lives) and `default` (where the Keycloak-edge Ingresses in S2.7 will
+live).
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout /tmp/tls.key -out /tmp/tls.crt \
+  -subj "/CN=api.example.com/O=enterprise-inference-test" \
+  -addext "subjectAltName=DNS:api.example.com"
+
+kubectl create secret tls api.example.com \
+  --cert=/tmp/tls.crt --key=/tmp/tls.key -n auth-apisix
+kubectl create secret tls api.example.com \
+  --cert=/tmp/tls.crt --key=/tmp/tls.key -n default
+```
+
+### S2.6 Hostname resolution for `${BASE_URL}`
+
+`generate-token.sh` and the inference curls in the deployment guide
+both hit `https://${BASE_URL}/...` directly. In a production EI deployment
+this is real DNS pointing at the load balancer; for a self-bootstrapped
+cluster, an `/etc/hosts` entry is sufficient.
+
+```bash
+echo "127.0.0.1 api.example.com" | sudo tee -a /etc/hosts
+```
+
+nginx in this scenario is on NodePort 30443 (not 443), so set
+`BASE_URL` with the port for the EI scripts to find it:
+
+```bash
+export BASE_URL=api.example.com:30443
+```
+
+### S2.7 Keycloak edge routes
+
+`generate-token.sh` issues HTTP requests against `${BASE_URL}` — against
+`/realms/master/protocol/openid-connect/token`, `/admin/realms/...`, and
+`/token`. On an EI cluster the Ansible playbooks publish all three behind
+nginx; when bootstrapping by hand we publish them with two Ingresses below.
+
+```bash
+# Pass-through Ingress for /realms/* and /admin/*
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-edge
+  namespace: default
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts: [api.example.com]
+    secretName: api.example.com
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /realms
+        pathType: Prefix
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+EOF
+
+# Rewriting Ingress for /token → /realms/master/protocol/openid-connect/token.
+# In its own Ingress because the rewrite-target annotation applies to
+# every path in the Ingress that holds it.
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-token
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /realms/master/protocol/openid-connect/token
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts: [api.example.com]
+    secretName: api.example.com
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /token
+        pathType: Exact
+        backend:
+          service: { name: keycloak, port: { number: 80 } }
+EOF
+```
+
+Verify the routes work end-to-end (after S2.6):
+
+```bash
+# Should return the realm's public JWKS / configuration
+curl -k https://api.example.com:30443/realms/master/.well-known/openid-configuration \
+  | python3 -c "import sys,json; c=json.load(sys.stdin); print('issuer:', c['issuer'])"
+
+# Should return an access token for the OIDC client created in S2.3
+curl -k -s -X POST https://api.example.com:30443/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=my-client-id" \
+  -d "client_secret=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR" \
+  | python3 -c "import sys,json; t=json.load(sys.stdin); print('token len:', len(t.get('access_token','')))"
+```
+
+Cluster is now ready. Proceed to **Build the Image** below.
+
+---
 
 ## Build the Image
+
+> **Both scenarios converge here.** Whether your cluster came from the OPEA
+> Ansible playbooks (Scenario 1) or from the k3s bootstrap above (Scenario 2),
+> the image build and all subsequent steps are identical.
 
 ```bash
 git clone https://github.com/cld2labs/Enterprise-Inference.git
@@ -319,311 +641,3 @@ third_party/Dell/model-deployment/
 - [SGLang documentation](https://docs.sglang.io)
 - [SGLang CPU server guide](https://docs.sglang.io/docs/hardware-platforms/cpu_server)
 - [OpenAI gpt-oss model card](https://huggingface.co/openai/gpt-oss-20b)
-
----
-
-## Appendix: From-Scratch Bootstrap
-
-An Enterprise Inference cluster brought up with the OPEA Ansible
-playbooks already has k3s, nginx-ingress, APISIX, Keycloak, the
-Keycloak edge routes, and the OIDC client provisioned for you — skip
-this appendix entirely and go straight to **Build the Image**. The
-deployment guide is the same regardless of how the cluster was
-bootstrapped.
-
-This appendix produces the same cluster shape by hand for cases where
-the Ansible playbooks haven't been run: k3s + nginx + Keycloak + APISIX
-(with the GatewayProxy/IngressClass wiring), the TLS secret in both
-namespaces that need it, a `KC_HOSTNAME`-pinned Keycloak, the
-`/realms`, `/admin`, and `/token` edge Ingresses, and the
-`my-client-id` OIDC client. After it runs, `generate-token.sh` and the
-model deploy work identically to the OPEA flow.
-
-### A.1 k3s + Helm
-
-```bash
-sudo bash scripts/bootstrap-k3s.sh
-export KUBECONFIG=$HOME/.kube/config
-kubectl get nodes -o wide
-helm version --short
-```
-
-The script installs k3s (`--disable traefik`), symlinks `kubectl`, copies
-kubeconfig to `~/.kube/config`, and installs Helm 3.
-
-### A.2 nginx-ingress
-
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm install ingress-nginx ingress-nginx/ingress-nginx \
-  -n ingress-nginx --create-namespace \
-  --set controller.service.type=NodePort \
-  --set controller.service.nodePorts.http=30080 \
-  --set controller.service.nodePorts.https=30443 \
-  --set controller.admissionWebhooks.enabled=false \
-  --set controller.ingressClassResource.default=true
-
-kubectl wait --for=condition=ready pod -n ingress-nginx \
-  -l app.kubernetes.io/component=controller --timeout=120s
-```
-
-### A.3 Keycloak (dev mode)
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: keycloak, namespace: default }
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: keycloak } }
-  template:
-    metadata: { labels: { app: keycloak } }
-    spec:
-      containers:
-      - name: keycloak
-        image: quay.io/keycloak/keycloak:26.0
-        args: ["start-dev"]
-        env:
-        - { name: KEYCLOAK_ADMIN,          value: admin }
-        - { name: KEYCLOAK_ADMIN_PASSWORD, value: admin }
-        - { name: KC_HTTP_RELATIVE_PATH,   value: "/" }
-        - { name: KC_PROXY_HEADERS,        value: xforwarded }
-        # Pin the issuer hostname so tokens are always stamped with the
-        # cluster-internal name, no matter which edge hostname the
-        # request came in on. APISIX validates the `iss` claim against
-        # this hostname (chart's oidc.discovery default).
-        - { name: KC_HOSTNAME,             value: "http://keycloak.default.svc.cluster.local" }
-        - { name: KC_HOSTNAME_STRICT,      value: "false" }
-        - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: "false" }
-        ports: [{ containerPort: 8080, name: http }]
----
-apiVersion: v1
-kind: Service
-metadata: { name: keycloak, namespace: default }
-spec:
-  selector: { app: keycloak }
-  ports: [{ port: 80, targetPort: 8080 }]
-EOF
-kubectl wait --for=condition=ready pod -l app=keycloak --timeout=300s
-```
-
-Create the OIDC client. The `clientId` and `secret` here must exactly
-match what you'll later pass to the chart via `--set oidc.clientId=...`
-and `--set oidc.clientSecret=...`. The values below are the appendix
-defaults used by the gpt-oss-20b deployment guide — substitute your
-own for any non-test deployment.
-
-```bash
-ADMIN=$(kubectl run kc-admin --rm -i --restart=Never --quiet \
-  --image=curlimages/curl:8.10.1 -- \
-  sh -c 'curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
-    -d "client_id=admin-cli" -d "username=admin" -d "password=admin" -d "grant_type=password"' \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
-
-CLIENT_ID=my-client-id
-CLIENT_SECRET=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR
-
-kubectl run kc-create --rm -i --restart=Never --quiet \
-  --image=curlimages/curl:8.10.1 -- \
-  sh -c "curl -sS -X POST -H 'Authorization: Bearer $ADMIN' \
-    -H 'Content-Type: application/json' \
-    http://keycloak.default.svc.cluster.local/admin/realms/master/clients \
-    -d '{\"clientId\":\"${CLIENT_ID}\",\"secret\":\"${CLIENT_SECRET}\",\"serviceAccountsEnabled\":true,\"publicClient\":false,\"directAccessGrantsEnabled\":true}'"
-```
-
-Verify the client was created:
-
-```bash
-kubectl run kc-check --rm -i --restart=Never --quiet \
-  --image=curlimages/curl:8.10.1 -- \
-  sh -c "curl -sS -X POST http://keycloak.default.svc.cluster.local/realms/master/protocol/openid-connect/token \
-    -d 'client_id=${CLIENT_ID}' -d 'client_secret=${CLIENT_SECRET}' -d 'grant_type=client_credentials'" \
-  | head -c 80
-# expect: JSON with "access_token":"..."
-```
-
-### A.4 APISIX
-
-The Apache APISIX chart installs the dataplane + etcd + ingress
-controller. On v2 of the ingress controller (current as of this writing)
-you additionally need a `GatewayProxy` CR and an `IngressClass` whose
-`parameters` reference it — without those, the controller silently drops
-every `ApisixRoute` and the chart's route ends up unreachable.
-
-```bash
-helm repo add apisix https://charts.apiseven.com
-helm install auth-apisix apisix/apisix \
-  -n auth-apisix --create-namespace \
-  --set service.type=NodePort \
-  --set ingress-controller.enabled=true \
-  --set ingress-controller.config.apisix.serviceNamespace=auth-apisix
-
-kubectl wait --for=condition=ready pod -n auth-apisix --all --timeout=300s
-
-# Grab the admin key the chart generated for the dataplane
-ADMIN_KEY=$(helm get values auth-apisix -n auth-apisix --all \
-  | python3 -c "import sys,yaml; print(yaml.safe_load(sys.stdin)['apisix']['admin']['credentials']['admin'])")
-echo "APISIX admin key: $ADMIN_KEY"
-
-# Create the GatewayProxy that the ingress controller will use as its
-# dataplane handle.
-kubectl apply -f - <<EOF
-apiVersion: apisix.apache.org/v1alpha1
-kind: GatewayProxy
-metadata:
-  name: apisix-proxy
-  namespace: auth-apisix
-spec:
-  provider:
-    type: ControlPlane
-    controlPlane:
-      endpoints:
-        - http://auth-apisix-admin.auth-apisix.svc.cluster.local:9180
-      auth:
-        type: AdminKey
-        adminKey:
-          value: "${ADMIN_KEY}"
-EOF
-
-# Patch the IngressClass `apisix` (which the chart created) to point at
-# the GatewayProxy we just made.
-kubectl patch ingressclass apisix --type='merge' -p '{
-  "spec": {
-    "parameters": {
-      "apiGroup": "apisix.apache.org",
-      "kind": "GatewayProxy",
-      "name": "apisix-proxy",
-      "namespace": "auth-apisix",
-      "scope": "Namespace"
-    }
-  }
-}'
-
-# Verify
-kubectl get gatewayproxy -n auth-apisix
-kubectl get ingressclass apisix -o jsonpath='{.spec.parameters}{"\n"}'
-```
-
-### A.5 TLS cert for `api.example.com`
-
-The chart's `--set ingress.secretName=${BASE_URL}` references a TLS
-Secret whose name equals the hostname (so for the appendix default, the
-Secret is named `api.example.com`). nginx requires the Secret in the
-same namespace as the Ingress that consumes it. We need it in two
-places: `auth-apisix` (where the chart-created Ingress for the model
-lives) and `default` (where the Keycloak-edge Ingresses in A.7 will
-live).
-
-```bash
-openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-  -keyout /tmp/tls.key -out /tmp/tls.crt \
-  -subj "/CN=api.example.com/O=enterprise-inference-test" \
-  -addext "subjectAltName=DNS:api.example.com"
-
-kubectl create secret tls api.example.com \
-  --cert=/tmp/tls.crt --key=/tmp/tls.key -n auth-apisix
-kubectl create secret tls api.example.com \
-  --cert=/tmp/tls.crt --key=/tmp/tls.key -n default
-```
-
-### A.6 Hostname resolution for `${BASE_URL}`
-
-`generate-token.sh` and the inference curls in the deployment guide
-both hit `https://${BASE_URL}/...` directly, so the host running those
-commands must resolve `api.example.com`. In a production EI deployment
-this is real DNS pointing at the load balancer; for a self-bootstrapped
-cluster, an `/etc/hosts` entry pointing at the node is enough.
-
-```bash
-echo "127.0.0.1 api.example.com" | sudo tee -a /etc/hosts
-```
-
-nginx in this appendix is on NodePort 30443 (not 443), so set
-`BASE_URL` with the port for the EI scripts to find it:
-
-```bash
-export BASE_URL=api.example.com:30443
-```
-
-### A.7 Keycloak edge routes
-
-`generate-token.sh` issues two HTTP requests against `${BASE_URL}` —
-first against `/realms/master/protocol/openid-connect/token` and
-`/admin/realms/master/clients/...` (via `keycloak-fetch-client-secret.sh`,
-to log in as the admin user and read the OIDC client secret), then
-against `/token` (to exchange `client_credentials` for an access token).
-On an EI cluster the Ansible playbooks publish all three behind nginx;
-when bootstrapping by hand we publish them with two Ingresses below.
-
-```bash
-# Pass-through Ingress for /realms/* and /admin/* — these go straight to
-# Keycloak's endpoints unmodified.
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: keycloak-edge
-  namespace: default
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts: [api.example.com]
-    secretName: api.example.com
-  rules:
-  - host: api.example.com
-    http:
-      paths:
-      - path: /realms
-        pathType: Prefix
-        backend:
-          service: { name: keycloak, port: { number: 80 } }
-      - path: /admin
-        pathType: Prefix
-        backend:
-          service: { name: keycloak, port: { number: 80 } }
-EOF
-
-# Rewriting Ingress for /token → /realms/master/protocol/openid-connect/token.
-# In its own Ingress because the rewrite-target annotation applies to
-# every path in the Ingress that holds it.
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: keycloak-token
-  namespace: default
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /realms/master/protocol/openid-connect/token
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts: [api.example.com]
-    secretName: api.example.com
-  rules:
-  - host: api.example.com
-    http:
-      paths:
-      - path: /token
-        pathType: Exact
-        backend:
-          service: { name: keycloak, port: { number: 80 } }
-EOF
-```
-
-Verify the routes work end-to-end (assuming you've done A.6):
-
-```bash
-# Should return the realm's public JWKS / configuration
-curl -k https://api.example.com:30443/realms/master/.well-known/openid-configuration \
-  | python3 -c "import sys,json; c=json.load(sys.stdin); print('issuer:', c['issuer'])"
-
-# Should return an access token for the OIDC client created in A.3
-curl -k -s -X POST https://api.example.com:30443/token \
-  -d "grant_type=client_credentials" \
-  -d "client_id=my-client-id" \
-  -d "client_secret=tf29wNR5fZ7edbNmnLSWDEvL7Simx4CR" \
-  | python3 -c "import sys,json; t=json.load(sys.stdin); print('token len:', len(t.get('access_token','')))"
-```
-
-Now proceed to **Build the Image** and **Deploy a Model** above.

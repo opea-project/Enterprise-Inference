@@ -1,0 +1,11 @@
+# Local investigation / working notes — not for upstream
+FIXES.md
+INVESTIGATION.md
+JOURNEY.md
+REMAINING_WORK.md
+UPSTREAM_BUG_REPORT.md
+
+# Security scan outputs
+bandit-report.html
+bandit-screen-output.txt
+trivy-reports/
