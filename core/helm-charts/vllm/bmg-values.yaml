@@ -1,0 +1,194 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Intel® Arc™ Battlemage (BMG) GPU optimized override values for vLLM deployments.
+# This file contains BMG-specific overrides for Intel Arc B-series GPU (e.g., B580, B770).
+# Requires the Intel GPU Plugin (intel-device-plugins-gpu) to be installed on the cluster.
+
+# Intel XPU accelerator device (Arc GPU)
+accelDevice: "xpu"
+# Kubernetes resource name exposed by the Intel GPU device plugin
+accelDeviceResource: "gpu.intel.com/xe"
+
+block_size: 64           # XPU-optimised KV cache block size (must be >= 64 for 0.14.1-xpu IPEX chunked prefill)
+max_num_seqs: 128        # Max concurrent sequences (tuned for Arc B-series VRAM)
+max_seq_len_to_capture: 2048
+d_type: "float16"
+max_model_len: 8192
+
+image:
+  repository: intel/vllm
+  tag: "0.14.1-xpu"
+  pullPolicy: IfNotPresent
+  command: ["vllm", "serve"]
+
+# intel/vllm:0.14.1-xpu runs as root (no user defined in image)
+podSecurityContext:
+  fsGroup: 0
+  runAsUser: 0
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+  readOnlyRootFilesystem: false
+  runAsNonRoot: false
+  runAsUser: 0
+
+# Node affinity for BMG inference nodes
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: ei-inference-eligible
+          operator: In
+          values: ["true"]
+
+# Intel XPU runtime settings
+VLLM_NO_USAGE_STATS: 1
+DO_NOT_TRACK: 1
+
+# vLLM device backend - set via env var in 0.14.1-xpu (VLLM_TARGET_DEVICE=xpu is already baked in)
+VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+
+LLM_MODEL_ID: "Qwen/Qwen2.5-Coder-3B-Instruct"
+
+modelConfigs:
+
+  "meta-llama/Llama-3.1-8B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "llama3_json",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "mistralai/Mistral-7B-Instruct-v0.3":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "mistral",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "Qwen/Qwen2.5-7B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "hermes",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "Qwen/Qwen2.5-Coder-3B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "hermes",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "tiiuae/Falcon3-7B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+defaultModelConfigs:
+  configMapValues:
+    VLLM_NO_USAGE_STATS: "1"
+    DO_NOT_TRACK: "1"
+    VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+    HF_HUB_DISABLE_XET: "1"
+  extraCmdArgs:
+    [
+      "--dtype", "float16",
+      "--block-size", "16",
+      "--max-model-len", "8192",
+      "--gpu-memory-utilization", "0.90",
+      "--max-num-seqs", "128",
+      "--enforce-eager",
+    ]
+  tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+  pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"

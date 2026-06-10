@@ -23,7 +23,7 @@ remove_model_deployed_via_huggingface(){
     fi        
     
     read -p "Enter the deployment name of the model you wish to deprovision: " hugging_face_model_remove_name    
-    if [ "$cpu_or_gpu" == "c" ]; then
+    if [ "$device" == "cpu" ]; then
         hugging_face_model_remove_name="${hugging_face_model_remove_name}-cpu"
     fi
     if [ -n "$hugging_face_model_remove_name" ]; then

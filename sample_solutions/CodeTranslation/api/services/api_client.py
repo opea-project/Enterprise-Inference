@@ -35,7 +35,7 @@ class APIClient:
 
     def translate_code(self, source_code: str, source_lang: str, target_lang: str) -> str:
         """
-        Translate code from one language to another using CodeLlama-34b-instruct
+        Translate code from one language to another using an instruct model.
 
         Args:
             source_code: Code to translate
@@ -48,42 +48,41 @@ class APIClient:
         try:
             client = self.get_inference_client()
 
-            # Create prompt for code translation
-            prompt = f"""Translate the following {source_lang} code to {target_lang}.
-Only output the translated code without any explanations or markdown formatting.
-
-{source_lang} code:
-```
-{source_code}
-```
-
-{target_lang} code:
-```"""
-
             logger.info(f"Translating code from {source_lang} to {target_lang}")
 
-            # Use completions endpoint for CodeLlama
-            response = client.completions.create(
+            response = client.chat.completions.create(
                 model=config.INFERENCE_MODEL_NAME,
-                prompt=prompt,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"You are an expert code translator. "
+                            f"Translate {source_lang} code to {target_lang}. "
+                            f"Output only the translated code with no explanations or markdown."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Translate this {source_lang} code to {target_lang}:\n\n{source_code}",
+                    },
+                ],
                 max_tokens=config.LLM_MAX_TOKENS,
                 temperature=config.LLM_TEMPERATURE,
-                stop=["```"]  # Stop at closing code block
             )
 
-            # Handle response structure
-            if hasattr(response, 'choices') and len(response.choices) > 0:
-                choice = response.choices[0]
-                if hasattr(choice, 'text'):
-                    translated_code = choice.text.strip()
-                    logger.info(f"Successfully translated code ({len(translated_code)} characters)")
-                    return translated_code
-                else:
-                    logger.error(f"Unexpected response structure: {type(choice)}, {choice}")
-                    return ""
-            else:
-                logger.error(f"Unexpected response: {type(response)}, {response}")
-                return ""
+            if response.choices:
+                translated_code = response.choices[0].message.content.strip()
+                # Strip markdown code fences if model wraps output anyway
+                if translated_code.startswith("```"):
+                    lines = translated_code.splitlines()
+                    translated_code = "\n".join(
+                        lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+                    ).strip()
+                logger.info(f"Successfully translated code ({len(translated_code)} characters)")
+                return translated_code
+
+            logger.error(f"Empty choices in response: {response}")
+            return ""
         except Exception as e:
             logger.error(f"Error translating code: {str(e)}", exc_info=True)
             raise

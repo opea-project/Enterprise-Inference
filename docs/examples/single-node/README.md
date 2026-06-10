@@ -1,6 +1,6 @@
 # Setup Single Node Using Ansible
 
-These playbooks sets up a single node inference environment on either a  Intel® AI Accelerator or Intel® Xeon node using Ansible. It is designed to be run on the  Intel® AI Accelerator or Intel® Xeon node where the Intel® AI for Enterprise Inference Service will be deployed. The playbooks installs all necessary dependencies, configures the environment, and prepares the system for the Intel® AI for Enterprise Inference Service. If you are going to use  Intel® AI Accelerator, you will need to have the  Intel® AI Accelerator drivers and firmware installed on the system before running this playbook, for more information on installing the Intel® AI Accelerator drivers and firmware, refer to the [Intel® AI Accelerator Drivers Installation Guide](../../intel-ai-accelerator-prerequisites.md).
+These playbooks set up a single node inference environment on an Intel® AI Accelerator (Gaudi), Intel® Arc™ Battlemage (BMG) GPU, or Intel® Xeon node using Ansible. They are designed to be run on the target node where the Intel® AI for Enterprise Inference Service will be deployed. The playbooks install all necessary dependencies, configure the environment, and prepare the system for the Intel® AI for Enterprise Inference Service. If you are going to use Intel® AI Accelerator, you will need to have the Intel® AI Accelerator drivers and firmware installed on the system before running this playbook; for more information refer to the [Intel® AI Accelerator Drivers Installation Guide](../../intel-ai-accelerator-prerequisites.md). For Intel® Arc™ Battlemage GPU, refer to the [BMG Setup Guide](../../intel-arc-bmg-setup.md) for driver and prerequisites.
 
 Many of the defaults are setup to work out of the box, but you will need to update the **`cluster_ip`** and provide the **`hf_token`** for downloading models from Hugging Face.
 
@@ -33,8 +33,8 @@ Before running the playbook, review and update the following variables in the pl
 - **`hf_token_falcon3`**: Hugging Face token for Falcon 3. This can be the same as `hf_token`.
 
 ### Model Configuration
-- **`models`**: A comma-separated list of model IDs to deploy (e.g., `1,2`). See the main documentation for a list of the models. The current setup only allows for one model to be deployed at a time.
-- **`cpu_or_gpu`**: Set to `cpu` or `gpu` depending on the hardware.
+- **`models`**: A comma-separated list of model IDs to deploy (e.g., `1,2`). See the [supported models](../../supported-models.md) for the full list. The current setup only allows for one model to be deployed at a time.
+- **`device`**: Set to `cpu` for Xeon CPU, `hpu` for Gaudi GPU, or `xpu` for Intel® Arc™ Battlemage GPU.
 
 ### Certificate Configuration
 - **`cert_dir`**: The directory where certificates will be stored. No need to update it.

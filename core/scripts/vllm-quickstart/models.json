@@ -1,31 +1,72 @@
 {
   "docker": {
-    "image": "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.11.2",
+    "default_runtime": "cpu",
     "port": "8000:8000",
-    "environment": {
-      "VLLM_CPU_SGL_KERNEL": "1",
-      "VLLM_CPU_KVCACHE_SPACE": "40",
-      "VLLM_RPC_TIMEOUT": "100000",
-      "VLLM_ALLOW_LONG_MAX_MODEL_LEN": "1",
-      "VLLM_ENGINE_ITERATION_TIMEOUT_S": "120",
-      "VLLM_CPU_NUM_OF_RESERVED_CPU": "0"
-    },
-    "volumes": [
-      "/root/.cache/huggingface:/root/.cache/huggingface",
-      "/opt/vllm/examples:/workspace/examples"
-    ]
+    "runtime_profiles": {
+      "cpu": {
+        "image": "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.11.2",
+        "environment": {
+          "VLLM_CPU_SGL_KERNEL": "1",
+          "VLLM_CPU_KVCACHE_SPACE": "40",
+          "VLLM_RPC_TIMEOUT": "100000",
+          "VLLM_ALLOW_LONG_MAX_MODEL_LEN": "1",
+          "VLLM_ENGINE_ITERATION_TIMEOUT_S": "120",
+          "VLLM_CPU_NUM_OF_RESERVED_CPU": "0"
+        },
+        "volumes": [
+          "/root/.cache/huggingface:/root/.cache/huggingface",
+          "/opt/vllm/examples:/workspace/examples"
+        ]
+      },
+      "xpu": {
+        "image": "intel/vllm:0.14.1-xpu",
+        "group_add": [
+          "video",
+          "render"
+        ],
+        "devices": [
+          "/dev/dri:/dev/dri"
+        ],
+        "shm_size": "16g",
+        "environment": {
+          "VLLM_RPC_TIMEOUT": "100000",
+          "VLLM_ALLOW_LONG_MAX_MODEL_LEN": "1",
+          "VLLM_ENGINE_ITERATION_TIMEOUT_S": "120",
+          "SYCL_CACHE_PERSISTENT": "1"
+        },
+        "volumes": [
+          "/root/.cache/huggingface:/root/.cache/huggingface",
+          "/opt/vllm/examples:/workspace/examples"
+        ]
+      }
+    }
   },
   "global_defaults": {
-    "block_size": 128,
-    "dtype": "bfloat16",
-    "distributed_executor_backend": "mp",
-    "trust_remote_code": true,
-    "enable_chunked_prefill": true,
-    "enforce_eager": true,
-    "max_num_batched_tokens": 2048,
-    "max_num_seqs": 256,
-    "disable_log_requests": true,
-    "enable_auto_tool_choice": true
+    "cpu": {
+      "block_size": 128,
+      "dtype": "bfloat16",
+      "distributed_executor_backend": "mp",
+      "trust_remote_code": true,
+      "enable_chunked_prefill": true,
+      "enforce_eager": true,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 256,
+      "disable_log_requests": true,
+      "enable_auto_tool_choice": true
+    },
+    "xpu": {
+      "device": "xpu",
+      "block_size": 128,
+      "dtype": "bfloat16",
+      "distributed_executor_backend": "mp",
+      "trust_remote_code": true,
+      "enable_chunked_prefill": true,
+      "enforce_eager": true,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 256,
+      "disable_log_requests": true,
+      "enable_auto_tool_choice": true
+    }
   },
   "models": {
     "llama-8B": {

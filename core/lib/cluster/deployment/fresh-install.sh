@@ -57,10 +57,10 @@ fresh_installation() {
             # Deploy NRI CPU Balloons for CPU deployments (after all infrastructure, before models)
             if [[ "$deploy_nri_balloon_policy" == "yes" ]]; then
                 # Ensure this is a CPU deployment
-                if [[ "$cpu_or_gpu" != "c" ]]; then
-                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (cpu_or_gpu='c')${NC}"
-                    echo "${RED}Current cpu_or_gpu setting: '$cpu_or_gpu'${NC}"
-                    echo "${RED}Please set cpu_or_gpu to 'c' or disable NRI balloon policy deployment. Exiting!${NC}"
+                if [[ "$device" != "cpu" ]]; then
+                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (device='cpu')${NC}"
+                    echo "${RED}Current device setting: '$device'${NC}"
+                    echo "${RED}Please set device to 'cpu' or disable NRI balloon policy deployment. Exiting!${NC}"
                     exit 1
                 fi
                 execute_and_check "Deploying CPU Optimization (NRI Balloons & Topology Detection)..." deploy_nri_balloons_playbook "$@" \
@@ -74,6 +74,14 @@ fresh_installation() {
                     "Failed to deploy Habana AI Operator. Exiting."
             else
                 echo "Skipping Habana AI Operator installation..."
+            fi
+
+            if [[ "$deploy_intel_gpu_plugin" == "yes" ]]; then
+                execute_and_check "Deploying Intel GPU Plugin for Arc BMG..." run_deploy_intel_gpu_plugin_playbook \
+                    "Intel GPU Plugin is deployed." \
+                    "Failed to deploy Intel GPU Plugin. Exiting."
+            else
+                echo "Skipping Intel GPU Plugin installation..."
             fi
 
             if [[ "$uninstall_ceph" == "yes" ]]; then

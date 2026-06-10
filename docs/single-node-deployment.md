@@ -10,9 +10,9 @@ Before running the automation, it is recommended to complete all [prerequisites]
 
 ## System Component Deployment Recommendations
 
-For single-node Xeon clusters, **Keycloak** and **APISIX** are recommended.
+For single-node Xeon or Intel® Arc™ Battlemage GPU clusters, **Keycloak** and **APISIX** are recommended.
 
-For Intel® AI Accelerator or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
+For Intel® AI Accelerator (Gaudi) or large multi-node Xeon clusters, the GenAI Gateway is well-suited.
 
 ## Deployment
 
@@ -53,16 +53,27 @@ Follow the steps below depending on the hardware platform. The `models` argument
 #### CPU only
 Run the command below to deploy the Llama 3.1 8B parameter model on CPU.
 ```bash
-./inference-stack-deploy.sh --models "21" --cpu-or-gpu "cpu" --hugging-face-token $HUGGINGFACE_TOKEN
+./inference-stack-deploy.sh --models "21" --device "cpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
-#### Intel® AI Accelerators
+#### Intel® AI Accelerators (Gaudi)
 
 > **📝 Note**: If running on Intel® AI Accelerators, ensure firmware and drivers are up to date using the [automated setup scripts](./intel-ai-accelerator-prerequisites.md#automated-installationupgrade-process) before deployment.
 
-Run the command below to deploy the Llama 3.1 8B parameter model on Intel® AI Accelerator. For Gaudi 3, set `cpu-or-gpu` to `gaudi3` instead.
+Run the command below to deploy the Llama 3.1 8B parameter model on Intel® AI Accelerator (Gaudi 2). For Gaudi 3, the same `hpu` value applies.
 ```bash
-./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN
+./inference-stack-deploy.sh --models "1" --device "hpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
+
+#### Intel® Arc™ Battlemage (BMG) GPU
+
+> **📝 Note**: If running on Intel® Arc™ Battlemage GPU, ensure Intel GPU drivers are installed and the Intel GPU Plugin is ready. See the [BMG setup guide](./intel-arc-bmg-setup.md) for prerequisites.
+
+Run the command below to deploy the Qwen2.5-Coder-3B-Instruct model on Intel® Arc™ Battlemage GPU (default for XPU deployments).
+```bash
+./inference-stack-deploy.sh --models "36" --device "xpu" --hugging-face-token $HUGGINGFACE_TOKEN
+```
+
+For other BMG-compatible models (31–36), replace the model number. See [supported models](./intel-arc-bmg-setup.md#supported-models) for the full list.
 
 Select Option 1 and confirm the Yes/No prompt.
 
@@ -88,9 +99,14 @@ To test on CPU only. Note `vllmcpu` is appended to the URL.
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
 
-To test on Intel® AI Accelerators:
+To test on Intel® AI Accelerators (Gaudi):
 ```bash
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
+```
+
+To test on Intel® Arc™ Battlemage GPU (XPU). Note `vllmxpu` is appended to the URL.
+```bash
+curl -k https://${BASE_URL}/Qwen2.5-Coder-3B-Instruct-vllmxpu/v1/completions -X POST -d '{"model": "Qwen/Qwen2.5-Coder-3B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Post-Deployment

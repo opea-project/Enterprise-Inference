@@ -2687,6 +2687,534 @@
 
 
 
+    - name: Deploy BMG Llama-3.1-8B LLM Model
+      block:
+        - name: Delete Ingress resource BMG Llama-3.1-8B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-llama-8b-ingress
+            state: absent
+          tags: install-bmg-llama-8b
+        - name: Delete Ingress resource BMG Llama-3.1-8B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-llama-8b-ingress
+            state: absent
+          tags: install-bmg-llama-8b
+        - name: Deploy BMG LLM model Llama-3.1-8B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-llama-8b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="meta-llama/Llama-3.1-8B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_llama_8b
+          failed_when: helm_upgrade_install_bmg_llama_8b.rc != 0
+          tags: install-bmg-llama-8b
+        - name: Register BMG Llama-3.1-8B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "meta-llama/Llama-3.1-8B-Instruct"
+            reg_litellm_model: "openai/meta-llama/Llama-3.1-8B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-llama-8b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-llama-8b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-llama-8b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-llama-8b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-llama-8b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-llama-8b --short"
+      register: helm_release_bmg_llama_8b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-llama-8b
+    - name: Uninstall vllm-bmg-llama-8b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-llama-8b"
+      run_once: true
+      tags: uninstall-bmg-llama-8b
+      when:
+        - "'bmg-llama-8b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_llama_8b_installed.stdout != ""
+
+    - name: Deploy BMG Mistral-7B LLM Model
+      block:
+        - name: Delete Ingress resource BMG Mistral-7B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-mistral-7b-ingress
+            state: absent
+          tags: install-bmg-mistral-7b
+        - name: Delete Ingress resource BMG Mistral-7B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-mistral-7b-ingress
+            state: absent
+          tags: install-bmg-mistral-7b
+        - name: Deploy BMG LLM model Mistral-7B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-mistral-7b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="mistralai/Mistral-7B-Instruct-v0.3"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_mistral_7b
+          failed_when: helm_upgrade_install_bmg_mistral_7b.rc != 0
+          tags: install-bmg-mistral-7b
+        - name: Register BMG Mistral-7B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "mistralai/Mistral-7B-Instruct-v0.3"
+            reg_litellm_model: "openai/mistralai/Mistral-7B-Instruct-v0.3"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-mistral-7b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-mistral-7b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-mistral-7b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-mistral-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-mistral-7b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-mistral-7b --short"
+      register: helm_release_bmg_mistral_7b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-mistral-7b
+    - name: Uninstall vllm-bmg-mistral-7b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-mistral-7b"
+      run_once: true
+      tags: uninstall-bmg-mistral-7b
+      when:
+        - "'bmg-mistral-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_mistral_7b_installed.stdout != ""
+
+    - name: Deploy BMG DeepSeek-R1-Distill-Llama-8B LLM Model
+      block:
+        - name: Delete Ingress resource BMG DeepSeek-R1-Distill-Llama-8B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-deepseek-r1-distill-llama8b-ingress
+            state: absent
+          tags: install-bmg-deepseek-r1-distill-llama8b
+        - name: Delete Ingress resource BMG DeepSeek-R1-Distill-Llama-8B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-deepseek-r1-distill-llama8b-ingress
+            state: absent
+          tags: install-bmg-deepseek-r1-distill-llama8b
+        - name: Deploy BMG LLM model DeepSeek-R1-Distill-Llama-8B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-deepseek-r1-distill-llama8b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_deepseek_llama8b
+          failed_when: helm_upgrade_install_bmg_deepseek_llama8b.rc != 0
+          tags: install-bmg-deepseek-r1-distill-llama8b
+        - name: Register BMG DeepSeek-R1-Distill-Llama-8B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+            reg_litellm_model: "openai/deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-deepseek-r1-distill-llama8b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-deepseek-r1-distill-llama8b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-deepseek-r1-distill-llama8b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-deepseek-r1-distill-llama8b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-deepseek-r1-distill-llama8b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-deepseek-r1-distill-llama8b --short"
+      register: helm_release_bmg_deepseek_llama8b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-deepseek-r1-distill-llama8b
+    - name: Uninstall vllm-bmg-deepseek-r1-distill-llama8b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-deepseek-r1-distill-llama8b"
+      run_once: true
+      tags: uninstall-bmg-deepseek-r1-distill-llama8b
+      when:
+        - "'bmg-deepseek-r1-distill-llama8b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_deepseek_llama8b_installed.stdout != ""
+
+    - name: Deploy BMG Qwen2.5-7B LLM Model
+      block:
+        - name: Delete Ingress resource BMG Qwen2.5-7B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-qwen-2-5-7b-ingress
+            state: absent
+          tags: install-bmg-qwen-2-5-7b
+        - name: Delete Ingress resource BMG Qwen2.5-7B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-qwen-2-5-7b-ingress
+            state: absent
+          tags: install-bmg-qwen-2-5-7b
+        - name: Deploy BMG LLM model Qwen2.5-7B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-qwen-2-5-7b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_qwen_2_5_7b
+          failed_when: helm_upgrade_install_bmg_qwen_2_5_7b.rc != 0
+          tags: install-bmg-qwen-2-5-7b
+        - name: Register BMG Qwen2.5-7B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen2.5-7B-Instruct"
+            reg_litellm_model: "openai/Qwen/Qwen2.5-7B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-qwen-2-5-7b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-qwen-2-5-7b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-qwen-2-5-7b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-qwen-2-5-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-qwen-2-5-7b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-qwen-2-5-7b --short"
+      register: helm_release_bmg_qwen_2_5_7b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-qwen-2-5-7b
+    - name: Uninstall vllm-bmg-qwen-2-5-7b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-qwen-2-5-7b"
+      run_once: true
+      tags: uninstall-bmg-qwen-2-5-7b
+      when:
+        - "'bmg-qwen-2-5-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_qwen_2_5_7b_installed.stdout != ""
+
+    - name: Deploy BMG Falcon3-7B LLM Model
+      block:
+        - name: Delete Ingress resource BMG Falcon3-7B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-falcon3-7b-ingress
+            state: absent
+          tags: install-bmg-falcon3-7b
+        - name: Delete Ingress resource BMG Falcon3-7B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-falcon3-7b-ingress
+            state: absent
+          tags: install-bmg-falcon3-7b
+        - name: Deploy BMG LLM model Falcon3-7B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-falcon3-7b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="tiiuae/Falcon3-7B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_falcon3_7b
+          failed_when: helm_upgrade_install_bmg_falcon3_7b.rc != 0
+          tags: install-bmg-falcon3-7b
+        - name: Register BMG Falcon3-7B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "tiiuae/Falcon3-7B-Instruct"
+            reg_litellm_model: "openai/tiiuae/Falcon3-7B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-falcon3-7b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-falcon3-7b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-falcon3-7b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-falcon3-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-falcon3-7b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-falcon3-7b --short"
+      register: helm_release_bmg_falcon3_7b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-falcon3-7b
+    - name: Uninstall vllm-bmg-falcon3-7b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-falcon3-7b"
+      run_once: true
+      tags: uninstall-bmg-falcon3-7b
+      when:
+        - "'bmg-falcon3-7b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_falcon3_7b_installed.stdout != ""
+
+    - name: Deploy BMG Qwen2.5-Coder-3B LLM Model
+      block:
+        - name: Delete Ingress resource BMG Qwen2.5-Coder-3B from default namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: default
+            name: vllm-bmg-qwen-2-5-coder-3b-ingress
+            state: absent
+          tags: install-bmg-qwen-2-5-coder-3b
+        - name: Delete Ingress resource BMG Qwen2.5-Coder-3B from auth-apisix namespace
+          kubernetes.core.k8s:
+            kind: Ingress
+            namespace: auth-apisix
+            name: vllm-bmg-qwen-2-5-coder-3b-ingress
+            state: absent
+          tags: install-bmg-qwen-2-5-coder-3b
+        - name: Deploy BMG LLM model Qwen2.5-Coder-3B
+          ansible.builtin.command: >-
+            helm upgrade --install vllm-bmg-qwen-2-5-coder-3b "{{ remote_helm_charts_base }}/vllm"
+            --set LLM_MODEL_ID="Qwen/Qwen2.5-Coder-3B-Instruct"
+            --set global.monitoring="{{ vllm_metrics_enabled }}"
+            --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
+            --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
+            {% if bmg_deployment|lower == "true" %}
+              --values {{ bmg_values_file }}
+              --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
+            {% endif %}
+            {% if apisix_enabled %}
+              --set apisix.enabled={{ apisix_enabled }}
+              --set platform={{ kubernetes_platform }}
+            {% endif %}
+            {% if ingress_enabled %}
+              --set ingress.enabled={{ ingress_enabled }}
+              --set ingress.host={{ secret_name }}
+              --set ingress.secretname={{ secret_name }}
+              {% if kubernetes_platform == "eks" %}
+              --set aws_certificate_arn={{ aws_certificate_arn | default('') }}
+              {% endif %}
+            {% endif %}
+            {% if deploy_keycloak == 'yes' and apisix_enabled %}
+              --set oidc.client_id={{ keycloak_client_id | default('') }}
+              --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {{ helm_proxy_args | default('') }}
+            --force
+          register: helm_upgrade_install_bmg_qwen_2_5_coder_3b
+          failed_when: helm_upgrade_install_bmg_qwen_2_5_coder_3b.rc != 0
+          tags: install-bmg-qwen-2-5-coder-3b
+        - name: Register BMG Qwen2.5-Coder-3B model
+          import_tasks: register-model-genai-gateway.yml
+          vars:
+            reg_model_name: "Qwen/Qwen2.5-Coder-3B-Instruct"
+            reg_litellm_model: "openai/Qwen/Qwen2.5-Coder-3B-Instruct"
+            reg_custom_llm_provider: "openai"
+            reg_api_base: "http://vllm-bmg-qwen-2-5-coder-3b-service.default/v1"
+            reg_input_cost_per_token: 0.001
+            reg_output_cost_per_token: 0.002
+          tags:
+            - install-bmg-qwen-2-5-coder-3b
+            - install-genai-gateway
+          run_once: true
+          when:
+            - "'install-bmg-qwen-2-5-coder-3b' in ansible_run_tags"
+            - "'install-genai-gateway' in ansible_run_tags"
+      run_once: true
+      when:
+        - model_name_list is defined
+        - bmg_deployment|lower == "true"
+        - install_true == 'true'
+        - "'bmg-qwen-2-5-coder-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+
+    - name: Check if vllm-bmg-qwen-2-5-coder-3b Model is deployed
+      ansible.builtin.command:
+        cmd: "helm list --filter vllm-bmg-qwen-2-5-coder-3b --short"
+      register: helm_release_bmg_qwen_2_5_coder_3b_installed
+      ignore_errors: true
+      run_once: true
+      tags: uninstall-bmg-qwen-2-5-coder-3b
+    - name: Uninstall vllm-bmg-qwen-2-5-coder-3b Model
+      ansible.builtin.command:
+        cmd: "helm uninstall vllm-bmg-qwen-2-5-coder-3b"
+      run_once: true
+      tags: uninstall-bmg-qwen-2-5-coder-3b
+      when:
+        - "'bmg-qwen-2-5-coder-3b' in (model_name_list | regex_replace(',', ' ') | split())"
+        - uninstall_true == 'true'
+        - helm_release_bmg_qwen_2_5_coder_3b_installed.stdout != ""
+
     - name: List of Models to be Installed
       tags: always
       run_once: true

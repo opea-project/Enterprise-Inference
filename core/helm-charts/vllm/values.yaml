@@ -17,6 +17,8 @@ autoscaling:
 
 # empty for CPU (longer latencies are tolerated before HPA scaling unaccelerated service)
 accelDevice: ""
+# Kubernetes resource name for the accelerator (e.g. habana.ai/gaudi, gpu.intel.com/xe)
+accelDeviceResource: ""
 
 port: 2080
 shmSize: 1Gi
