@@ -1,0 +1,33 @@
+# =============================================================================
+# DocQvision API - Python Dependencies
+# =============================================================================
+
+# Web Framework & Server
+fastapi==0.115.4
+uvicorn==0.32.0
+python-multipart>=0.0.18
+
+# Data Validation & Configuration
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# AI/ML APIs
+openai>=1.54.0,<2.0.0
+
+# PDF Processing
+pypdf==5.1.0              # PDF text extraction
+PyMuPDF==1.24.14          # PDF to image conversion (provides 'fitz' module)
+
+# Image Processing
+Pillow==12.1.1
+
+# PDF Generation
+reportlab==4.2.5
+
+# Database
+sqlalchemy==2.0.43
+alembic==1.18.0
+
+# HTTP Clients
+requests==2.32.3
+httpx==0.28.1
