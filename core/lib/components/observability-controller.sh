@@ -18,5 +18,5 @@ deploy_observability_playbook() {
 
     local extra_vars="secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} deploy_observability=${deploy_observability} deploy_logging=${deploy_logging} observability_stack_chart_version=${observability_stack_chart_version} kubernetes_platform=${kubernetes_platform}"
 
-    ansible-playbook -i "${INVENTORY_PATH}" "$playbook_path" --become --become-user=root --extra-vars "$extra_vars" --tags "$tags" --vault-password-file "$vault_pass_file"
+    ansible-playbook -i "${INVENTORY_PATH}" "$playbook_path" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" --extra-vars "$extra_vars" --tags "$tags" --vault-password-file "$vault_pass_file"
 }

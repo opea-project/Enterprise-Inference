@@ -10,7 +10,7 @@ run_infrastructure_readiness_check() {
         echo -e "${YELLOW}Please ensure the inventory file exists and contains the correct host information.${NC}"
         return 1
     fi    
-    if ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --extra-vars "brownfield_deployment=true" playbooks/inference-precheck.yml; then
+    if ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" --extra-vars "brownfield_deployment=true" playbooks/inference-precheck.yml; then
         echo -e "${GREEN}Infrastructure readiness check completed successfully.${NC}"
         return 0
     else

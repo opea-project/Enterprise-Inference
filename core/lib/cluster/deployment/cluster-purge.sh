@@ -11,7 +11,7 @@ run_reset_playbook() {
     fi
         
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-keycloak-controller.yml --extra-vars "delete_pv_on_purge=${delete_pv_on_purge}"
-    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root reset.yml -e "confirm_reset=yes reset_nodes=false"
+    ansible-playbook -i "${INVENTORY_PATH}" --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" reset.yml -e "confirm_reset=yes reset_nodes=false"
     # Check the exit status of the Ansible playbook command
     if [ $? -eq 0 ]; then
         echo "Cluster reset playbook execution completed successfully."
