@@ -6,7 +6,9 @@ All business logic is directly in the MCP tools - no intermediate wrapper classe
 """
 
 import argparse
+import ast
 import json
+import operator
 import os
 import sys
 import urllib.request
@@ -54,7 +56,7 @@ def ensure_db(db_path: str) -> None:
     print(f"   Downloading from tau2-bench …")
     p.parent.mkdir(parents=True, exist_ok=True)
     try:
-        urllib.request.urlretrieve(TAU2_BENCH_URL, str(p))
+        urllib.request.urlretrieve(TAU2_BENCH_URL, str(p))  # nosec B310 - hardcoded https URL to tau2-bench dataset
         print(f"   ✅ Downloaded ({p.stat().st_size / 1_048_576:.1f} MB)")
     except Exception as exc:
         print(f"   ❌ Download failed: {exc}")
@@ -369,6 +371,28 @@ def _get_tool_metadata_payload() -> Dict[str, Any]:
 
 # ==================== READ / GENERIC TOOLS ====================
 
+_CALC_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _safe_eval_math(node: ast.AST) -> float:
+    if isinstance(node, ast.Expression):
+        return _safe_eval_math(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, ast.BinOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.left), _safe_eval_math(node.right))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.operand))
+    raise ValueError("Unsupported expression")
+
+
 @mcp.tool()
 def calculate(expression: str, session_id: str = "") -> str:
     """
@@ -383,9 +407,11 @@ def calculate(expression: str, session_id: str = "") -> str:
     Raises:
         ValueError: If the expression is invalid.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 2))
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as e:
+        raise ValueError("Invalid expression") from e
+    return str(round(float(_safe_eval_math(tree)), 2))
 
 
 @mcp.tool()
