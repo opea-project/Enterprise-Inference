@@ -18,7 +18,7 @@ spec:
     spec:
       initContainers:
         - name: wait-for-postgres-redis
-          image: busybox:1.36
+          image: docker.io/library/busybox:1.28
           command:
             - /bin/sh
             - -c

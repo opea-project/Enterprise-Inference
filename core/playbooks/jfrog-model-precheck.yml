@@ -1,0 +1,25 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Generic JFrog pre-check: verifies a model folder exists in ei-generic-models
+# before helm install. Fails with an actionable message if not found.
+#
+# Required variable:
+#   jfrog_folder: the folder name in ei-generic-models (e.g. "Meta-Llama-3.1-8B-Instruct")
+
+- name: "Check {{ jfrog_folder }} exists in JFrog"
+  ansible.builtin.uri:
+    url: "{{ jfrog_url | regex_replace('/$', '') }}/api/storage/ei-generic-models/{{ jfrog_folder }}"
+    url_username: "{{ jfrog_username }}"
+    url_password: "{{ jfrog_password }}"
+    method: GET
+    status_code: [200]
+  register: jfrog_precheck
+  ignore_errors: true
+  run_once: true
+
+- name: "Fail if {{ jfrog_folder }} not found in JFrog"
+  ansible.builtin.fail:
+    msg: "Model {{ jfrog_folder }} not found in JFrog ei-generic-models. Upload it first: ./jfrog-setup.sh --step 3x --hf-token <token>"
+  when: jfrog_precheck is failed
+  run_once: true

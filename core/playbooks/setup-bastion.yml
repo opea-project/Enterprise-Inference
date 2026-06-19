@@ -94,7 +94,7 @@
         dest: /tmp/kubectl
         mode: '0755'
         timeout: 120
-      when: not kubectl_exists.stat.exists or (existing_kubectl_version is defined and existing_kubectl_version.rc != 0)
+      when: (not kubectl_exists.stat.exists or (existing_kubectl_version is defined and existing_kubectl_version.rc != 0)) and not airgap_enabled | default(false) | bool
       tags: kubectl
 
     - name: Install kubectl to /usr/local/bin
@@ -132,6 +132,7 @@
         url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         dest: /tmp/get-helm-3.sh
         mode: '0755'
+      when: not airgap_enabled | default(false) | bool
       tags: helm
 
     - name: Install Helm
@@ -191,6 +192,7 @@
         url: "https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_amd64"
         dest: /usr/local/bin/yq
         mode: '0755'
+      when: not airgap_enabled | default(false) | bool
       tags: additional_tools
 
     - name: Install kubectx and kubens for context switching
@@ -203,6 +205,7 @@
           url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx
         - name: kubens
           url: https://raw.githubusercontent.com/ahmetb/kubectx/master/kubens
+      when: not airgap_enabled | default(false) | bool
       tags: additional_tools
 
     # Network connectivity verification

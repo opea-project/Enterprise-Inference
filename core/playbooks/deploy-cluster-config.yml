@@ -15,7 +15,7 @@
     - role: inference-tools
   tasks:
     - name: Create TLS cert for Admin dashboard
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -30,7 +30,7 @@
       register: kubectl_output
       tags: deploy_cluster_dashboard
     - name: Create Admin dashboard ingress
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
@@ -61,7 +61,7 @@
       when: brownfield_deployment != "yes"
       tags: deploy_cluster_dashboard
     - name: Create ServiceAccount for Admin Dashboard
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: v1
@@ -71,7 +71,7 @@
             namespace: kube-system
       tags: deploy_cluster_dashboard
     - name: Create ClusterRole for Kubernetes Dashboard
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1
@@ -97,7 +97,7 @@
               verbs: ["get", "create", "update"]
       tags: deploy_cluster_dashboard
     - name: Create ClusterRoleBinding for Admin Dashboard
-      community.kubernetes.k8s:
+      kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: rbac.authorization.k8s.io/v1

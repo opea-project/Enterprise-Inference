@@ -732,10 +732,48 @@
             name: "{{huggingface_model_deployment_name}}-ingress"
             state: absent
           tags: "install-{{ huggingface_model_deployment_name }}"
+        - name: Download "{{ huggingface_model_id }}" weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            MODEL_ID="{{ huggingface_model_id }}"
+            JFROG_FOLDER="${MODEL_ID#*/}"
+            HOST_DIR="/opt/ei-models/${MODEL_ID}"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — upload the model first: ./jfrog-setup.sh --step 3x --hf-token <token>"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: "install-{{ huggingface_model_deployment_name }}"
         - name: Deploy LLM model "{{ huggingface_model_id }}"
           ansible.builtin.command: >-
             helm upgrade --install "{{huggingface_model_deployment_name}}" "{{ remote_helm_charts_base }}/vllm"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/{{ huggingface_model_id }}"
+            --set SERVED_MODEL_NAME="{{ huggingface_model_id }}"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="{{ huggingface_model_id }}"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
@@ -745,12 +783,14 @@
             {% endif %}
             {% if cpu_playbook == 'true' %}
               --values {{ remote_helm_charts_base }}/vllm/xeon-values.yaml
+              {% if enable_cpu_balloons | default(false) | bool %}
               --set cpu_balloon_annotation="vllm-balloon"
               --set podLabels.name="vllm"
               --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
               --set memory="{{ optimal_memory_gb | default(8) }}Gi"
               --set tensor_parallel_size={{ optimal_balloon_config.tensor_parallel_size | default(1) }}
               --set pipeline_parallel_size={{ optimal_balloon_config.pipeline_parallel_size | default(1) }}
+              {% endif %}
             {% elif gaudi_deployment|lower == "true" %}
               --set tensor_parallel_size={{ huggingface_tensor_parellel_size }}
               --values {{ gaudi_values_file }}
@@ -766,6 +806,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -1989,6 +2033,12 @@
             name: vllm-llama-8b-cpu-ingress
             state: absent
           ignore_errors: yes
+        - name: JFrog pre-check for Meta-Llama-3.1-8B-Instruct
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Meta-Llama-3.1-8B-Instruct"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-llama-8b
         - name: Deploy CPU based LLM model  llama 8b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -1998,12 +2048,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2027,6 +2079,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2092,6 +2148,12 @@
             namespace: auth-apisix
             name: vllm-deepseek-r1-qwen32b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for DeepSeek-R1-Distill-Qwen-32B
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "DeepSeek-R1-Distill-Qwen-32B"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-deepseek-r1-distill-qwen-32b
         - name: Deploy CPU based LLM model Deepseek R1 Distill Qwen 32b Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-qwen32b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2101,12 +2163,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ model_paralletensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2130,6 +2194,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2194,6 +2262,12 @@
             namespace: auth-apisix
             name: vllm-deepseek-r1-llama-8b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for DeepSeek-R1-Distill-Llama-8B
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "DeepSeek-R1-Distill-Llama-8B"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-deepseek-r1-distill-llama8b
         - name: Deploy CPU based LLM model Deepseek R1 Distill Llama 8B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-deepseek-r1-llama-8b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2203,12 +2277,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2232,6 +2308,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2299,21 +2379,60 @@
             namespace: auth-apisix
             name: vllm-llama-3-2-3b-cpu-ingress
             state: absent
+        - name: Download meta-llama/Llama-3.2-3B-Instruct weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            JFROG_FOLDER="Meta-Llama-3.2-3B-Instruct"
+            HOST_DIR="/opt/ei-models/meta-llama/Llama-3.2-3B-Instruct"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — check JFrog URL, credentials, and that the model was uploaded"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-llama-3-2-3b
         - name: Deploy CPU based LLM model Llama-3.2-3B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-llama-3-2-3b-cpu "{{ remote_helm_charts_base }}/vllm"
             --values "{{ xeon_values_file }}"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/meta-llama/Llama-3.2-3B-Instruct"
+            --set SERVED_MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="meta-llama/Llama-3.2-3B-Instruct"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2337,6 +2456,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2409,21 +2532,60 @@
             namespace: auth-apisix
             name: vllm-qwen-3-1-7b-cpu-ingress
             state: absent
+        - name: Download Qwen/Qwen3-1.7B weights from JFrog
+          ansible.builtin.shell: |
+            set -e
+            JFROG_FOLDER="Qwen3-1.7B"
+            HOST_DIR="/opt/ei-models/Qwen/Qwen3-1.7B"
+            JFROG_BASE="{{ jfrog_url | regex_replace('/$', '') }}"
+            mkdir -p "${HOST_DIR}"
+            FILES=$(curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+              "${JFROG_BASE}/api/storage/ei-generic-models/${JFROG_FOLDER}?list&deep=1&listFolders=0" \
+              | python3 -c "import sys,json; [print(f['uri'].lstrip('/')) for f in json.load(sys.stdin).get('files',[])]")
+            if [ -z "$FILES" ]; then
+              echo "ERROR: No files found in JFrog for ${JFROG_FOLDER} — check JFrog URL, credentials, and that the model was uploaded"
+              exit 1
+            fi
+            while IFS= read -r rel; do
+              [ -z "$rel" ] && continue
+              DEST="${HOST_DIR}/${rel}"
+              mkdir -p "$(dirname "$DEST")"
+              if [ -f "$DEST" ]; then echo "Skipping ${rel} (exists)"; continue; fi
+              echo "Downloading ${rel}..."
+              curl -fsSL -u "{{ jfrog_username }}:{{ jfrog_password }}" \
+                "${JFROG_BASE}/ei-generic-models/${JFROG_FOLDER}/${rel}" -o "${DEST}.tmp" \
+                && mv "${DEST}.tmp" "${DEST}" \
+                || { rm -f "${DEST}.tmp"; echo "ERROR: failed to download ${rel}"; exit 1; }
+            done <<< "$FILES"
+          args:
+            executable: /bin/bash
+          run_once: true
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-1-7b
         - name: Deploy CPU based LLM model Qwen-3-1-7B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen-3-1-7b-cpu "{{ remote_helm_charts_base }}/vllm"
             --values "{{ xeon_values_file }}"
+            {% if airgap_enabled | default(false) | bool %}
+            --set LLM_MODEL_ID="/data/Qwen/Qwen3-1.7B"
+            --set SERVED_MODEL_NAME="Qwen/Qwen3-1.7B"
+            --set global.modelUseHostPath=/opt/ei-models
+            --set pvc.enabled=false
+            {% else %}
             --set LLM_MODEL_ID="Qwen/Qwen3-1.7B"
+            {% endif %}
             --set global.monitoring="{{ vllm_metrics_enabled }}"
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2447,6 +2609,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2514,6 +2680,12 @@
             namespace: auth-apisix
             name: vllm-cpu-qwen-3-4b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for Qwen3-4B-Instruct-2507
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Qwen3-4B-Instruct-2507"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-4b
         - name: Deploy CPU based LLM model  Qwen-3-4B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen-3-4b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2523,12 +2695,14 @@
             --set svcmonitor.enabled="{{ vllm_metrics_enabled }}"
             --set global.HUGGINGFACEHUB_API_TOKEN={{ hugging_face_token }}
             {% if cpu_playbook == 'true' %}
+            {% if enable_cpu_balloons | default(false) | bool %}
             --set cpu_balloon_annotation="vllm-balloon"
             --set podLabels.name="vllm"
             --set cpu="{{ optimal_balloon_config.workload_cpus | default(8) }}"
             --set memory="{{ optimal_memory_gb | default(8) }}Gi"
             --set tensor_parallel_size={{ tensor_parallel_size | default(1) }}
             --set pipeline_parallel_size={{ pipeline_parallel_size | default(1) }}
+            {% endif %}
             {% endif %}
             {% if apisix_enabled %}
               --set apisix.enabled={{ apisix_enabled }}
@@ -2552,6 +2726,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2618,6 +2796,12 @@
             namespace: auth-apisix
             name: vllm-qwen3-coder-30b-cpu-ingress
             state: absent
+        - name: JFrog pre-check for Qwen3-Coder-30B-A3B-Instruct
+          include_tasks: jfrog-model-precheck.yml
+          vars:
+            jfrog_folder: "Qwen3-Coder-30B-A3B-Instruct"
+          when: airgap_enabled | default(false) | bool
+          tags: install-cpu-qwen3-coder-30b
         - name: Deploy CPU based LLM model Qwen3-Coder-30B Installation
           ansible.builtin.command: >-
             helm upgrade --install vllm-qwen3-coder-30b-cpu "{{ remote_helm_charts_base }}/vllm"
@@ -2656,6 +2840,10 @@
             {% if deploy_keycloak == 'yes' and apisix_enabled %}
               --set oidc.client_id={{ keycloak_client_id | default('') }}
               --set oidc.client_secret={{ client_secret | default('') }}
+            {% endif %}
+            {% if airgap_enabled | default(false) | bool %}
+            --set defaultModelConfigs.configMapValues.HF_HUB_OFFLINE="1"
+            --set defaultModelConfigs.configMapValues.TRANSFORMERS_OFFLINE="1"
             {% endif %}
             {{ helm_proxy_args | default('') }}
             --force
@@ -2697,6 +2885,7 @@
       ansible.builtin.shell:
         cmd: "helm list --short | grep 'vllm-'"
       register: inference_models
+      failed_when: inference_models.rc not in [0, 1]
       when: list_model_true == 'true'
     - name: Print Installed Models in Comma Separated Format
       ansible.builtin.debug:

@@ -82,10 +82,12 @@
       register: helm_repo
       changed_when: "'has been added' in helm_repo.stdout or 'already exists' in helm_repo.stdout"
       run_once: true
+      when: not airgap_enabled | default(false) | bool
 
     - name: Update Helm repos
       command: helm repo update
       run_once: true
+      when: not airgap_enabled | default(false) | bool
 
     - name: Install/upgrade istio-base
       command: helm upgrade --install istio-base istio/base -n istio-system --create-namespace --wait --version {{ istio_chart_version }}
@@ -96,6 +98,7 @@
         kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || \
         kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
       run_once: true
+      when: not airgap_enabled | default(false) | bool
 
     - name: Install/upgrade istiod in ambient mode
       command: helm upgrade --install istiod istio/istiod --namespace istio-system --set profile=ambient --wait --version {{ istio_chart_version }}

@@ -180,7 +180,7 @@
 # ============================================================================
 # STEP 3: Deploy NRI using Helm
 # ============================================================================
-- name: Add NRI plugins Helm repository
+- name: Add NRI plugins Helm repository (internet)
   kubernetes.core.helm_repository:
     name: "{{ nri_cpu_balloons.helm.repo_name }}"
     repo_url: "{{ nri_cpu_balloons.helm.repo_url }}"
@@ -193,6 +193,16 @@
   delay: 10
   register: helm_repo_result
   until: helm_repo_result is succeeded
+  run_once: true
+  when: not airgap_enabled | default(false) | bool
+
+- name: Add NRI plugins Helm repository (airgap via JFrog)
+  ansible.builtin.command: >
+    helm repo add {{ nri_cpu_balloons.helm.repo_name }} {{ helm_repo_nri_plugins }}
+    --username {{ jfrog_username }} --password {{ jfrog_password }}
+    --force-update
+  when: airgap_enabled | default(false) | bool
+  changed_when: false
   run_once: true
 
 - name: Update Helm repositories for NRI
