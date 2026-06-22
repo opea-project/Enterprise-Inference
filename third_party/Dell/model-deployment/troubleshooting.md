@@ -20,7 +20,7 @@ upstream timed out (110: Operation timed out) ... 60.001
 
 **Cause:**
 
-CPU-based model inference (`vllm-cpu`) generates tokens at ~0.3-0.4 tokens/s. Responses requiring more than ~24 tokens exceed the default 60s upstream timeout enforced by ingress-nginx and APISIX.
+Model inference using CPU-based configurations may encounter performance variances where processing times exceed the default 60-second upstream timeout enforced by ingress-nginx and APISIX, resulting in a timeout error.
 
 **Fix:**
 
@@ -75,5 +75,5 @@ Re-run the inference request and confirm a `200 OK` response is returned within 
 **Notes:**
 
 - The nginx ingress annotation takes effect immediately; no pod restart required.
-- For GPU-based deployments this timeout is rarely needed as throughput is significantly higher (30-50 tokens/s vs 0.3-0.4 tokens/s on CPU).
+- GPU-based deployments typically achieve significantly higher throughput, making this timeout adjustment rarely necessary compared to CPU configurations.
 - If requests still time out after increasing both timeouts, reduce `max_tokens` in the request payload to limit response length.
