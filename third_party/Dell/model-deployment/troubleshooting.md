@@ -32,7 +32,7 @@ Apply to both the `default` and `auth-apisix` namespaces. To find ingress names:
 kubectl get ingress -A | grep <model-name>
 ```
 
-Then annotate each ingress:
+Then annotate **EACH** ingress:
 
 ```bash
 kubectl annotate ingress <ingress-name> -n <namespace> \
