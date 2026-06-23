@@ -38,7 +38,10 @@ loadbalancer_apiserver_healthcheck_port: 8081
 # disable_host_nameservers: false
 
 ## Upstream dns servers
-# upstream_dns_servers:
+upstream_dns_servers:
+  - "10.248.2.1"
+  - "10.45.15.7"
+  - "10.2.71.6"
 #   - 8.8.8.8
 #   - 8.8.4.4
 
@@ -55,15 +58,15 @@ loadbalancer_apiserver_healthcheck_port: 8081
 # external_cloud_provider:
 
 ## Set these proxy values in order to update package manager and docker daemon to use proxies and custom CA for https_proxy if needed
-# http_proxy: ""
-# https_proxy: ""
+http_proxy: "http://proxy-dmz.intel.com:912"
+https_proxy: "http://proxy-dmz.intel.com:912"
 # https_proxy_cert_file: ""
 
 # DO NOT CHANGE INDENTATION - used by Automation
 env_proxy:
-  http_proxy: ""
-  https_proxy: ""
-  no_proxy: ""
+  http_proxy: "http://proxy-dmz.intel.com:912"
+  https_proxy: "http://proxy-dmz.intel.com:912"
+  no_proxy: "localhost,127.0.0.1,10.96.0.0/12,10.244.0.0/16,192.168.0.0/16,.svc,.cluster.local,10.233.0.1,10.233.0.0/18,10.0.0.0/8,intel.com,bmgaisolutions.com,api.example.com"
 
 ## Refer to roles/kubespray-defaults/defaults/main/main.yml before modifying no_proxy
 # no_proxy: ""

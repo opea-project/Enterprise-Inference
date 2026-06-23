@@ -17,12 +17,14 @@ ingress_enabled: 'false'
 deploy_keycloak: 'no'
 tensor_parallel_size_vllm: 1
 gaudi_deployment: 'true'
+bmg_deployment: 'false'
 huggingface_model_id: 'false'
 hugging_face_model_deployment: 'false'
 huggingface_model_deployment_name: 'None'
 hugging_face_model_remove_name: 'false'
 balloon_policy_cpu: 'None'
 gaudi_values_file: "{{ remote_helm_charts_base }}/vllm/gaudi-values.yaml"
+bmg_values_file: "{{ remote_helm_charts_base }}/vllm/bmg-values.yaml"
 huggingface_tensor_parellel_size: 'false'
 vllm_metrics_enabled: 'false'
 # Total CPUs reserved across all NUMA nodes for system components (keycloak, apisix, observability)

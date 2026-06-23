@@ -3,6 +3,10 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      args:
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
     container_name: code-trans-backend
     ports:
       - "5001:5001"
@@ -32,6 +36,10 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+      args:
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+        - no_proxy=${no_proxy}
     container_name: code-trans-frontend
     ports:
       - "3000:8080"
@@ -39,7 +47,6 @@ services:
       - backend
     networks:
       - code-trans-network
-    restart: unless-stopped
 
 networks:
   code-trans-network:

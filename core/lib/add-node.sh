@@ -44,7 +44,7 @@ add_worker_node() {
 
 
     #Rerun baloon policy if its cpu deployment
-    if [[ "$cpu_or_gpu" == "c" ]]; then
+    if [[ "$device" == "cpu" ]]; then
         echo "Reapplying NRI CPU Balloons for CPU deployments..."
         execute_and_check "Reapplying NRI CPU Balloons..." deploy_nri_balloons_playbook "$@" \
             "NRI CPU Balloons re-applied successfully." \

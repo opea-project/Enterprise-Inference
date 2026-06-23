@@ -4,9 +4,9 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export BASE_URL=api.example.com # The base URL of the Keycloak server, note https:// is omitted
-export KEYCLOAK_ADMIN_USERNAME=your-keycloak-admin-user # The username for Keycloak admin login
-export KEYCLOAK_PASSWORD=changeme # The password for Keycloak admin login
-export KEYCLOAK_CLIENT_ID=my-client-id # The client ID to be created in Keycloak
+export KEYCLOAK_ADMIN_USERNAME=admin # The username for Keycloak admin login
+export KEYCLOAK_PASSWORD=password # The password for Keycloak admin login
+export KEYCLOAK_CLIENT_ID=my-client # The client ID to be created in Keycloak
 
 export KEYCLOAK_CLIENT_SECRET=$(bash "${SCRIPT_DIR}/keycloak-fetch-client-secret.sh" ${BASE_URL} ${KEYCLOAK_ADMIN_USERNAME} ${KEYCLOAK_PASSWORD} ${KEYCLOAK_CLIENT_ID} | awk -F': ' '/Client secret:/ {print $2}')
 

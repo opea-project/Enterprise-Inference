@@ -50,7 +50,7 @@ NC=$(tput sgr0)
 # --keycloak-admin-password <password>: The Keycloak admin password.
 # --hugging-face-token <token>: The token for Huggingface.
 # --models <models>: The models to deploy (comma-separated list of model numbers or names).
-# --cpu-or-gpu <c/g>: Specify whether to run on CPU or GPU.
+# --device <cpu/hpu/xpu>: Specify the target device. 'cpu' for Xeon, 'hpu' for Gaudi GPU, 'xpu' for Intel Arc Battlemage GPU.
 
 # Main Menu
 
@@ -86,7 +86,7 @@ NC=$(tput sgr0)
 
 # Example
 # To perform a fresh installation with specific parameters, you can run:
-# ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/to/cert.pem" --key-file "/path/to/key.pem" --keycloak-client-id "my-client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "1,3,5" --cpu-or-gpu "g"
+# ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/to/cert.pem" --key-file "/path/to/key.pem" --keycloak-client-id "my-client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "1,3,5" --device "hpu"
 
 ##############################################################################
 
@@ -118,6 +118,7 @@ source "$SCRIPT_DIR/lib/cluster/drv-fw-update.sh"
 # Components deployment
 source "$SCRIPT_DIR/lib/components/kubernetes-setup.sh"
 source "$SCRIPT_DIR/lib/components/intel-base-operator.sh"
+source "$SCRIPT_DIR/lib/components/intel-gpu-plugin.sh"
 source "$SCRIPT_DIR/lib/components/ingress-controller.sh"
 source "$SCRIPT_DIR/lib/components/keycloak-controller.sh"
 source "$SCRIPT_DIR/lib/components/genai-gateway-controller.sh"
@@ -166,10 +167,11 @@ Options:
   --keycloak-admin-password <pw> Keycloak admin password.
   --hugging-face-token <token>   Huggingface token.
   --models <models>              Models to deploy (comma-separated).
-  --cpu-or-gpu <c/g>             Run on CPU (c) or GPU (g).
+  --device <cpu/hpu/xpu>         Target device: cpu (Xeon), hpu (Gaudi GPU), xpu (Intel Arc Battlemage GPU).
 
 Examples:
-  Setup cluster: ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/cert.pem" --key-file "/path/key.pem" --keycloak-client-id "client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "1,3,5" --cpu-or-gpu "g"
+  Setup cluster (Gaudi GPU): ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/cert.pem" --key-file "/path/key.pem" --keycloak-client-id "client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "1,3,5" --device "hpu"
+  Setup cluster (BMG GPU):   ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/cert.pem" --key-file "/path/key.pem" --keycloak-client-id "client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "36" --device "xpu"
 
 ###############################################################################  
 EOF

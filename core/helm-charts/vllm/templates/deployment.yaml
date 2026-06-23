@@ -126,11 +126,12 @@ spec:
           {{- if .Values.image.pullPolicy }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- end }}
-          # command:
-          #   - /bin/bash
-          #   - -c
-          #   - |
-          #     python3 -m vllm.entrypoints.openai.api_server --dtype {{ .Values.d_type }}  --model {{ .Values.LLM_MODEL_ID }} --port {{ .Values.port }} --tensor-parallel-size {{ .Values.tensor_parallel_size }} --block-size {{ .Values.block_size }} --max-model-len {{ .Values.max_model_len }} --disable-log-requests
+          {{- if .Values.image.command }}
+          command:
+            {{- range .Values.image.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
           args:
             {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
             {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
@@ -195,7 +196,7 @@ spec:
             {{- end }}
             {{- else }}
             limits:
-              habana.ai/gaudi: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+              {{ .Values.accelDeviceResource | default "habana.ai/gaudi" }}: {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs .Values.LLM_MODEL_ID | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
             {{- end }}
           {{- end }}
             

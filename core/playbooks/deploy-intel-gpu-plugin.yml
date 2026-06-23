@@ -1,0 +1,106 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+- name: Deploy Intel GPU Plugin for Intel Arc Battlemage (BMG) GPU
+  hosts: "{{ inference_delegate | default('kube_control_plane') }}"
+  gather_facts: false
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  environment: "{{ proxy_disable_env | default(env_proxy | default({})) }}"
+  vars:
+    intel_gpu_plugin_namespace: "intel-system"
+    intel_gpu_plugin_version: "{{ intel_gpu_plugin_version | default('0.35.0') }}"
+  tasks:
+    - name: Create Intel System namespace
+      kubernetes.core.k8s:
+        name: "{{ intel_gpu_plugin_namespace }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+      run_once: true
+
+    - name: Deploy Node Feature Discovery (NFD)
+      ansible.builtin.command:
+        cmd: >-
+          kubectl apply -k
+          https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/nfd?ref=v{{ intel_gpu_plugin_version }}
+      run_once: true
+      register: nfd_deploy
+      retries: 3
+      delay: 10
+      until: nfd_deploy.rc == 0
+      changed_when: "'configured' in nfd_deploy.stdout or 'created' in nfd_deploy.stdout"
+
+    - name: Wait for NFD master to be ready
+      ansible.builtin.command:
+        cmd: kubectl rollout status deployment/nfd-master -n node-feature-discovery --timeout=120s
+      run_once: true
+      register: nfd_ready
+      retries: 6
+      delay: 20
+      until: nfd_ready.rc == 0
+      changed_when: false
+
+    - name: Deploy NodeFeatureRules for Intel GPU detection
+      ansible.builtin.command:
+        cmd: >-
+          kubectl apply -k
+          https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/nfd/overlays/node-feature-rules?ref=v{{ intel_gpu_plugin_version }}
+      run_once: true
+      register: nfd_rules_deploy
+      retries: 3
+      delay: 10
+      until: nfd_rules_deploy.rc == 0
+      changed_when: "'configured' in nfd_rules_deploy.stdout or 'created' in nfd_rules_deploy.stdout"
+
+    - name: Wait for nodes to be labeled with Intel GPU feature
+      ansible.builtin.command:
+        cmd: >-
+          kubectl get nodes -l intel.feature.node.kubernetes.io/gpu=true -o name
+      run_once: true
+      register: gpu_nodes
+      retries: 18
+      delay: 10
+      until: gpu_nodes.stdout_lines | length > 0
+      changed_when: false
+
+    - name: Deploy Intel GPU Device Plugin via NFD-labeled nodes overlay
+      ansible.builtin.command:
+        cmd: >-
+          kubectl apply -k
+          https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/gpu_plugin/overlays/nfd_labeled_nodes?ref=v{{ intel_gpu_plugin_version }}
+      run_once: true
+      register: gpu_plugin_deploy
+      retries: 3
+      delay: 10
+      until: gpu_plugin_deploy.rc == 0
+      changed_when: "'configured' in gpu_plugin_deploy.stdout or 'created' in gpu_plugin_deploy.stdout"
+
+    - name: Wait for Intel GPU Device Plugin DaemonSet to be ready
+      kubernetes.core.k8s_info:
+        kind: DaemonSet
+        label_selectors:
+          - "app=intel-gpu-plugin"
+        namespace: "{{ intel_gpu_plugin_namespace }}"
+      register: gpu_plugin_ds
+      until:
+        - gpu_plugin_ds.resources | length > 0
+        - gpu_plugin_ds.resources[0].status.numberReady is defined
+        - gpu_plugin_ds.resources[0].status.numberReady >= 1
+      retries: 30
+      delay: 10
+      run_once: true
+      ignore_errors: true
+
+    - name: Print Intel GPU Plugin deployment status
+      debug:
+        msg:
+          - "================================================================"
+          - "Intel GPU Plugin Deployment Status"
+          - "================================================================"
+          - "Plugin Version: {{ intel_gpu_plugin_version }}"
+          - "Namespace: {{ intel_gpu_plugin_namespace }}"
+          - "GPU-labeled nodes: {{ gpu_nodes.stdout_lines | join(', ') }}"
+          - "The Intel GPU Plugin enables Intel Arc Battlemage (BMG) GPU"
+          - "resources (gpu.intel.com/xe) on Kubernetes nodes."
+          - "================================================================"
+      run_once: true
