@@ -11,16 +11,3 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add ingress-nginx repository using Helm module
-      community.kubernetes.helm_repository:
-        name: ingress-nginx
-        repo_url: https://kubernetes.github.io/ingress-nginx
-        state: present
-    - name: Add Ingress-Nginx repository
-      ansible.builtin.command: helm repo list
-      register: helm_repo_list
-      failed_when: false
-      changed_when: false
-    - name: Synchronize repositories
-      ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != ""

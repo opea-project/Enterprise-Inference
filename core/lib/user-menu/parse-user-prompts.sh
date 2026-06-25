@@ -35,9 +35,9 @@ prompt_for_input() {
         echo "Proceeding with the setup of Habana AI Operator: $deploy_habana_ai_operator"
     fi
     if [ -z "$deploy_ingress_controller" ]; then
-        read -p "Do you want to proceed with deploying Ingress NGINX Controller? (yes/no): " deploy_ingress_controller
+        read -p "Do you want to proceed with deploying Envoy Gateway Edge Controller? (yes/no): " deploy_ingress_controller
     else
-        echo "Proceeding with the setup of Ingress Controller: $deploy_ingress_controller"
+        echo "Proceeding with the setup of Edge Gateway Controller: $deploy_ingress_controller"
     fi
     if [ -z "$deploy_keycloak" ]; then
         read -p "Do you want to proceed with deploying Keycloak & APISIX? (yes/no): " deploy_keycloak

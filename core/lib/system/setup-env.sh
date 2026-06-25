@@ -90,6 +90,13 @@ setup_initial_env() {
     echo -e "${GREEN} Enterprise Inference requirements installed.${NC}"
     cp -r "$HOMEDIR"/helm-charts "$HOMEDIR"/scripts "$KUBESPRAYDIR"/
     cp -r "$KUBESPRAYDIR"/inventory/sample/ "$KUBESPRAYDIR"/inventory/mycluster
+
+    # Auto-generate hosts.yaml if it doesn't exist (single-node auto-detect)
+    if [ ! -f "$HOMEDIR/inventory/hosts.yaml" ]; then
+        echo -e "${YELLOW}No hosts.yaml found — auto-generating for single-node deployment...${NC}"
+        bash "$HOMEDIR/scripts/generate-hosts.sh"
+    fi
+
     cp  "$HOMEDIR"/inventory/hosts.yaml $KUBESPRAYDIR/inventory/mycluster/
     cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml    
     cp "$HOMEDIR"/playbooks/* "$KUBESPRAYDIR"/playbooks/    

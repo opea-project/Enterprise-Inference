@@ -1,5 +1,6 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
+{{- if eq .Values.platform "eks" }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -32,3 +33,4 @@ spec:
     - hosts:
       - {{ .Values.ingress.host }}
       secretName: {{ .Values.ingress.secretName }}
+{{- end }}
