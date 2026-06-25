@@ -1,0 +1,45 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+{{- if .Values.ingress.enabled}}
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) | splitList "/" | last }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # nginx.ingress.kubernetes.io/rewrite-target: /{{ $modelName }}/$1
+    nginx.ingress.kubernetes.io/rewrite-target: {{- if .Values.apisix.enabled }}{{- else }}{{- end }}
+  resourceVersion: "244487"
+  uid: df2b31a1-6653-4d71-9de0-4df33cb93ad1
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{- if .Values.apisix.enabled }}
+              auth-apisix-gateway
+            {{- else }}
+              {{ include "sglang.fullname" . }}-service
+            {{- end }}
+            port:
+              number: 80
+        # path: /{{ $modelName }}/(.*)
+        path: {{- if and .Values.apisix.enabled .Values.accelDevice }}
+          /{{ $modelName }}/(.*)
+          {{- else if and .Values.apisix.enabled (not .Values.accelDevice) }}
+          /{{ $modelName }}-sglangcpu/(.*)
+          {{- else if not .Values.apisix.enabled }}
+          /{{ $modelName }}/(.*)
+          {{- end }}
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.secretname }}
+{{- end }}
