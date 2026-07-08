@@ -1,0 +1,223 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Intel® Arc™ Battlemage (BMG) GPU optimized override values for vLLM deployments.
+# This file contains BMG-specific overrides for Intel Arc B-series GPU (e.g., B580, B770).
+# Requires the Intel GPU Plugin (intel-device-plugins-gpu) to be installed on the cluster.
+
+# Intel XPU accelerator device (Arc GPU)
+accelDevice: "xpu"
+# Kubernetes resource name exposed by the Intel GPU device plugin.
+# Use "gpu.intel.com/xe" with the newer Xe kernel driver (Ubuntu 25.10 / Arc B-series),
+# or "gpu.intel.com/i915" on hosts still using the i915 driver.
+xpuDeviceResource: "gpu.intel.com/xe"
+
+block_size: 64           # XPU-optimised KV cache block size (must be >= 64 for 0.14.1-xpu IPEX chunked prefill)
+max_num_seqs: 128        # Max concurrent sequences (tuned for Arc B-series VRAM)
+max_seq_len_to_capture: 2048
+d_type: "float16"
+max_model_len: 8192
+tensor_parallel_size: "1" # Arc Pro B50 has 1 GPU; adjust for multi-GPU setups
+
+image:
+  repository: intel/vllm
+  tag: "0.17.0-xpu"
+  pullPolicy: IfNotPresent
+  command: ["vllm", "serve"]
+
+# --- Security context (non-root, scanner-compliant) ---
+# The intel/vllm:0.17.0-xpu image defaults to root, but the workload runs fine as
+# a non-root user (UID 1001) provided it can reach the Arc render node
+# (/dev/dri/renderD*). That device is owned by root:render on the host, so the pod
+# must join the host's "render" (and typically "video") group via supplementalGroups.
+# HF_HOME is set to /data (the model-volume mount); fsGroup: 1001 makes that volume
+# and the /tmp + /dev/shm emptyDirs group-writable, so caches work without root.
+#
+# IMPORTANT — validate the host GIDs on the BMG node before deploying (they vary by
+# distro/kernel). On the target node run:
+#   getent group render video          # e.g. render:x:993   video:x:44
+#   stat -c '%g %G' /dev/dri/renderD128
+# then set supplementalGroups below to the matching numeric GIDs. A GPU permission
+# error at startup almost always means the render GID here does not match the host.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  # [<render GID>, <video GID>] — verify per host with `getent group render video`.
+  # Validated on the Arc Pro B50 test host (Ubuntu 25.10): render=992, video=44.
+  # These GIDs are NOT guaranteed across distros/kernels — re-check on each node.
+  supplementalGroups: [992, 44]
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - SYS_NICE
+  # vLLM/IPEX writes SYCL and compile caches at runtime, so the root filesystem
+  # cannot be fully read-only; model/HF caches live on the mounted /data volume.
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+
+# Node affinity for BMG inference nodes
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: ei-inference-eligible
+          operator: In
+          values: ["true"]
+
+# Intel XPU runtime settings
+VLLM_NO_USAGE_STATS: 1
+DO_NOT_TRACK: 1
+
+# vLLM device backend - set via env var in 0.14.1-xpu (VLLM_TARGET_DEVICE=xpu is already baked in)
+VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+
+LLM_MODEL_ID: "Qwen/Qwen2.5-Coder-3B-Instruct"
+
+modelConfigs:
+
+  "meta-llama/Llama-3.1-8B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "llama3_json",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "mistralai/Mistral-7B-Instruct-v0.3":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "mistral",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "Qwen/Qwen2.5-7B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "hermes",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "Qwen/Qwen2.5-Coder-3B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser", "hermes",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+  "tiiuae/Falcon3-7B-Instruct":
+    configMapValues:
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+      HF_HUB_DISABLE_XET: "1"
+    extraCmdArgs:
+      [
+        "--dtype", "float16",
+        "--block-size", "64",
+        "--max-model-len", "8192",
+        "--gpu-memory-utilization", "0.90",
+        "--max-num-seqs", "128",
+        "--enforce-eager",
+      ]
+    tensor_parallel_size: "1"
+    pipeline_parallel_size: "1"
+
+defaultModelConfigs:
+  configMapValues:
+    VLLM_NO_USAGE_STATS: "1"
+    DO_NOT_TRACK: "1"
+    VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+    HF_HUB_DISABLE_XET: "1"
+    HOME: "/tmp"  # Non-root UID 1001 not in /etc/passwd; HOME avoids getpass.getuser() in PyTorch cache
+    PYTORCH_DISABLE_TORCH_INDUCTOR: "1"  # Workaround: inductor cache requires getpass.getuser(), which fails for non-root UID 1001
+  extraCmdArgs:
+    [
+      "--dtype", "float16",
+      "--block-size", "16",
+      "--max-model-len", "8192",
+      "--gpu-memory-utilization", "0.90",
+      "--max-num-seqs", "128",
+      "--enforce-eager",
+    ]
+  tensor_parallel_size: "{{ .Values.tensor_parallel_size }}"
+  pipeline_parallel_size: "{{ .Values.pipeline_parallel_size }}"

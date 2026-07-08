@@ -8,7 +8,7 @@ keycloak_admin_user=your-keycloak-admin-user
 keycloak_admin_password=changeme
 hugging_face_token=your_hugging_face_token
 models=
-cpu_or_gpu=
+device=
 deploy_kubernetes_fresh=on
 deploy_ingress_controller=on
 deploy_keycloak_apisix=on
@@ -37,7 +37,19 @@ Make sure to update the values in the inference-config.cfg file according to you
 > - If `deploy_keycloak_apisix` is set to `off`, the `keycloak_client_id`, `keycloak_admin_user`, and `keycloak_admin_password` values will have no effect.
 > - The `hugging_face_token` is the token used for pulling LLM models from Hugging Face. 
 > - If `deploy_llm_models` is set to `off`, the `hugging_face_token` value will be ignored.
-> - The `cpu_or_gpu` value specifies whether to deploy models for CPU or Intel® AI Accelerator.
+> - The `device` value selects the target hardware for model deployment. Accepted values:
+>   - `cpu` — Intel® Xeon® CPU
+>   - `hpu` / `gpu` / `gaudi2` / `gaudi3` — Intel® Gaudi® AI Accelerator (`gpu` and `gaudi2` map to Gaudi 2; `gaudi3` maps to Gaudi 3)
+>   - `xpu` / `bmg` — Intel® Arc™ Battlemage (BMG) GPU
 >
+
+> **Migration note (`cpu_or_gpu` → `device`)**
+>
+> Earlier releases used a `cpu_or_gpu` key that only distinguished CPU from Gaudi. It has been replaced by `device`, which additionally supports Intel® Arc™ Battlemage GPUs (`xpu`).
+>
+> - **Before:** `cpu_or_gpu=cpu` (or `gpu` for Gaudi) — CPU vs Gaudi only.
+> - **After:** `device=cpu` (Xeon), `device=hpu` (Gaudi), or `device=xpu` (Intel Arc BMG).
+>
+> If you have an existing `inference-config.cfg`, rename the `cpu_or_gpu` line to `device` and set the appropriate value from the list above. A value of `cpu` or `gpu`/`hpu` maps to the same behavior as before.
 
 For running behind corporate proxy, please refer to this [guide](./running-behind-proxy.md)

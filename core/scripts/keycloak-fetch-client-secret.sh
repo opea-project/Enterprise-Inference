@@ -45,8 +45,8 @@ TOKEN=$(curl -s -k -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "username=$USERNAME" \
     -d "password=$PASSWORD" \
-    -d 'grant_type=password' \
-    -d 'client_id=admin-cli' | jq -r '.access_token')
+    -d "grant_type=password" \
+    -d "client_id=admin-cli" | jq -r '.access_token')
 
 if [ -z "$TOKEN" ]; then
     echo "Login failed"

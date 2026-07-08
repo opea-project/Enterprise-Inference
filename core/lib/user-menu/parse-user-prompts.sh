@@ -12,7 +12,7 @@ parse_arguments() {
             --keycloak-admin-password) keycloak_admin_password="$2"; shift ;;
             --hugging-face-token) hugging_face_token="$2"; shift ;;
             --models) models="$2"; shift ;;
-            --cpu-or-gpu) cpu_or_gpu="$2"; shift ;;
+            --device) device="$2"; shift ;;
             --deploy-nri-balloon-policy) deploy_nri_balloon_policy="$2"; shift ;;
             --skip-check) skip_check="true" ;;
             -h|--help) usage; exit 0 ;;
@@ -86,14 +86,14 @@ prompt_for_input() {
 
     if [ -z "$deploy_nri_balloon_policy" ]; then
         # Automatically enable NRI balloon policy for CPU deployments
-        if [ "$cpu_or_gpu" == "c" ]; then
+        if [ "$device" == "cpu" ]; then
             deploy_nri_balloon_policy="yes"
             if [ "$balloon_policy_cpu" == "enabled" ]; then
                 echo "NRI CPU Balloon Policy automatically enabled for CPU deployment"
             fi            
         else
             deploy_nri_balloon_policy="no"
-            echo "NRI CPU Balloon Policy disabled for GPU deployment"
+            echo "NRI CPU Balloon Policy disabled for GPU/BMG deployment"
         fi
     else
         echo "Proceeding with the setup of NRI CPU Balloon Policy: $deploy_nri_balloon_policy"
@@ -135,24 +135,28 @@ prompt_for_input() {
         fi
     fi        
     
-    if [[ -z "$cpu_or_gpu" ]]; then
-        read -p "Do you want to run on CPU or GPU? (c/g): " cpu_or_gpu
-        case "$cpu_or_gpu" in
-            c|C)
-                cpu_or_gpu="c"
+    if [[ -z "$device" ]]; then
+        read -p "Do you want to run on CPU, Gaudi GPU, or Intel Arc BMG GPU? (cpu/hpu/xpu): " device
+        case "$device" in
+            cpu|CPU)
+                device="cpu"
                 echo "Running on CPU"
                 ;;
-            g|G)
-                cpu_or_gpu="g"
-                echo "Running on GPU"
+            hpu|HPU)
+                device="hpu"
+                echo "Running on Gaudi GPU"
+                ;;
+            xpu|XPU)
+                device="xpu"
+                echo "Running on Intel Arc Battlemage (BMG) GPU"
                 ;;
             *)
                 echo "Invalid option. Defaulting to CPU."
-                cpu_or_gpu="c"
+                device="cpu"
                 ;;
         esac
     else
-        echo "cpu_or_gpu is already set to $cpu_or_gpu"
+        echo "device is already set to $device"
     fi
     
 }
