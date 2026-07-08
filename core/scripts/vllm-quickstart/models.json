@@ -1,6 +1,6 @@
 {
   "docker": {
-    "image": "vllm/vllm-openai-cpu:v0.21.0",
+    "image": "vllm/vllm-openai-cpu:v0.24.0",
     "port": "8000:8000",
     "environment": {
       "VLLM_CPU_SGL_KERNEL": "1",
