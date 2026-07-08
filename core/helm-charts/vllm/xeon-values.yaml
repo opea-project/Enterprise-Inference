@@ -26,8 +26,8 @@ max_model_len: 8192
 
 # vLLM CPU image configuration
 image:
-  repository: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo
-  tag: "v0.21.0"
+  repository: vllm/vllm-openai-cpu
+  tag: "v0.24.0"
   pullPolicy: IfNotPresent
 
 # Node affinity for Xeon inference nodes
@@ -58,6 +58,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       HF_HUB_DISABLE_XET: "1"
       VLLM_CPU_SGL_KERNEL: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -89,6 +91,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -120,6 +124,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -149,6 +155,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -178,6 +186,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -209,6 +219,8 @@ modelConfigs:
       VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -242,6 +254,8 @@ modelConfigs:
       VLLM_CPU_SGL_KERNEL: "1"
       HF_HUB_DISABLE_XET: "1"
       LOGNAME: "vllm"
+      USER: "vllm"
+      TRITON_CACHE_DIR: "/tmp/.triton"
     extraCmdArgs:
       [
         "--block-size",
@@ -273,6 +287,8 @@ defaultModelConfigs:
     VLLM_CPU_NUM_OF_RESERVED_CPU: "0"
     VLLM_CPU_SGL_KERNEL: "1"
     HF_HUB_DISABLE_XET: "1"
+    USER: "vllm"
+    TRITON_CACHE_DIR: "/tmp/.triton"
   extraCmdArgs:
     [
       "--block-size",

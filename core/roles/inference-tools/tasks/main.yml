@@ -19,7 +19,7 @@
   ansible.builtin.pip:
     name: kubernetes
     state: present
-    extra_args: "--break-system-packages"
+    extra_args: "--break-system-packages --ignore-installed"
   become: true
   when: pip_install_result is failed
   tags: always
