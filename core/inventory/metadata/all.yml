@@ -60,10 +60,10 @@ loadbalancer_apiserver_healthcheck_port: 8081
 # https_proxy_cert_file: ""
 
 # DO NOT CHANGE INDENTATION - used by Automation
-env_proxy:
-  http_proxy: ""
-  https_proxy: ""
-  no_proxy: ""
+# env_proxy:
+#   http_proxy: ""
+#   https_proxy: ""
+#   no_proxy: "localhost,127.0.0.1,10.96.0.0/12,10.244.0.0/16,192.168.0.0/16,.svc,.cluster.local,10.233.0.1,10.233.0.0/18,10.0.0.0/8"
 
 ## Refer to roles/kubespray-defaults/defaults/main/main.yml before modifying no_proxy
 # no_proxy: ""

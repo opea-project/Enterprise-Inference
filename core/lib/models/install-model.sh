@@ -6,21 +6,31 @@ deploy_inference_llm_models_playbook() {
     install_true="true"
     enable_cpu_balloons="false"
     
-    if [ "$cpu_or_gpu" == "c" ]; then
+    if [ "$device" == "cpu" ]; then
         cpu_playbook="true"
         gpu_playbook="false"
         gaudi_deployment="false"
+        bmg_deployment="false"
         enable_cpu_balloons="true"  # Enable NRI balloons for CPU deployments
         huggingface_model_deployment_name="${huggingface_model_deployment_name}-cpu"
         if [ "$balloon_policy_cpu" == "enabled" ]; then
             echo "${GREEN}CPU deployment detected - using generic NRI balloon policy${NC}"
         fi        
     fi
-    if [ "$cpu_or_gpu" == "g" ]; then
+    if [ "$device" == "hpu" ]; then
         cpu_playbook="false"
         gpu_playbook="true"
         gaudi_deployment="true"
+        bmg_deployment="false"
         enable_cpu_balloons="false"
+    fi
+    if [ "$device" == "xpu" ]; then
+        cpu_playbook="false"
+        gpu_playbook="true"
+        gaudi_deployment="false"
+        bmg_deployment="true"
+        enable_cpu_balloons="false"
+        echo "${GREEN}Intel Arc Battlemage (BMG) GPU deployment detected${NC}"
     fi
     if [ "$deploy_apisix" == "no" ]; then        
         apisix_enabled="false"
@@ -42,12 +52,17 @@ deploy_inference_llm_models_playbook() {
         gaudi_values_file=$gaudi2_values_file_path
     elif [[ "$gaudi_platform" == "gaudi3" ]]; then
         gaudi_values_file=$gaudi3_values_file_path
-    fi    
+    fi
+
+    if [[ "$bmg_deployment" == "true" ]]; then
+        bmg_values_file=$bmg_values_file_path
+    fi
 
     echo "Ingress based Deployment: $ingress_enabled"
     echo "APISIX Enabled: $apisix_enabled"
-    echo "Keycloak Enabled: $deploy_keycloak"    
+    echo "Keycloak Enabled: $deploy_keycloak"
     echo "Gaudi based: $gaudi_deployment"
+    echo "BMG (Intel Arc) based: $bmg_deployment"
     echo "Model Metrics Enabled: $vllm_metrics_enabled"
     echo "CPU NRI Balloons: $enable_cpu_balloons"
     
@@ -77,7 +92,7 @@ deploy_inference_llm_models_playbook() {
     fi
         
     ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-inference-models.yml \
-        --extra-vars "kubernetes_platform=${kubernetes_platform} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} install_true=${install_true} model_name_list='${model_name_list//\ /,}' cpu_playbook=${cpu_playbook} gpu_playbook=${gpu_playbook} hugging_face_token_falcon3=${hugging_face_token_falcon3} deploy_keycloak=${deploy_keycloak} apisix_enabled=${apisix_enabled} ingress_enabled=${ingress_enabled} gaudi_deployment=${gaudi_deployment} huggingface_model_id=${huggingface_model_id} hugging_face_model_deployment=${hugging_face_model_deployment} huggingface_model_deployment_name=${huggingface_model_deployment_name} deploy_inference_llm_models_playbook=${deploy_inference_llm_models_playbook} huggingface_tensor_parellel_size=${huggingface_tensor_parellel_size} deploy_genai_gateway=${deploy_genai_gateway} vllm_metrics_enabled=${vllm_metrics_enabled} gaudi_values_file=${gaudi_values_file} xeon_values_file=${xeon_values_file_path} deploy_ceph=${deploy_ceph} enable_cpu_balloons=${enable_cpu_balloons} balloon_policy_cpu=${balloon_policy_cpu} aws_certificate_arn=${aws_certificate_arn}" --tags "$tags" --vault-password-file "$vault_pass_file"
+        --extra-vars "kubernetes_platform=${kubernetes_platform} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file} keycloak_admin_user=${keycloak_admin_user} keycloak_admin_password=${keycloak_admin_password} keycloak_client_id=${keycloak_client_id} hugging_face_token=${hugging_face_token} install_true=${install_true} model_name_list='${model_name_list//\ /,}' cpu_playbook=${cpu_playbook} gpu_playbook=${gpu_playbook} hugging_face_token_falcon3=${hugging_face_token_falcon3} deploy_keycloak=${deploy_keycloak} apisix_enabled=${apisix_enabled} ingress_enabled=${ingress_enabled} gaudi_deployment=${gaudi_deployment} bmg_deployment=${bmg_deployment} huggingface_model_id=${huggingface_model_id} hugging_face_model_deployment=${hugging_face_model_deployment} huggingface_model_deployment_name=${huggingface_model_deployment_name} deploy_inference_llm_models_playbook=${deploy_inference_llm_models_playbook} huggingface_tensor_parellel_size=${huggingface_tensor_parellel_size} deploy_genai_gateway=${deploy_genai_gateway} vllm_metrics_enabled=${vllm_metrics_enabled} gaudi_values_file=${gaudi_values_file} xeon_values_file=${xeon_values_file_path} bmg_values_file=${bmg_values_file_path} deploy_ceph=${deploy_ceph} enable_cpu_balloons=${enable_cpu_balloons} balloon_policy_cpu=${balloon_policy_cpu} aws_certificate_arn=${aws_certificate_arn}" --tags "$tags" --vault-password-file "$vault_pass_file"
 
 }
 
@@ -113,10 +128,10 @@ add_model() {
         # Deploy NRI CPU Balloons for CPU deployments (after all infrastructure, before models)
         if [[ "$deploy_nri_balloon_policy" == "yes" ]]; then
             # Ensure this is a CPU deployment
-            if [[ "$cpu_or_gpu" != "c" ]]; then
-                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (cpu_or_gpu='c')${NC}"
-                    echo "${RED}Current cpu_or_gpu setting: '$cpu_or_gpu'${NC}"
-                    echo "${RED}Please set cpu_or_gpu to 'c' or disable NRI balloon policy deployment. Exiting!${NC}"
+            if [[ "$device" != "cpu" ]]; then
+                    echo "${RED}Error: NRI Balloon Policy can only be deployed for CPU deployments (device='cpu')${NC}"
+                    echo "${RED}Current device setting: '$device'${NC}"
+                    echo "${RED}Please set device to 'cpu' or disable NRI balloon policy deployment. Exiting!${NC}"
                     exit 1
             fi
             execute_and_check "Deploying CPU Optimization (NRI Balloons & Topology Detection)..." deploy_nri_balloons_playbook "$@" \

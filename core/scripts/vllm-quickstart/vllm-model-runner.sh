@@ -16,6 +16,7 @@ readonly CONTAINER_NAME="vllm-container"
 # Port configuration (can be overridden via command line)
 PORT="8000"
 HEALTHCHECK_URL="http://localhost:${PORT}/health"
+RUNTIME=""
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -33,13 +34,16 @@ show_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -p, --port PORT    Port to run the vLLM server on (default: 8000)"
-    echo "  -h, --help         Display this help message"
+    echo "  -p, --port PORT      Port to run the vLLM server on (default: 8000)"
+    echo "  -r, --runtime RT     Runtime profile: cpu or xpu (default from models.json)"
+    echo "  -h, --help           Display this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                  # Start vLLM on default port 8000"
-    echo "  $0 -p 8080          # Start vLLM on port 8080"
-    echo "  $0 --port 9000      # Start vLLM on port 9000"
+    echo "  $0                   # Start vLLM with default runtime on port 8000"
+    echo "  $0 -p 8080           # Start vLLM on port 8080"
+    echo "  $0 -r cpu            # Start vLLM using CPU runtime profile"
+    echo "  $0 -r xpu            # Start vLLM using XPU runtime profile"
+    echo "  $0 --port 9000       # Start vLLM on port 9000"
 }
 
 # Parse command line arguments
@@ -58,6 +62,15 @@ parse_arguments() {
                     exit 1
                 fi
                 PORT="$2"
+                shift 2
+                ;;
+            -r|--runtime)
+                if [[ -z "$2" || "$2" == -* ]]; then
+                    echo "Error: --runtime requires a value (cpu or xpu)"
+                    show_usage
+                    exit 1
+                fi
+                RUNTIME=$(echo "$2" | tr '[:upper:]' '[:lower:]')
                 shift 2
                 ;;
             -h|--help)
@@ -105,7 +118,7 @@ cleanup_and_exit() {
 
     if [[ "$exit_code" -ne 0 ]]; then
         log "ERROR" "$message"
-        printf "${RED}❌ %s${NC}\n" "$message"
+        printf "${RED}[ERROR] %s${NC}\n" "$message"
         printf "${YELLOW}Check %s for detailed logs.${NC}\n" "$LOG_FILE"
     fi
 
@@ -339,10 +352,17 @@ validate_environment() {
         cleanup_and_exit 1 "Invalid JSON syntax in $CONFIG_FILE"
     fi
 
+    # Resolve runtime profile from config/CLI
+    resolve_runtime
+
     # Check Docker daemon
     check_docker_access
     if ! ${USE_SUDO}docker info >/dev/null 2>&1; then
         cleanup_and_exit 1 "Docker daemon is not running or not accessible."
+    fi
+
+    if is_xpu_mode; then
+        validate_xpu_environment
     fi
 
     log "SUCCESS" "Environment validation completed"
@@ -360,6 +380,99 @@ check_docker_access() {
         USE_SUDO="sudo "
         log "WARN" "User not in docker group, using sudo for Docker commands"
     fi
+}
+
+# Resolve runtime profile from CLI or config
+resolve_runtime() {
+    local has_profiles
+    has_profiles=$(jq -r 'if .docker.runtime_profiles then "yes" else "no" end' "$CONFIG_FILE")
+
+    if [[ "$has_profiles" == "yes" ]]; then
+        if [[ -z "$RUNTIME" ]]; then
+            RUNTIME=$(jq -r '.docker.default_runtime // empty' "$CONFIG_FILE")
+            if [[ -z "$RUNTIME" || "$RUNTIME" == "null" ]]; then
+                RUNTIME=$(jq -r '.docker.runtime_profiles | keys[0]' "$CONFIG_FILE")
+            fi
+        fi
+
+        if ! jq -e ".docker.runtime_profiles.\"$RUNTIME\"" "$CONFIG_FILE" >/dev/null 2>&1; then
+            cleanup_and_exit 1 "Runtime '$RUNTIME' not found in $CONFIG_FILE. Available: $(jq -r '.docker.runtime_profiles | keys | join(", ")' "$CONFIG_FILE")"
+        fi
+    else
+        if [[ -z "$RUNTIME" ]]; then
+            RUNTIME="cpu"
+        fi
+    fi
+
+    log "INFO" "Using runtime profile: $RUNTIME"
+}
+
+# Detect whether selected runtime is XPU
+is_xpu_mode() {
+    local docker_image
+    docker_image=$(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".image else .docker.image end" "$CONFIG_FILE")
+
+    if [[ "$RUNTIME" == "xpu" || "$docker_image" == *"-xpu"* ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Validate host prerequisites for Intel GPU/XPU containers
+validate_xpu_environment() {
+    log "INFO" "XPU mode detected. Validating Intel GPU device access..."
+
+    if [[ ! -e "/dev/dri" ]]; then
+        cleanup_and_exit 1 "XPU mode requires /dev/dri on the host. Install Intel GPU runtime/driver and verify device nodes."
+    fi
+
+    if ! ls /dev/dri/renderD* >/dev/null 2>&1; then
+        cleanup_and_exit 1 "No render device found under /dev/dri. Ensure Intel Battlemage GPU drivers are loaded."
+    fi
+
+    log "SUCCESS" "Detected /dev/dri render node(s) for XPU execution"
+}
+
+# Resolve configured Docker supplementary groups to a host-supported value.
+# Prefer a named group when it exists; otherwise fall back to the numeric GID
+# of the relevant /dev/dri device node so Docker can still grant access.
+resolve_docker_group_add() {
+    local group_name="$1"
+    local device_glob=""
+    local resolved_gid=""
+
+    if [[ -z "$group_name" ]]; then
+        return 1
+    fi
+
+    if getent group "$group_name" >/dev/null 2>&1; then
+        printf "%s\n" "$group_name"
+        return 0
+    fi
+
+    case "$group_name" in
+        render)
+            device_glob="/dev/dri/renderD*"
+            ;;
+        video)
+            device_glob="/dev/dri/card* /dev/dri/renderD*"
+            ;;
+        *)
+            ;;
+    esac
+
+    if [[ -n "$device_glob" ]]; then
+        resolved_gid=$(stat -c '%g' $device_glob 2>/dev/null | awk 'NF { print; exit }')
+        if [[ -n "$resolved_gid" ]]; then
+            log "WARN" "Host group '$group_name' is missing; using device GID '$resolved_gid' instead" >&2
+            printf "%s\n" "$resolved_gid"
+            return 0
+        fi
+    fi
+
+    log "WARN" "Skipping Docker group '$group_name' because it is not defined on the host" >&2
+    return 1
 }
 
 # Load and parse configuration
@@ -479,14 +592,14 @@ build_vllm_args() {
     # Start building arguments
     local args="--model $model_path"
 
-    # Add global defaults
+    # Add global defaults (runtime-specific if configured)
     while IFS='=' read -r key value; do
         if [[ "$value" == "true" ]]; then
             args="$args --$key"
         elif [[ "$value" != "false" && "$value" != "null" ]]; then
             args="$args --$(echo "$key" | tr '_' '-') $value"
         fi
-    done < <(jq -r '.global_defaults | to_entries[] | "\(.key)=\(.value)"' "$CONFIG_FILE")
+    done < <(jq -r "if (.global_defaults.\"$RUNTIME\") then .global_defaults.\"$RUNTIME\" else .global_defaults end | to_entries[] | \"\(.key)=\(.value)\"" "$CONFIG_FILE")
 
     # Add model-specific arguments
     while IFS='=' read -r key value; do
@@ -647,7 +760,11 @@ start_vllm_container() {
 
     # Get Docker image first
     local docker_image
-    docker_image=$(jq -r '.docker.image' "$CONFIG_FILE")
+    docker_image=$(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".image else .docker.image end" "$CONFIG_FILE")
+
+    if [[ -z "$docker_image" || "$docker_image" == "null" ]]; then
+        cleanup_and_exit 1 "Docker image is not configured for runtime '$RUNTIME'"
+    fi
 
     # Pull the image first to avoid confusion during container start
     if ! pull_docker_image "$docker_image"; then
@@ -660,16 +777,54 @@ start_vllm_container() {
     # Add port mapping (use user-specified PORT, mapping host port to container port 8000)
     docker_cmd="$docker_cmd -p ${PORT}:8000"
 
+    # Add optional shared memory configuration
+    local shm_size
+    shm_size=$(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".shm_size // empty else .docker.shm_size // empty end" "$CONFIG_FILE")
+    if [[ -n "$shm_size" ]]; then
+        docker_cmd="$docker_cmd --shm-size $shm_size"
+    fi
+
+    # Add optional supplementary groups (skip render by request)
+    while read -r group_name; do
+        local resolved_group
+        if [[ "$group_name" == "render" ]]; then
+            continue
+        fi
+        if [[ -n "$group_name" ]] && resolved_group=$(resolve_docker_group_add "$group_name"); then
+            docker_cmd="$docker_cmd --group-add $resolved_group"
+        fi
+    done < <(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".group_add[]? else .docker.group_add[]? end" "$CONFIG_FILE")
+
+    local use_intel_xpu_image=false
+    if [[ "$docker_image" == "intel/vllm:0.14.1-xpu" ]]; then
+        use_intel_xpu_image=true
+    fi
+
+    # Add optional device mappings (e.g. /dev/dri for XPU)
+    while read -r device; do
+        [[ -n "$device" ]] && docker_cmd="$docker_cmd --device $device"
+    done < <(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".devices[]? else .docker.devices[]? end" "$CONFIG_FILE")
+
     # Add environment variables
-    docker_cmd="$docker_cmd -e HUGGING_FACE_HUB_TOKEN=$HFToken"
+    local escaped_value
+    printf -v escaped_value '%q' "$HFToken"
+    docker_cmd="$docker_cmd -e HUGGING_FACE_HUB_TOKEN=$escaped_value"
     while IFS='=' read -r key value; do
-        docker_cmd="$docker_cmd -e $key=$value"
-    done < <(jq -r '.docker.environment | to_entries[] | "\(.key)=\(.value)"' "$CONFIG_FILE")
+        printf -v escaped_value '%q' "$value"
+        docker_cmd="$docker_cmd -e $key=$escaped_value"
+    done < <(jq -r "if .docker.runtime_profiles then (.docker.runtime_profiles.\"$RUNTIME\".environment // {}) else (.docker.environment // {}) end | to_entries[] | \"\(.key)=\(.value)\"" "$CONFIG_FILE")
+
+    if [[ "$use_intel_xpu_image" == "true" ]]; then
+        docker_cmd="$docker_cmd -e VLLM_TARGET_DEVICE=xpu"
+        docker_cmd="$docker_cmd -e VLLM_LOGGING_LEVEL=DEBUG"
+        docker_cmd="$docker_cmd -e ZE_FLAT_DEVICE_HIERARCHY=FLAT"
+        docker_cmd="$docker_cmd -e ONEAPI_DEVICE_SELECTOR='level_zero:gpu;opencl:gpu'"
+    fi
 
     # Add volume mounts
     while read -r volume; do
         [[ -n "$volume" ]] && docker_cmd="$docker_cmd -v $volume"
-    done < <(jq -r '.docker.volumes[]?' "$CONFIG_FILE")
+    done < <(jq -r "if .docker.runtime_profiles then .docker.runtime_profiles.\"$RUNTIME\".volumes[]? else .docker.volumes[]? end" "$CONFIG_FILE")
 
     # Add Docker image and vLLM arguments
     docker_cmd="$docker_cmd --ipc=host $docker_image $vllm_args"
@@ -756,7 +911,7 @@ perform_health_check() {
 
             if [[ "$http_code" == "200" ]]; then
                 log "SUCCESS" "vLLM server is healthy and responding"
-                printf "${GREEN}✅ vLLM server is running successfully at %s${NC}\n" "$HEALTHCHECK_URL"
+                printf "${GREEN}[OK] vLLM server is running successfully at %s${NC}\n" "$HEALTHCHECK_URL"
                 return 0
             elif [[ -n "$http_code" && "$http_code" != "000" ]]; then
                 # We got a response but not 200, show what we got
@@ -771,7 +926,7 @@ perform_health_check() {
     done
 
     log "ERROR" "Health check failed after $max_attempts attempts"
-    printf "${RED}❌ vLLM server failed to start or is not responding${NC}\n"
+    printf "${RED}[ERROR] vLLM server failed to start or is not responding${NC}\n"
     printf "${YELLOW}The server may still be initializing. Check logs with: ${USE_SUDO}docker logs %s${NC}\n" "$CONTAINER_NAME"
     return 1
 }
@@ -797,8 +952,12 @@ main() {
     load_configuration
 
     # Hardware detection
-    local parallel_config
-    parallel_config=$(compute_parallel_config)
+    local parallel_config=""
+    if is_xpu_mode; then
+        log "INFO" "Skipping CPU NUMA parallel auto-configuration for XPU mode"
+    else
+        parallel_config=$(compute_parallel_config)
+    fi
 
     # User interaction
     local selected_model

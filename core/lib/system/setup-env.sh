@@ -19,17 +19,22 @@ setup_initial_env() {
         git config --global http.proxy "$https_proxy"
         git config --global https.proxy "$https_proxy"
     fi
-    if [ ! -d "$KUBESPRAYDIR" ]; then
+    if [ ! -d "$KUBESPRAYDIR/.git" ]; then
+        # Remove incomplete kubespray directory if it exists
+        if [ -d "$KUBESPRAYDIR" ]; then
+            echo "Removing incomplete Kubespray directory..."
+            rm -rf "$KUBESPRAYDIR"
+        fi
         git clone https://github.com/kubernetes-sigs/kubespray.git $KUBESPRAYDIR
         if [ $? -ne 0 ] || [ ! -d "$KUBESPRAYDIR/.git" ]; then
             echo -e "${RED}----------------------------------------------------------------------------${NC}"
-            echo -e "${RED}|  NOTICE: Failed to clone Kubespray Repository.                           |${NC}"        
-            echo -e "${RED}|  Unable to proceed with Inference Stack Deployment                        |${NC}"        
-            echo -e "${RED}|  due to missing dependency                                                |${NC}"        
-            echo -e "${RED}----------------------------------------------------------------------------${NC}"            
+            echo -e "${RED}|  NOTICE: Failed to clone Kubespray Repository.                           |${NC}"
+            echo -e "${RED}|  Unable to proceed with Inference Stack Deployment                        |${NC}"
+            echo -e "${RED}|  due to missing dependency                                                |${NC}"
+            echo -e "${RED}----------------------------------------------------------------------------${NC}"
             exit 1
         fi
-        cd $KUBESPRAYDIR        
+        cd $KUBESPRAYDIR
         git checkout "$kubespray_version"
     else
         echo "Kubespray directory already exists, skipping clone."
@@ -96,6 +101,7 @@ setup_initial_env() {
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
     xeon_values_file_path="$REMOTEDIR/vllm/xeon-values.yaml"
+    bmg_values_file_path="$REMOTEDIR/vllm/bmg-values.yaml"
     cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml
     cp "$HOMEDIR"/inventory/metadata/all.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/all/all.yml
     cp -r "$HOMEDIR"/roles/* $KUBESPRAYDIR/roles/        

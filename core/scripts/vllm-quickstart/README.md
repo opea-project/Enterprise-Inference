@@ -1,11 +1,12 @@
 ## 📋 Overview
 
-The `vllm-model-runner.sh` launcher script simplifies the deployment of popular open-source LLMs with optimized configurations for CPU-based inference. It handles dependency installation, hardware detection, Docker container management, and health monitoring automatically.
+The `vllm-model-runner.sh` launcher script simplifies the deployment of popular open-source LLMs with optimized configurations for both CPU and Intel GPU/XPU inference. It handles dependency installation, hardware detection, Docker container management, and health monitoring automatically.
 
 ## ✨ Features
 
 - **One-Command Deployment** — Interactive model selection and automated setup
 - **Multi-Model Support** — Pre-configured profiles for popular LLMs
+- **Dual Runtime Support** — Switch between CPU and Intel XPU profiles with `--runtime`
 - **Custom Port Configuration** — Run the server on any port with `-p` option
 - **Hardware Auto-Detection** — Automatically configures tensor/pipeline parallelism based on NUMA topology
 - **Dependency Management** — Installs Docker, jq, curl, and git if missing
@@ -18,7 +19,9 @@ The `vllm-model-runner.sh` launcher script simplifies the deployment of popular 
 - **Operating System**: Ubuntu
 - **HuggingFace Token**: Required for downloading models
 - **Sudo Access**: Required for dependency installation
-- **Hardware**: CPU with sufficient RAM for model inference
+- **Hardware**:
+  - CPU runtime: Intel Xeon class CPU with sufficient RAM
+  - XPU runtime: Intel GPU (for example Battlemage/BMG) with `/dev/dri` available on host
 
 > **Note:** The script will automatically install Docker, jq, curl, and git if they are not present.
 
@@ -42,6 +45,13 @@ The `vllm-model-runner.sh` launcher script simplifies the deployment of popular 
 ./vllm-model-runner.sh
 ```
 
+To explicitly choose runtime:
+
+```bash
+./vllm-model-runner.sh --runtime cpu
+./vllm-model-runner.sh --runtime xpu
+```
+
 To run on a custom port:
 
 ```bash
@@ -53,11 +63,12 @@ To run on a custom port:
 The script will:
 1. Check and install any missing dependencies
 2. Validate your environment and HuggingFace token
-3. Display available models for selection
-4. Detect hardware configuration for optimal parallelism
-5. Pull the vLLM Docker image (if not cached)
-6. Start the vLLM server container
-7. Perform health checks until the server is ready
+3. Resolve the runtime profile (`cpu` or `xpu`)
+4. Display available models for selection
+5. Detect hardware configuration for optimal parallelism
+6. Pull the vLLM Docker image (if not cached)
+7. Start the vLLM server container
+8. Perform health checks until the server is ready
 
 ### Example Session
 
@@ -116,16 +127,22 @@ The `models.json` file contains all configuration:
 ```json
 {
   "docker": {
-    "image": "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.11.2",
+    "default_runtime": "cpu",
+    "runtime_profiles": {
+      "cpu": {
+        "image": "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.11.2"
+      },
+      "xpu": {
+        "image": "intel/vllm:0.14.1-xpu"
+      }
+    },
     "port": "8000:8000",
     "environment": { ... },
     "volumes": [ ... ]
   },
   "global_defaults": {
-    "block_size": 128,
-    "dtype": "bfloat16",
-    "trust_remote_code": true,
-    ...
+    "cpu": { ... },
+    "xpu": { ... }
   },
   "models": {
     "model-key": {
@@ -185,6 +202,7 @@ docker logs -f vllm-container
 | `Permission denied` | Add user to docker group: `sudo usermod -aG docker $USER` then logout/login |
 | `Container keeps stopping` | Check logs: `docker logs vllm-container` — usually indicates insufficient memory |
 | `Health check timeout` | Model loading can take several minutes; check logs for progress |
+| `XPU runtime fails to start` | Ensure Intel GPU drivers are installed and `/dev/dri/renderD*` exists on host |
 
 ### Stop the Server
 
