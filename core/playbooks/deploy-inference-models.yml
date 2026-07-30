@@ -465,6 +465,56 @@
                 keycloak-realmcreation.sh: "{{ lookup('file', remote_home_dir + '/keycloak-realmcreation.sh') }}"
           run_once: true
 
+        - name: Create Secret with Keycloak admin credentials for the setup Job
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: keycloak-admin-credentials-env
+                namespace: default
+              type: Opaque
+              stringData:
+                KEYCLOAK_ADMIN_USER: "{{ keycloak_admin_user }}"
+                KEYCLOAK_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
+                KEYCLOAK_CLIENT_ID: "{{ keycloak_client_id }}"
+          run_once: true
+          no_log: true
+
+        - name: Create ServiceAccount and RBAC for Keycloak realm setup Job
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              - apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: keycloak-realm-setup
+                  namespace: default
+              - apiVersion: rbac.authorization.k8s.io/v1
+                kind: Role
+                metadata:
+                  name: keycloak-realm-setup-secret-writer
+                  namespace: default
+                rules:
+                  - apiGroups: [""]
+                    resources: ["secrets"]
+                    verbs: ["get", "create", "update", "patch"]
+              - apiVersion: rbac.authorization.k8s.io/v1
+                kind: RoleBinding
+                metadata:
+                  name: keycloak-realm-setup-secret-writer
+                  namespace: default
+                subjects:
+                  - kind: ServiceAccount
+                    name: keycloak-realm-setup
+                    namespace: default
+                roleRef:
+                  kind: Role
+                  name: keycloak-realm-setup-secret-writer
+                  apiGroup: rbac.authorization.k8s.io
+          run_once: true
+
         - name: Create Keycloak realm setup Job
           kubernetes.core.k8s:
             state: present
@@ -482,6 +532,7 @@
                     name: keycloak-realm-setup
                   spec:
                     restartPolicy: Never
+                    serviceAccountName: keycloak-realm-setup
                     containers:
                     - name: keycloak-setup
                       image: ubuntu:22.04
@@ -496,6 +547,9 @@
                             {'name': 'NO_PROXY',    'value': env_proxy.no_proxy    | default('')}
                           ] if (env_proxy is defined and env_proxy.http_proxy | default('') != '') else []
                         }}
+                      envFrom:
+                      - secretRef:
+                          name: keycloak-admin-credentials-env
                       command: ["/bin/bash", "-c"]
                       args:
                         - |
@@ -522,8 +576,8 @@
                             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                               -X POST \
                               -d "client_id=admin-cli" \
-                              -d "username={{ keycloak_admin_user }}" \
-                              -d "password={{ keycloak_admin_password }}" \
+                              --data-urlencode "username=${KEYCLOAK_ADMIN_USER}" \
+                              --data-urlencode "password=${KEYCLOAK_ADMIN_PASSWORD}" \
                               -d "grant_type=password" \
                               http://keycloak.default.svc.cluster.local:80/realms/master/protocol/openid-connect/token)
 
@@ -550,11 +604,7 @@
 
                           # Run the realm creation script
                           echo "Running Keycloak realm creation script..."
-                          /tmp/keycloak-realmcreation.sh \
-                            keycloak.default.svc.cluster.local:80 \
-                            "{{ keycloak_admin_user }}" \
-                            "{{ keycloak_admin_password }}" \
-                            "{{ keycloak_client_id }}"
+                          /tmp/keycloak-realmcreation.sh keycloak.default.svc.cluster.local:80
                       volumeMounts:
                       - name: scripts
                         mountPath: /scripts
@@ -586,20 +636,33 @@
           delay: 10
           run_once: true
 
-        - name: Get Keycloak realm setup Job logs
-          command: kubectl logs job/keycloak-realm-setup-models -n default
-          register: script_output
+        - name: Read Keycloak client secret from Kubernetes Secret
+          kubernetes.core.k8s_info:
+            kind: Secret
+            namespace: default
+            name: keycloak-client-secret
+          register: client_secret_obj
+          until:
+            - client_secret_obj.resources | length > 0
+            - client_secret_obj.resources[0].data['client-secret'] is defined
+          retries: 12
+          delay: 5
+          failed_when: false
           run_once: true
+          no_log: true
 
         - name: Set Keycloak client fact
           set_fact:
-            client_secret: "{{ script_output.stdout | regex_search('Client secret: (.*)') | join('') | regex_replace('^Client secret: ') }}"
-          when: script_output.stdout is search('Client secret:')
+            client_secret: "{{ client_secret_obj.resources[0].data['client-secret'] | b64decode }}"
+          when:
+            - client_secret_obj.resources | default([]) | length > 0
+            - client_secret_obj.resources[0].data['client-secret'] is defined
           run_once: true
+          no_log: true
 
         - name: Warning when client secret not found
           debug:
-            msg: "WARNING: Client secret was not found in the Keycloak setup job output. Please check the job logs manually."
+            msg: "WARNING: Client secret was not found in the keycloak-client-secret Secret. Please check the job logs manually."
           when: client_secret is not defined
           run_once: true
       run_once: true

@@ -492,6 +492,58 @@
       run_once: true
       when: deploy_keycloak == "yes"
 
+    - name: Create Secret with Keycloak admin credentials for the setup Job
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: keycloak-admin-credentials-env
+            namespace: default
+          type: Opaque
+          stringData:
+            KEYCLOAK_ADMIN_USER: "{{ keycloak_admin_user }}"
+            KEYCLOAK_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
+            KEYCLOAK_CLIENT_ID: "{{ keycloak_client_id }}"
+      run_once: true
+      no_log: true
+      when: deploy_keycloak == "yes"
+
+    - name: Create ServiceAccount and RBAC for Keycloak realm setup Job
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          - apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: keycloak-realm-setup
+              namespace: default
+          - apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: keycloak-realm-setup-secret-writer
+              namespace: default
+            rules:
+              - apiGroups: [""]
+                resources: ["secrets"]
+                verbs: ["get", "create", "update", "patch"]
+          - apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: keycloak-realm-setup-secret-writer
+              namespace: default
+            subjects:
+              - kind: ServiceAccount
+                name: keycloak-realm-setup
+                namespace: default
+            roleRef:
+              kind: Role
+              name: keycloak-realm-setup-secret-writer
+              apiGroup: rbac.authorization.k8s.io
+      run_once: true
+      when: deploy_keycloak == "yes"
+
     - name: Create Keycloak realm setup Job
       kubernetes.core.k8s:
         state: present
@@ -509,6 +561,7 @@
                 name: keycloak-realm-setup
               spec:
                 restartPolicy: Never
+                serviceAccountName: keycloak-realm-setup
                 containers:
                 - name: keycloak-setup
                   image: ubuntu:22.04
@@ -523,39 +576,42 @@
                         {'name': 'NO_PROXY',    'value': env_proxy.no_proxy    | default('')}
                       ] if (env_proxy is defined and env_proxy.http_proxy | default('') != '') else []
                     }}
+                  envFrom:
+                  - secretRef:
+                      name: keycloak-admin-credentials-env
                   command: ["/bin/bash", "-c"]
                   args:
                     - |
                       set -e
-                      
+
                       # Install dependencies
                       apt-get update -qq
                       apt-get install -y -qq curl jq
-                      
+
                       # Copy script to writable location
                       cp /scripts/keycloak-realmcreation.sh /tmp/keycloak-realmcreation.sh
                       chmod +x /tmp/keycloak-realmcreation.sh
-                      
+
                       # Retry mechanism for Keycloak availability
                       MAX_RETRIES=30
                       RETRY_DELAY=10
                       RETRY_COUNT=0
-                      
+
                       echo "Waiting for Keycloak to be ready..."
                       while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
                         # Test token endpoint
                         HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
                           -d "client_id=admin-cli" \
-                          -d "username={{ keycloak_admin_user }}" \
-                          -d "password={{ keycloak_admin_password }}" \
+                          --data-urlencode "username=${KEYCLOAK_ADMIN_USER}" \
+                          --data-urlencode "password=${KEYCLOAK_ADMIN_PASSWORD}" \
                           -d "grant_type=password" \
                           http://keycloak.default.svc.cluster.local:80/realms/master/protocol/openid-connect/token || echo "000")
-                        
+
                         if [ "$HTTP_CODE" = "200" ]; then
                           echo "Keycloak is ready (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
                           break
                         fi
-                        
+
                         RETRY_COUNT=$((RETRY_COUNT + 1))
                         if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                           echo "Keycloak not ready yet (attempt $RETRY_COUNT/$MAX_RETRIES, HTTP: $HTTP_CODE). Retrying in ${RETRY_DELAY}s..."
@@ -565,18 +621,14 @@
                           exit 1
                         fi
                       done
-                      
+
                       # Additional stability wait
                       echo "Waiting 15 seconds for Keycloak to stabilize..."
                       sleep 15
-                      
+
                       # Run the script with internal service name
                       echo "Running realm creation script..."
-                      /tmp/keycloak-realmcreation.sh \
-                        keycloak.default.svc.cluster.local:80 \
-                        "{{ keycloak_admin_user }}" \
-                        "{{ keycloak_admin_password }}" \
-                        "{{ keycloak_client_id }}"
+                      /tmp/keycloak-realmcreation.sh keycloak.default.svc.cluster.local:80
                   volumeMounts:
                   - name: scripts
                     mountPath: /scripts
@@ -610,25 +662,32 @@
       run_once: true
       when: deploy_keycloak == "yes"
 
-    - name: Get Keycloak realm setup Job logs
-      command: kubectl logs job/keycloak-realm-setup -n default
-      register: script_output
+    - name: Read Keycloak client secret from Kubernetes Secret
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: default
+        name: keycloak-client-secret
+      register: client_secret_obj
+      until:
+        - client_secret_obj.resources | length > 0
+        - client_secret_obj.resources[0].data['client-secret'] is defined
+      retries: 12
+      delay: 5
+      failed_when: false
       run_once: true
-      environment:
-        http_proxy: ""
-        https_proxy: ""
-        no_proxy: ""
+      no_log: true
       when: deploy_keycloak == "yes"
 
     - name: Set client_secret fact
       set_fact:
-        client_secret: "{{ script_output.stdout | regex_search('Client secret: (.*)') | join('') | regex_replace('^Client secret: ') }}"
+        client_secret: "{{ client_secret_obj.resources[0].data['client-secret'] | b64decode }}"
       when:
-        - script_output is defined
-        - script_output.stdout is defined
-        - script_output.stdout is search('Client secret:')
+        - client_secret_obj is defined
+        - client_secret_obj.resources | default([]) | length > 0
+        - client_secret_obj.resources[0].data['client-secret'] is defined
         - deploy_keycloak == "yes"
       run_once: true
+      no_log: true
 
     - name: Verify Keycloak ApisixRoute is synced
       shell: |
