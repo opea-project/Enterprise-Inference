@@ -118,9 +118,9 @@ curl -s --max-time 5 https://google.com && echo "INTERNET RESTORED" || echo "FAI
 From a machine with access to both the repo and VM2, clone the repository and check out the airgap branch:
 
 ```bash
-git clone https://github.com/cld2labs/Enterprise-Inference.git
+git clone https://github.com/opea-project/Enterprise-Inference.git
 cd Enterprise-Inference
-git checkout cld2labs/airgap
+git checkout dell-airgap
 ```
 
 Then copy it to VM2:
@@ -188,6 +188,13 @@ Replace the following placeholders with your own values before running the deplo
 | `<VM1-IP>` | IP address of VM1 (the JFrog machine) |
 | `<your-jfrog-password>` | JFrog admin password set during the UI wizard in Step 2 |
 | `<your-huggingface-token>` | Your HuggingFace token with read access to the gated Llama models |
+
+> [!IMPORTANT]
+> If deploying on Intel® Gaudi® hardware, also update the `<VM1-IP>` placeholder in
+> `core/scripts/habana/config.toml` with VM1's actual IP before running the deployment.
+> This file is copied verbatim to the containerd config on the target node (not
+> templated like `inference-config.cfg`), so the placeholder must be replaced manually
+> or the Habana runtime will fail to pull images through the JFrog mirror.
 
 ### Apply single-node inventory
 
@@ -366,9 +373,9 @@ Use this path when your VM has direct internet access. All images, binaries, and
 #### Step 1 - Clone the Repository
 
 ```bash
-git clone https://github.com/cld2labs/Enterprise-Inference.git
+git clone https://github.com/opea-project/Enterprise-Inference.git
 cd Enterprise-Inference
-git checkout cld2labs/airgap
+git checkout dell-airgap
 ```
 
 #### Step 2 - Configure `inference-config.cfg`

@@ -17,7 +17,7 @@ This document covers common failures encountered during airgapped deployment of 
 # On VM1 - download and upload pip wheel
 pip download pip --no-deps -d /tmp/pip-dl/
 curl -u admin:password -T /tmp/pip-dl/pip-*.whl \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/pip.whl"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/pip.whl"
 ```
 The deployment script (`setup-env.sh`) handles the rest automatically - it downloads the wheel, reads the version from its WHEEL metadata, renames it to the proper format (e.g. `pip-26.0.1-py3-none-any.whl`), and installs it.
 
@@ -33,7 +33,7 @@ The deployment script (`setup-env.sh`) handles the rest automatically - it downl
 ```bash
 pip download <package>==<version> --no-deps -d /tmp/wheels/
 curl -u admin:password -T /tmp/wheels/<package>.whl \
-  "http://100.67.152.212:8082/artifactory/ei-pypi-local/<package>.whl"
+  "http://<VM1-IP>:8082/artifactory/ei-pypi-local/<package>.whl"
 ```
 
 ---
@@ -48,7 +48,7 @@ curl -u admin:password -T /tmp/wheels/<package>.whl \
 ```bash
 ansible-galaxy collection download kubernetes.core:6.3.0 -p /tmp/
 curl -u admin:password -T /tmp/kubernetes-core-6.3.0.tar.gz \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/ansible-collections/kubernetes-core-latest.tar.gz"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/ansible-collections/kubernetes-core-latest.tar.gz"
 ```
 
 > **Warning**: Files must use the `-latest` suffix (e.g. `kubernetes-core-latest.tar.gz`). Versioned filenames (e.g. `kubernetes-core-6.3.0.tar.gz`) are silently skipped by `setup-env.sh`.
@@ -80,9 +80,9 @@ sed -i 's/community\.kubernetes\./kubernetes.core./g' <playbook>.yml
 **Fix**: `setup-env.sh` automatically rewrites `/etc/apt/sources.list` to point to JFrog when `airgap_enabled=yes`. If running manually:
 ```bash
 sudo tee /etc/apt/sources.list > /dev/null << EOF
-deb [trusted=yes] http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy main restricted universe multiverse
-deb [trusted=yes] http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy-updates main restricted universe multiverse
-deb [trusted=yes] http://admin:password@100.67.152.212:8082/artifactory/ei-debian-virtual jammy-security main restricted universe multiverse
+deb [trusted=yes] http://admin:password@<VM1-IP>:8082/artifactory/ei-debian-virtual jammy main restricted universe multiverse
+deb [trusted=yes] http://admin:password@<VM1-IP>:8082/artifactory/ei-debian-virtual jammy-updates main restricted universe multiverse
+deb [trusted=yes] http://admin:password@<VM1-IP>:8082/artifactory/ei-debian-virtual jammy-security main restricted universe multiverse
 EOF
 sudo apt-get update
 ```
@@ -101,12 +101,12 @@ sudo apt-get update
 apt-get download <package>
 # Upload to JFrog
 curl -u admin:password -T <package>.deb \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/apt-debs/<package>.deb"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/apt-debs/<package>.deb"
 
 # On VM2 - install
 curl -sfL -u admin:password \
   -o /tmp/<package>.deb \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/apt-debs/<package>.deb"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/apt-debs/<package>.deb"
 sudo dpkg -i /tmp/<package>.deb
 ```
 
@@ -125,7 +125,7 @@ git clone https://github.com/kubernetes-sigs/kubespray.git
 cd kubespray && git checkout v2.27.0 && cd ..
 tar -czf kubespray.tar.gz kubespray/
 curl -u admin:password -T kubespray.tar.gz \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/kubespray.tar.gz"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/kubespray.tar.gz"
 ```
 
 ---
@@ -150,7 +150,7 @@ find ~/Enterprise-Inference -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -
 
 **Symptom**: Kubespray `download` role fails with:
 ```
-trying next host - response was http.StatusNotFound" host="100.67.152.212:8082"
+trying next host - response was http.StatusNotFound" host="<VM1-IP>:8082"
 ```
 
 **Root cause**: Kubespray constructs binary download URLs from component versions. The binary was not uploaded to JFrog with the matching path structure.
@@ -160,7 +160,7 @@ trying next host - response was http.StatusNotFound" host="100.67.152.212:8082"
 # Example: missing kubelet
 curl -LO https://dl.k8s.io/release/v1.30.4/bin/linux/amd64/kubelet
 curl -u admin:password -T kubelet \
-  "http://100.67.152.212:8082/artifactory/ei-generic-binaries/dl.k8s.io/release/v1.30.4/bin/linux/amd64/kubelet"
+  "http://<VM1-IP>:8082/artifactory/ei-generic-binaries/dl.k8s.io/release/v1.30.4/bin/linux/amd64/kubelet"
 ```
 See `core/inventory/metadata/offline.yml` for the full list of expected paths.
 
@@ -183,7 +183,7 @@ cat /etc/containerd/certs.d/docker.io/hosts.toml
 Expected format (no `skip_verify` field at all):
 ```toml
 server = "https://docker.io"
-[host."http://100.67.152.212:8082/v2/ei-docker-virtual"]
+[host."http://<VM1-IP>:8082/v2/ei-docker-virtual"]
   capabilities = ["pull", "resolve"]
   override_path = true
 ```
@@ -194,7 +194,7 @@ for reg in docker.io ghcr.io registry.k8s.io quay.io public.ecr.aws; do
   sudo mkdir -p /etc/containerd/certs.d/$reg
   sudo tee /etc/containerd/certs.d/$reg/hosts.toml <<EOF
 server = "https://$reg"
-[host."http://100.67.152.212:8082/v2/ei-docker-virtual"]
+[host."http://<VM1-IP>:8082/v2/ei-docker-virtual"]
   capabilities = ["pull","resolve"]
   override_path = true
 EOF
@@ -212,9 +212,9 @@ sudo systemctl restart containerd
 
 **Fix**: On VM1, pull by amd64 platform digest to force JFrog to cache the platform-specific manifest:
 ```bash
-docker pull --platform linux/amd64 100.67.152.212:8082/ei-docker-virtual/library/nginx:1.25.2-alpine
+docker pull --platform linux/amd64 <VM1-IP>:8082/ei-docker-virtual/library/nginx:1.25.2-alpine
 # Then pull by digest
-docker pull 100.67.152.212:8082/ei-docker-virtual/library/nginx@sha256:fc2d39a0...
+docker pull <VM1-IP>:8082/ei-docker-virtual/library/nginx@sha256:fc2d39a0...
 ```
 
 Verify image is properly cached (must use Docker Accept headers):
@@ -223,7 +223,7 @@ curl -s -u admin:password \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
   -o /dev/null -w "%{http_code}" \
-  "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
+  "http://<VM1-IP>:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
 # Must return 200 (plain curl without Accept headers returns 404 even when cached)
 ```
 
@@ -235,7 +235,7 @@ curl -s -u admin:password \
 
 **Fix**: Pull a working equivalent tag, retag, and push to `ei-docker-local`:
 ```bash
-JFROG=100.67.152.212:8082
+JFROG=<VM1-IP>:8082
 docker pull $JFROG/ei-docker-virtual/library/busybox:latest
 docker tag $JFROG/ei-docker-virtual/library/busybox:latest $JFROG/ei-docker-local/library/busybox:1.28
 docker push $JFROG/ei-docker-local/library/busybox:1.28
@@ -284,7 +284,7 @@ Rotate the PAT after use. Docker Hub free accounts allow 100 pulls/6h unauthenti
 
 **Fix**: Use the JFrog virtual Helm repo instead. All EI playbooks handle this automatically when `airgap_enabled=yes`. If running helm manually:
 ```bash
-helm repo add ingress-nginx http://100.67.152.212:8082/artifactory/ei-helm-virtual \
+helm repo add ingress-nginx http://<VM1-IP>:8082/artifactory/ei-helm-virtual \
   --username admin --password password --force-update
 helm repo update
 ```
@@ -315,7 +315,7 @@ This is handled automatically by EI playbooks (`deploy-keycloak-tls-cert.yml`, `
 
 **Fix**: Use the JFrog Helm repo instead of OCI:
 ```bash
-helm repo add ei-helm http://100.67.152.212:8082/artifactory/ei-helm-virtual \
+helm repo add ei-helm http://<VM1-IP>:8082/artifactory/ei-helm-virtual \
   --username admin --password password --force-update
 helm install keycloak ei-helm/keycloak --version 22.1.0
 ```
@@ -332,9 +332,9 @@ EI playbooks do this automatically when `airgap_enabled=yes`.
 **Fix**: Regenerate and re-upload `index.yaml`:
 ```bash
 cd /tmp/helm-charts-dir
-helm repo index . --url http://100.67.152.212:8082/artifactory/ei-helm-local
+helm repo index . --url http://<VM1-IP>:8082/artifactory/ei-helm-local
 curl -u admin:password -T index.yaml \
-  "http://100.67.152.212:8082/artifactory/ei-helm-local/index.yaml"
+  "http://<VM1-IP>:8082/artifactory/ei-helm-local/index.yaml"
 helm repo update
 helm search repo ei-helm
 ```
@@ -485,7 +485,7 @@ helm upgrade <release> ./helm-charts/vllm --reuse-values \
 
 ### JFrog returns 404 to curl but image is shown as cached in UI
 
-**Symptom**: `curl http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine` returns 404 but the image appears in JFrog storage.
+**Symptom**: `curl http://<VM1-IP>:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine` returns 404 but the image appears in JFrog storage.
 
 **Root cause**: The JFrog v2 Docker API requires specific `Accept` headers to serve manifests. Plain curl without headers returns 404.
 
@@ -495,7 +495,7 @@ curl -s -u admin:password \
   -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
   -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
   -o /dev/null -w "%{http_code}" \
-  "http://100.67.152.212:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
+  "http://<VM1-IP>:8082/v2/ei-docker-virtual/library/nginx/manifests/1.25.2-alpine"
 ```
 
 ---
@@ -516,14 +516,14 @@ curl -s -u admin:password \
 
 The image name comes from Kubespray's defaults. Look for this pattern in the deployment log:
 ```
-trying next host - response was http.StatusNotFound" host="100.67.152.212:8082"
+trying next host - response was http.StatusNotFound" host="<VM1-IP>:8082"
 trying next host" error="...dial tcp...: i/o timeout" host=<registry>
 ```
 
 Check `core/kubespray/roles/kubespray-defaults/defaults/main/download.yml` for the image name and tag. Pre-cache on VM1:
 ```bash
 # Set the relevant remote to Online in JFrog UI first
-docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>
+docker pull <VM1-IP>:8082/ei-docker-virtual/<image>:<tag>
 # Then set back to Offline
 ```
 
@@ -533,7 +533,7 @@ docker pull 100.67.152.212:8082/ei-docker-virtual/<image>:<tag>
 
 ### Check JFrog is reachable from VM2
 ```bash
-curl -s --max-time 5 http://100.67.152.212:8082/artifactory/api/system/ping && echo "JFrog OK" || echo "JFrog unreachable"
+curl -s --max-time 5 http://<VM1-IP>:8082/artifactory/api/system/ping && echo "JFrog OK" || echo "JFrog unreachable"
 ```
 
 ### Confirm internet is blocked on VM2
@@ -553,23 +553,23 @@ tail -f /var/opt/jfrog/artifactory/log/request.log | grep 100.67.153.209
 ### List all images cached in JFrog
 ```bash
 curl -s -u admin:password \
-  http://100.67.152.212:8082/artifactory/api/docker/ei-docker-virtual/v2/_catalog | jq .repositories[]
+  http://<VM1-IP>:8082/artifactory/api/docker/ei-docker-virtual/v2/_catalog | jq .repositories[]
 ```
 
 ### Check tags for a specific image
 ```bash
 curl -s -u admin:password \
-  "http://100.67.152.212:8082/artifactory/api/docker/ei-docker-virtual/v2/library/nginx/tags/list" | jq .
+  "http://<VM1-IP>:8082/artifactory/api/docker/ei-docker-virtual/v2/library/nginx/tags/list" | jq .
 ```
 
 ### List all files in a generic repo path
 ```bash
 curl -s -u admin:password \
-  "http://100.67.152.212:8082/artifactory/api/storage/ei-generic-binaries/ansible-collections" | jq '.children[].uri'
+  "http://<VM1-IP>:8082/artifactory/api/storage/ei-generic-binaries/ansible-collections" | jq '.children[].uri'
 ```
 
 ### List all PyPI packages in JFrog
 ```bash
 curl -s -u admin:password \
-  "http://100.67.152.212:8082/artifactory/api/storage/ei-pypi-local" | jq '.children[].uri'
+  "http://<VM1-IP>:8082/artifactory/api/storage/ei-pypi-local" | jq '.children[].uri'
 ```

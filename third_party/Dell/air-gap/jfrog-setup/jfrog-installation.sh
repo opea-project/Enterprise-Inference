@@ -18,9 +18,10 @@
 #   sudo ./jfrog-installation.sh [OPTIONS]
 #
 # Options:
-#   --jfrog-port PORT   JFrog HTTP port (default: 8082)
-#   --skip-jfrog        Install tools only, skip JFrog installation
-#   -h, --help          Show this help message
+#   --jfrog-port PORT      JFrog HTTP port (default: 8082)
+#   --jfrog-version VER    JFrog Artifactory Trial version to install (default: 7.111.8)
+#   --skip-jfrog           Install tools only, skip JFrog installation
+#   -h, --help             Show this help message
 
 set -euo pipefail
 
@@ -28,6 +29,7 @@ set -euo pipefail
 # Defaults
 # ---------------------------------------------------------------------------
 JFROG_PORT="${JFROG_PORT:-8082}"
+JFROG_VERSION="${JFROG_VERSION:-7.111.8}"
 SKIP_JFROG=false
 
 # ---------------------------------------------------------------------------
@@ -51,6 +53,7 @@ section() {
 while [[ $# -gt 0 ]]; do
   case $1 in
     --jfrog-port) JFROG_PORT="$2"; shift 2 ;;
+    --jfrog-version) JFROG_VERSION="$2"; shift 2 ;;
     --skip-jfrog) SKIP_JFROG=true; shift ;;
     -h|--help)
       sed -n '/^# Usage:/,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \?//'
@@ -68,6 +71,7 @@ echo ""
 echo "============================================================"
 echo "  VM1 Setup — Prerequisites + JFrog Artifactory"
 echo "  JFrog port:       $JFROG_PORT"
+echo "  JFrog version:    $JFROG_VERSION"
 echo "  Skip JFrog:       $SKIP_JFROG"
 echo "============================================================"
 
@@ -155,7 +159,6 @@ else
     if [[ -n "$installer_tgz" ]]; then
       info "Using local installer: $installer_tgz"
     else
-      JFROG_VERSION="7.111.8"
       info "Downloading JFrog Platform Trial installer v${JFROG_VERSION}..."
       wget -O jfrog-deb-installer.tar.gz \
         "https://releases.jfrog.io/artifactory/jfrog-prox/org/artifactory/pro/deb/jfrog-platform-trial-prox/${JFROG_VERSION}/jfrog-platform-trial-prox-${JFROG_VERSION}-deb.tar.gz"

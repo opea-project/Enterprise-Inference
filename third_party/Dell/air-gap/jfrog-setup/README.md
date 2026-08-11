@@ -44,6 +44,7 @@ so connectivity between them is required throughout the entire process.
 | Network | Must be reachable from VM2 on port 8082 | Must be reachable from VM1. **Internet access must be fully disabled before running the EI deployment.** EI will exit with an error if `airgap_enabled=yes` and the machine can still reach the internet. |
 | OS | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
 | Access | Root or sudo privileges | Root or sudo privileges |
+| Artifactory version | Defaults to **`7.111.8`**, not necessarily the latest trial build on jfrog.com. This guide was last validated against **`7.146.7`**; pass `--jfrog-version 7.146.7` to `jfrog-installation.sh` (see [Step 1](#step-1---install-jfrog-on-vm1)) to install that version instead. | N/A |
 
 ### Credentials required
 
@@ -101,9 +102,9 @@ sudo apt install -y git
 Clone the repo and check out the airgap branch:
 
 ```bash
-git clone https://github.com/cld2labs/Enterprise-Inference.git Enterprise-Inference
+git clone https://github.com/opea-project/Enterprise-Inference.git Enterprise-Inference
 cd Enterprise-Inference
-git checkout cld2labs/airgap
+git checkout dell-airgap
 ```
 
 Then run the install script:
@@ -116,6 +117,13 @@ sudo ./jfrog-installation.sh
 
 > During the install, the package manager may show a package configuration prompt. Press
 > Enter or click OK to accept the defaults and continue.
+
+By default this installs JFrog Artifactory Trial `7.111.8`. To install a different
+version, pass `--jfrog-version`:
+
+```bash
+sudo ./jfrog-installation.sh --jfrog-version 7.146.7
+```
 
 The script installs these tools: curl, wget, git, jq, skopeo, helm, python3, pip3, ansible.
 
@@ -251,7 +259,7 @@ these commands:
 | Command | What it does |
 |---|---|
 | `./jfrog-setup.sh --step 1` | Creates all JFrog repositories: Docker repos for each upstream registry (Docker Hub, ECR, GHCR, registry.k8s.io, Quay), Helm, PyPI, Debian, and generic repos for binaries and models |
-| `./jfrog-setup.sh --step 2` | Sets anonymous read permission targets on all Docker repos so VM2 can pull images without credentials. **Note**: the "Allow Anonymous Access" toggle in Administration → Security → General must be enabled manually in the UI before running this step — the JFrog API cannot automate that toggle |
+| `./jfrog-setup.sh --step 2` | Sets anonymous read permission targets on all Docker repos so VM2 can pull images without credentials. **Note**: the "Allow Anonymous Access" toggle in Administration → Security → General must be enabled manually in the UI before running this step; the JFrog API cannot automate that toggle |
 | `./jfrog-setup.sh --step 3a` | Copies ~40 Docker images from upstream registries into JFrog using skopeo. Most images are pulled anonymously. `apache/apisix-ingress-controller:1.8.0` requires `--dockerhub-user` and `--dockerhub-pass` |
 | `./jfrog-setup.sh --step 3b` | Downloads 10 Helm charts (ingress-nginx, langfuse, apisix, keycloak, postgresql, redis, clickhouse, minio, valkey, nri-resource-policy-balloons) and uploads them along with an `index.yaml` that JFrog does not generate automatically |
 | `./jfrog-setup.sh --step 3c` | Downloads ~30 Python packages used by the EI deployment playbooks and uploads them to JFrog so VM2 can install them without internet access |
@@ -327,7 +335,7 @@ sudo ./uninstall-jfrog.sh --keep-data       # remove JFrog software but preserve
 ### Deployment exits with "airgap_enabled is set to yes but this machine has internet connectivity"
 
 This check runs at the start of every EI deployment when `airgap_enabled=yes`. It means
-VM2 can still reach the internet, which defeats the purpose of airgap mode — Docker images
+VM2 can still reach the internet, which defeats the purpose of airgap mode: Docker images
 not cached in JFrog would silently fall back to internet registries.
 
 Disable internet access on VM2 before running the deployment. A common way to do this is
