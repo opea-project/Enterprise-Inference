@@ -6,7 +6,9 @@ All business logic is directly in the MCP tools - no intermediate wrapper classe
 """
 
 import argparse
+import ast
 import json
+import operator
 import os
 import sys
 from datetime import datetime, timezone
@@ -327,6 +329,28 @@ def get_card_details(customer_id: str, card_id: str, session_id: str = "") -> st
     return card.model_dump_json(indent=2)
 
 
+_CALC_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _safe_eval_math(node: ast.AST) -> float:
+    if isinstance(node, ast.Expression):
+        return _safe_eval_math(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, ast.BinOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.left), _safe_eval_math(node.right))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _CALC_OPS:
+        return _CALC_OPS[type(node.op)](_safe_eval_math(node.operand))
+    raise ValueError("Unsupported expression")
+
+
 @mcp.tool()
 def calculate(expression: str, session_id: str = "") -> str:
     """Calculate the result of a mathematical expression.
@@ -337,9 +361,11 @@ def calculate(expression: str, session_id: str = "") -> str:
     Returns:
         The calculated result as a string.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 6))
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as e:
+        raise ValueError("Invalid expression") from e
+    return str(round(float(_safe_eval_math(tree)), 6))
 
 
 @mcp.tool()
