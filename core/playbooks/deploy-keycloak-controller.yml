@@ -12,20 +12,6 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add Ingress-Nginx repository
-      community.kubernetes.helm_repository:
-        name: ingress-nginx
-        repo_url: https://kubernetes.github.io/ingress-nginx
-        state: present
-      when: delete_pv_on_purge == "no"
-    - name: Verify repository availability
-      ansible.builtin.command: helm repo list
-      register: helm_repo_list
-      failed_when: false
-      changed_when: false
-    - name: Synchronize repositories
-      ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != "" and delete_pv_on_purge == "no"
     - name: Remove existing Keycloak PersistentVolume data directory
       ansible.builtin.file:
         path: /mnt/local-path-provisioner/

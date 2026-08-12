@@ -29,35 +29,35 @@
             tls.key: "{{ lookup('file', key_file) | b64encode }}"
       register: kubectl_output
       tags: deploy_cluster_dashboard
-    - name: Create Admin dashboard ingress
+    - name: Create Admin dashboard HTTPRoute
       community.kubernetes.k8s:
         state: present
         definition:
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
           metadata:
-            annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
-              nginx.ingress.kubernetes.io/rewrite-target: /$2
-            name: kubernetes-dashboard-ingress
+            name: kubernetes-dashboard-httproute
             namespace: kube-system
           spec:
-            ingressClassName: nginx
+            parentRefs:
+              - name: enterprise-edge-gateway
+                namespace: envoy-gateway-system
+            hostnames:
+              - "{{ secret_name }}"
             rules:
-              - host: "{{ secret_name }}"
-                http:
-                  paths:
-                    - backend:
-                        service:
-                          name: kubernetes-dashboard
-                          port:
-                            number: 443
-                      path: /dashboard(/|$)(.*)
-                      pathType: ImplementationSpecific
-            tls:
-              - hosts:
-                  - "{{ secret_name }}"
-                secretName: "{{ secret_name }}"
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /dashboard
+                filters:
+                  - type: URLRewrite
+                    urlRewrite:
+                      path:
+                        type: ReplacePrefixMatch
+                        replacePrefixMatch: /
+                backendRefs:
+                  - name: kubernetes-dashboard
+                    port: 443
       when: brownfield_deployment != "yes"
       tags: deploy_cluster_dashboard
     - name: Create ServiceAccount for Admin Dashboard

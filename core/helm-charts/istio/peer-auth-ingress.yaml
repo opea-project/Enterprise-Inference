@@ -4,11 +4,11 @@ apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
   name: peer-auth-ingress
-  namespace: ingress-nginx
+  namespace: envoy-gateway-system
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/name: envoy
   mtls:
     mode: STRICT
   portLevelMtls:

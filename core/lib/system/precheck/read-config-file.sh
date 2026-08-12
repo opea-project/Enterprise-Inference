@@ -46,17 +46,32 @@ read_config_file() {
             sed -i -E "s|^[[:space:]]*#?[[:space:]]*http_proxy:.*|http_proxy: \"$http_proxy\"|" "$INVENTORY_ALL_FILE"
             sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*http_proxy:.*|  http_proxy: \"$http_proxy\"|" "$INVENTORY_ALL_FILE"
             export http_proxy
+        else
+            sed -i -E "s|^[[:space:]]*#?[[:space:]]*http_proxy:.*|http_proxy: \"\"|" "$INVENTORY_ALL_FILE"
+            sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*http_proxy:.*|  http_proxy: \"\"|" "$INVENTORY_ALL_FILE"
+            unset http_proxy 2>/dev/null || true
         fi
 
         if [[ -n "$https_proxy" ]]; then
             sed -i -E "s|^[[:space:]]*#?[[:space:]]*https_proxy:.*|https_proxy: \"$https_proxy\"|" "$INVENTORY_ALL_FILE"
             sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*https_proxy:.*|  https_proxy: \"$https_proxy\"|" "$INVENTORY_ALL_FILE"
             export https_proxy
+        else
+            sed -i -E "s|^[[:space:]]*#?[[:space:]]*https_proxy:.*|https_proxy: \"\"|" "$INVENTORY_ALL_FILE"
+            sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*https_proxy:.*|  https_proxy: \"\"|" "$INVENTORY_ALL_FILE"
+            unset https_proxy 2>/dev/null || true
         fi
                                 
         if [[ -n "$no_proxy" ]]; then
+            # Ensure .svc.cluster.local is always in no_proxy for in-cluster traffic
+            if [[ "$no_proxy" != *".svc.cluster.local"* ]]; then
+                no_proxy="${no_proxy},.svc.cluster.local"
+            fi
             sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*no_proxy:.*|  no_proxy: \"$no_proxy\"|" "$INVENTORY_ALL_FILE"
             export no_proxy
+        else
+            sed -i -E "/^env_proxy:/,/^[^[:space:]]/s|^[[:space:]]*no_proxy:.*|  no_proxy: \"\"|" "$INVENTORY_ALL_FILE"
+            unset no_proxy 2>/dev/null || true
         fi
         
         

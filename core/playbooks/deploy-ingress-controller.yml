@@ -1,7 +1,7 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 ---
-- name: Deploy Ingress NGINX using Helm
+- name: Deploy Envoy Gateway and Enterprise Edge Gateway
   hosts: "{{ inference_delegate | default('kube_control_plane') }}"
   gather_facts: false
   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
@@ -11,19 +11,10 @@
   roles:
     - role: inference-tools
   tasks:
-    - name: Add the Ingress-NGINX Helm repository
-      community.kubernetes.helm_repository:
-        name: ingress-nginx
-        repo_url: https://kubernetes.github.io/ingress-nginx
-        state: present
-    - name: Validate if the Helm repositories are configured correctly
-      ansible.builtin.command: helm repo list
-      register: helm_repo_list
-      failed_when: false
-      changed_when: false
-    - name: Update Helm repositories to fetch the latest charts
-      ansible.builtin.shell: helm repo update
-      when: helm_repo_list.stdout != ""
+    - name: Install Gateway API CRDs
+      ansible.builtin.shell: >
+        kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+      run_once: true
 
     - name: Retrieving the Number of Infrastructure Nodes (ei-infra-eligible)
       ansible.builtin.shell: kubectl get nodes --selector=ei-infra-eligible=true -o jsonpath='{.items[*].metadata.name}' | wc -w
@@ -36,7 +27,7 @@
       changed_when: false
       when: inference_node_count.stdout | int == 0
 
-    - name: Determine Replica Node
+    - name: Determine Replica Count
       set_fact:
         inference_infra_replica_count: >-
           {{
@@ -45,62 +36,155 @@
             else 1)
           }}
 
-    - name: Display the Number of Nodes on which Ingress is deployed
+    - name: Display the Number of Gateway Proxy Replicas
       debug:
-        msg: "Number of Nodes on which Ingress is deployed: {{ inference_infra_replica_count }}"
+        msg: "Number of Envoy Gateway proxy replicas: {{ inference_infra_replica_count }}"
       run_once: true
 
-    - name: Deploy Ingress Nginx Controller
-      community.kubernetes.helm:
-        name: ingress-nginx
-        chart_ref: ingress-nginx/ingress-nginx
-        release_namespace: ingress-nginx
-        create_namespace: true
-        chart_version: "{{ ingress_controller | default('4.12.2') }}"
-        state: present
-        values:
-          controller:
-            progressDeadlineSeconds: 300
-            minReadySeconds: 0
-            replicaCount: "{{ inference_infra_replica_count | int }}"
-            hostPort:
-              enabled: true
-              ports:
-                http: 80
-                https: 443
-            tolerations:
-              - key: node-role.kubernetes.io/control-plane
-                operator: Exists
-                effect: NoSchedule
-              - key: node-role.kubernetes.io/master
-                operator: Exists
-                effect: NoSchedule
-            affinity:
-              nodeAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  nodeSelectorTerms:
-                  - matchExpressions:
-                    - key: ei-infra-eligible
-                      operator: In
-                      values: ["true"]
-                  - matchExpressions:
+    - name: Deploy Envoy Gateway Controller
+      ansible.builtin.shell: >
+        helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm
+        --version {{ envoy_gateway_version | default('v1.2.0') }}
+        --namespace envoy-gateway-system
+        --create-namespace
+        --wait
+      run_once: true
+
+    - name: Create EnvoyProxy configuration for proxy pod placement
+      ansible.builtin.shell: |
+        cat <<'INNEREOF' | sed 's/__REPLICAS__/{{ inference_infra_replica_count | int }}/' | kubectl apply -f -
+        apiVersion: gateway.envoyproxy.io/v1alpha1
+        kind: EnvoyProxy
+        metadata:
+          name: enterprise-proxy-config
+          namespace: envoy-gateway-system
+        spec:
+          provider:
+            type: Kubernetes
+            kubernetes:
+              envoyDeployment:
+                replicas: __REPLICAS__
+                pod:
+                  tolerations:
                     - key: node-role.kubernetes.io/control-plane
                       operator: Exists
-              podAntiAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    podAffinityTerm:
-                      labelSelector:
-                        matchLabels:
-                          app: ingress-nginx
-                      topologyKey: "kubernetes.io/hostname"
+                      effect: NoSchedule
+                    - key: node-role.kubernetes.io/master
+                      operator: Exists
+                      effect: NoSchedule
+                  affinity:
+                    nodeAffinity:
+                      requiredDuringSchedulingIgnoredDuringExecution:
+                        nodeSelectorTerms:
+                        - matchExpressions:
+                          - key: ei-infra-eligible
+                            operator: In
+                            values: ["true"]
+                        - matchExpressions:
+                          - key: node-role.kubernetes.io/control-plane
+                            operator: Exists
+                    podAntiAffinity:
+                      preferredDuringSchedulingIgnoredDuringExecution:
+                        - weight: 100
+                          podAffinityTerm:
+                            labelSelector:
+                              matchLabels:
+                                app.kubernetes.io/name: envoy
+                            topologyKey: "kubernetes.io/hostname"
+                patch:
+                  type: StrategicMerge
+                  value:
+                    spec:
+                      template:
+                        spec:
+                          containers:
+                            - name: envoy
+                              ports:
+                                - containerPort: 10443
+                                  hostPort: 443
+                                  name: https-443
+                                  protocol: TCP
+                                - containerPort: 10080
+                                  hostPort: 80
+                                  name: http-80
+                                  protocol: TCP
+                                - containerPort: 19001
+                                  hostPort: 19001
+                                  name: metrics
+                                  protocol: TCP
+              envoyService:
+                type: ClusterIP
+        INNEREOF
       run_once: true
-    - name: Pause to Allow Controller to Initialize
+
+    - name: Create GatewayClass
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: GatewayClass
+          metadata:
+            name: envoy
+          spec:
+            controllerName: gateway.envoyproxy.io/gatewayclass-controller
+            parametersRef:
+              group: gateway.envoyproxy.io
+              kind: EnvoyProxy
+              name: enterprise-proxy-config
+              namespace: envoy-gateway-system
+      run_once: true
+
+    - name: Create TLS Secret in Gateway namespace
+      community.kubernetes.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ secret_name }}"
+            namespace: envoy-gateway-system
+          type: kubernetes.io/tls
+          data:
+            tls.crt: "{{ lookup('file', cert_file) | b64encode }}"
+            tls.key: "{{ lookup('file', key_file) | b64encode }}"
+      run_once: true
+
+    - name: Create Enterprise Edge Gateway
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: Gateway
+          metadata:
+            name: enterprise-edge-gateway
+            namespace: envoy-gateway-system
+          spec:
+            gatewayClassName: envoy
+            listeners:
+              - name: https
+                protocol: HTTPS
+                port: 443
+                tls:
+                  mode: Terminate
+                  certificateRefs:
+                    - name: "{{ secret_name }}"
+                allowedRoutes:
+                  namespaces:
+                    from: All
+              - name: http
+                protocol: HTTP
+                port: 80
+                allowedRoutes:
+                  namespaces:
+                    from: All
+      run_once: true
+
+    - name: Pause to Allow Gateway to Initialize
       pause:
-        seconds: 10
-    - name: Wait for all ingress-nginx pods to be in a running and ready state
+        seconds: 15
+    - name: Wait for all Envoy Gateway pods to be in a running and ready state
       shell: |
-        kubectl get pods -n ingress-nginx -o json | jq -r '
+        kubectl get pods -n envoy-gateway-system -o json | jq -r '
           .items[] |
           select(.status.phase != "Running" or (.status.containerStatuses[] | select(.ready != true))) |
           .metadata.name' | wc -l
@@ -109,6 +193,6 @@
       retries: 160
       delay: 10
       failed_when: pod_status.rc != 0 and pod_status.stdout != "0"
-    - name: Ingress Controller Deployment status
+    - name: Envoy Gateway Deployment status
       debug:
-        msg: "All Ingress NGINX Controller pods are running and ready."
+        msg: "Envoy Gateway and Enterprise Edge Gateway are running and ready."

@@ -9,7 +9,7 @@
   vars:
     test_ns: test-ns
     default_ns: default
-    ingress_ns: ingress-nginx
+    ingress_ns: envoy-gateway-system
     genai_gw_ns: genai-gateway
     observability_ns: observability
     habana_ns: habana-ai-operator
@@ -348,12 +348,12 @@
       when: observability_ns_check.rc == 0
       run_once: true
 
-    - name: "[OpenShift] Label ingress-nginx namespace for ambient mode"
+    - name: "[OpenShift] Label envoy-gateway-system namespace for ambient mode"
       command: kubectl label namespace {{ ingress_ns }} istio.io/dataplane-mode=ambient --overwrite
       when: is_openshift | bool
       run_once: true
 
-    - name: Apply peer-auth-ingress.yaml to ingress-nginx namespace
+    - name: Apply peer-auth-ingress.yaml to envoy-gateway-system namespace
       command: kubectl apply -f {{ peer_auth_ingress_path }} -n {{ ingress_ns }}
       run_once: true
 

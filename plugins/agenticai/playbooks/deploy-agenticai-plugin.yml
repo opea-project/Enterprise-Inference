@@ -145,34 +145,31 @@
       run_once: true
 
     ###########################################################################
-    # Root Ingress (SUBDOMAIN MODE)
+    # Root HTTPRoute (SUBDOMAIN MODE)
     ###########################################################################
-    - name: Create Flowise Root Ingress (Subdomain)
+    - name: Create Flowise Root HTTPRoute (Subdomain)
       kubernetes.core.k8s:
         state: present
         definition:
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
           metadata:
             name: flowise-root
             namespace: "{{ agenticai_namespace }}"
           spec:
-            ingressClassName: "{{ agenticai_ingress_class }}"
-            tls:
-              - secretName: "flowise-{{ cluster_url }}"
-                hosts:
-                  - "flowise-{{ cluster_url }}"
+            parentRefs:
+              - name: enterprise-edge-gateway
+                namespace: envoy-gateway-system
+            hostnames:
+              - "flowise-{{ cluster_url }}"
             rules:
-              - host: "flowise-{{ cluster_url }}"
-                http:
-                  paths:
-                    - path: /
-                      pathType: Prefix
-                      backend:
-                        service:
-                          name: flowise
-                          port:
-                            number: 3000
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /
+                backendRefs:
+                  - name: flowise
+                    port: 3000
       when: kubernetes_platform != 'openshift' and agenticai_ingress_enabled | bool
       run_once: true
 

@@ -95,7 +95,7 @@
         state: absent
       when: kubernetes_platform != "eks"
       run_once: true
-    - name: Delete Ingress Resource
+    - name: Delete stale Ingress/HTTPRoute Resource
       kubernetes.core.k8s:
         state: absent
         api_version: networking.k8s.io/v1
@@ -137,6 +137,11 @@
         --set route.tls.termination=edge
         --set route.tls.insecureEdgeTerminationPolicy=Redirect
         --set ingress.enabled=false
+        {% elif kubernetes_platform == 'eks' %}
+        --set ingress.enabled=true
+        --set ingress.host={{ secret_name }}
+        --set ingress.secretname={{ secret_name }}
+        --set route.enabled=false
         {% else %}
         --set ingress.enabled=true
         --set ingress.host={{ secret_name }}
@@ -232,13 +237,17 @@
         --set langfuse.route.tls.insecureEdgeTerminationPolicy=Redirect
         --set langfuse.ingress.enabled=false
         --set langfuse.nextauth.url=https://trace-{{ secret_name }}
-        {% else %}
+        {% elif kubernetes_platform == 'eks' %}
         --set langfuse.ingress.enabled=true
-        --set langfuse.ingress.className={{ 'alb' if kubernetes_platform == 'eks' else 'nginx' }}
+        --set langfuse.ingress.className=alb
         --set langfuse.ingress.tls.enabled=true
         --set langfuse.ingress.hosts[0].host=trace-{{ secret_name }}
         --set langfuse.ingress.hosts[0].paths[0].pathType=Prefix
         --set langfuse.ingress.tls.secretName=trace-{{ secret_name }}
+        --set langfuse.nextauth.url=https://trace-{{ secret_name }}
+        --set langfuse.route.enabled=false
+        {% else %}
+        --set langfuse.ingress.enabled=false
         --set langfuse.nextauth.url=https://trace-{{ secret_name }}
         --set langfuse.route.enabled=false
         {% endif %}
@@ -286,4 +295,30 @@
             port:
               targetPort: 3000
       when: kubernetes_platform == "openshift"
+      run_once: true
+
+    - name: Create HTTPRoute for GenAI Gateway Trace (non-EKS, non-OpenShift)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
+          metadata:
+            name: genai-gateway-trace-httproute
+            namespace: genai-gateway
+          spec:
+            parentRefs:
+              - name: enterprise-edge-gateway
+                namespace: envoy-gateway-system
+            hostnames:
+              - "trace-{{ secret_name }}"
+            rules:
+              - matches:
+                  - path:
+                      type: PathPrefix
+                      value: /
+                backendRefs:
+                  - name: genai-gateway-trace-web
+                    port: 3000
+      when: kubernetes_platform != "openshift" and kubernetes_platform != "eks"
       run_once: true
