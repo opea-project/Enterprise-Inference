@@ -7,6 +7,6 @@ deploy_cluster_config_playbook() {
     else
         tags=""        
     fi
-    
-    ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cluster-config.yml --become --become-user=root --extra-vars "brownfield_deployment=${brownfield_deployment} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file}" --tags "$tags" 
+
+    ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cluster-config.yml --become --become-user=root --become-password-file="${BECOME_PASSWORD_FILE}" --extra-vars "brownfield_deployment=${brownfield_deployment} secret_name=${cluster_url} cert_file=${cert_file} key_file=${key_file}" --tags "$tags" 
 }
