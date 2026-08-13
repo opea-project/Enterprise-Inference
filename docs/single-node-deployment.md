@@ -58,6 +58,15 @@ Run the command below to deploy the Llama 3.1 8B parameter model on Intel® Gaud
 ./inference-stack-deploy.sh --models "1" --cpu-or-gpu "gpu" --hugging-face-token $HUGGINGFACE_TOKEN
 ```
 
+#### NVIDIA GPU
+
+The automation installs the NVIDIA GPU Operator (`nvidia/gpu-operator` Helm chart) automatically. Ensure your nodes meet NVIDIA's own prerequisites for the GPU Operator (supported OS/kernel, NVIDIA GPU present) before deployment.
+
+Run the command below to deploy the Llama 3.1 8B parameter model on NVIDIA GPU.
+```bash
+./inference-stack-deploy.sh --models "1" --cpu-or-gpu "nv-gpu" --hugging-face-token $HUGGINGFACE_TOKEN
+```
+
 Select Option 1 and confirm the Yes/No prompt.
 
 This will deploy the setup automatically. If any issues are encountered, double-check the prerequisites and configuration files.
@@ -82,7 +91,7 @@ To test on CPU only. Note `vllmcpu` is appended to the URL.
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct-vllmcpu/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```
 
-To test on Intel® Gaudi® AI Accelerators:
+To test on Intel® Gaudi® AI Accelerators or NVIDIA GPU:
 ```bash
 curl -k https://${BASE_URL}/Llama-3.1-8B-Instruct/v1/completions -X POST -d '{"model": "meta-llama/Llama-3.1-8B-Instruct", "prompt": "What is Deep Learning?", "max_tokens": 50, "temperature": 0}' -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN"
 ```

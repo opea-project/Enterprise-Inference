@@ -12,7 +12,26 @@ parse_arguments() {
             --keycloak-admin-password) keycloak_admin_password="$2"; shift ;;
             --hugging-face-token) hugging_face_token="$2"; shift ;;
             --models) models="$2"; shift ;;
-            --cpu-or-gpu) cpu_or_gpu="$2"; shift ;;
+            --cpu-or-gpu)
+                case "$2" in
+                    c|C|cpu|CPU)
+                        cpu_or_gpu="c"
+                        ;;
+                    g|G|gpu|GPU)
+                        cpu_or_gpu="g"
+                        ;;
+                    nv-gpu|NV-GPU|nvidia|NVIDIA)
+                        cpu_or_gpu="g"
+                        gpu_vendor="nvidia"
+                        ;;
+                    *)
+                        # Unrecognized value: pass through unchanged (existing behavior).
+                        # read_config_file will validate/normalize it if a config file is present.
+                        cpu_or_gpu="$2"
+                        ;;
+                esac
+                shift
+                ;;
             --deploy-nri-balloon-policy) deploy_nri_balloon_policy="$2"; shift ;;
             --skip-check) skip_check="true" ;;
             -h|--help) usage; exit 0 ;;
@@ -148,18 +167,23 @@ prompt_for_input() {
         else
             echo "Using provided Keycloak admin password"
         fi
-    fi        
-    
+    fi
+
     if [[ -z "$cpu_or_gpu" ]]; then
-        read -p "Do you want to run on CPU or GPU? (c/g): " cpu_or_gpu
+        read -p "Do you want to run on CPU or GPU? (c/g/nv-gpu): " cpu_or_gpu
         case "$cpu_or_gpu" in
-            c|C)
+            c|C|cpu|CPU)
                 cpu_or_gpu="c"
                 echo "Running on CPU"
                 ;;
-            g|G)
+            g|G|gpu|GPU)
                 cpu_or_gpu="g"
                 echo "Running on GPU"
+                ;;
+            nv-gpu|NV-GPU|nvidia|NVIDIA)
+                cpu_or_gpu="g"
+                gpu_vendor="nvidia"
+                echo "Running on NVIDIA GPU"
                 ;;
             *)
                 echo "Invalid option. Defaulting to CPU."
@@ -169,5 +193,5 @@ prompt_for_input() {
     else
         echo "cpu_or_gpu is already set to $cpu_or_gpu"
     fi
-    
+
 }

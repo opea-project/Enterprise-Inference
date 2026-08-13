@@ -50,7 +50,11 @@ NC=$(tput sgr0)
 # --keycloak-admin-password <password>: The Keycloak admin password.
 # --hugging-face-token <token>: The token for Huggingface.
 # --models <models>: The models to deploy (comma-separated list of model numbers or names).
-# --cpu-or-gpu <c/g>: Specify whether to run on CPU or GPU.
+# --cpu-or-gpu <c/g/nv-gpu>: Specify whether to run on CPU (c), Gaudi GPU (g), or NVIDIA GPU (nv-gpu, alias nvidia).
+#
+# NOTE: If core/inventory/inference-config.cfg exists, its cpu_or_gpu value overrides this flag.
+# The config file is sourced (via read_config_file) after argument parsing, so any --cpu-or-gpu
+# value passed on the command line is silently replaced when the config file is present.
 
 # Main Menu
 
@@ -167,7 +171,10 @@ Options:
   --keycloak-admin-password <pw> Keycloak admin password.
   --hugging-face-token <token>   Huggingface token.
   --models <models>              Models to deploy (comma-separated).
-  --cpu-or-gpu <c/g>             Run on CPU (c) or GPU (g).
+  --cpu-or-gpu <c/g/nv-gpu>      Run on CPU (c), Gaudi GPU (g), or NVIDIA GPU (nv-gpu, alias nvidia).
+
+Note: If core/inventory/inference-config.cfg exists, its cpu_or_gpu value overrides this flag
+(the config file is sourced after argument parsing).
 
 Examples:
   Setup cluster: ./inference-stack-deploy.sh --cluster-url "https://example.com" --cert-file "/path/cert.pem" --key-file "/path/key.pem" --keycloak-client-id "client-id" --keycloak-admin-user "user" --keycloak-admin-password "password" --hugging-face-token "token" --models "1,3,5" --cpu-or-gpu "g"
