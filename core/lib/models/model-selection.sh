@@ -1,16 +1,22 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2154
+
 model_selection(){
     
     if [ "$list_model_menu" != "skip" ]; then
         if [ -z "$hugging_face_token" ] && [ "$deploy_llm_models" = "yes" ]; then
-            read -p "Enter the token for Huggingface: " hugging_face_token
+            read -r -p "Enter the token for Huggingface: " hugging_face_token
         else
             echo "Using provided Huggingface token"            
         fi
         if [ -z "$deploy_llm_models" ]; then
-            read -p "Do you want to proceed with deploying Large Language Model (LLM)? (yes/no): " deploy_llm_models
+            read -r -p "Do you want to proceed with deploying Large Language Model (LLM)? (yes/no): " deploy_llm_models
             if [ "$deploy_llm_models" == "yes" ]; then
                 model_name_list=$(get_model_names)    
                 echo "Proceeding to deploy models: $model_name_list"
@@ -40,7 +46,7 @@ model_selection(){
                             echo "12. BAAI/bge-reranker-base"
                             echo "13. codellama/CodeLlama-34b-Instruct-hf"
                             echo "14. tiiuae/Falcon3-7B-Instruct"
-                            read -p "Enter the numbers of the GPU models you want to deploy/remove (comma-separated, e.g., 1,3,5): " models
+                            read -r -p "Enter the numbers of the GPU models you want to deploy/remove (comma-separated, e.g., 1,3,5): " models
                             # Validate input
                             IFS=',' read -ra selected <<< "$models"
                             for m in "${selected[@]}"; do
@@ -59,7 +65,7 @@ model_selection(){
                             echo "25. Qwen/Qwen3-1.7B"
                             echo "26. Qwen/Qwen3-4B-Instruct-2507"
                             echo "27. Qwen/Qwen3-Coder-30B-A3B-Instruct"
-                            read -p "Enter the number of the CPU model you want to deploy/remove: " cpu_model
+                            read -r -p "Enter the number of the CPU model you want to deploy/remove: " cpu_model
                             # Validate input
                             if ! [[ "$cpu_model" =~ ^(21|22|23|24|25|26|27)$ ]]; then
                                 echo "Error: Invalid model selected ($cpu_model). Exiting." >&2

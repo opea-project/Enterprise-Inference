@@ -1,10 +1,16 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034
+
 remove_inference_nodes_playbook() {
     echo "Remove Inference LLM Nodes playbook..."
     # Prompt the user for the worker node names to be removed
-    read -p "Enter the names of the worker nodes to be removed (comma-separated, as defined in hosts.yml): " worker_nodes_to_remove            
+    read -r -p "Enter the names of the worker nodes to be removed (comma-separated, as defined in hosts.yml): " worker_nodes_to_remove            
     if [ -z "$worker_nodes_to_remove" ]; then
         echo "Error: No worker node names provided."
         return 1

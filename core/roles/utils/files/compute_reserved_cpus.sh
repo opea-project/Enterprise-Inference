@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
 TOTAL_RESERVED=$1
@@ -39,8 +41,7 @@ for i in $(seq 0 $((total_numa - 1))); do
       all_cpus+=("$seg")
     fi
   done
-  IFS=$'\n' sorted=($(printf '%s\n' "${all_cpus[@]}" | sort -n))
-  unset IFS
+  mapfile -t sorted < <(printf '%s\n' "${all_cpus[@]}" | sort -n)
   total_cpus_in_numa=${#sorted[@]}
   if [ "$ht_enabled" = true ] && [ "$total_cpus_in_numa" -ge "$((cpus_per_numa * 2))" ]; then
     half=$((total_cpus_in_numa / 2))
@@ -58,8 +59,7 @@ for i in $(seq 0 $((total_numa - 1))); do
   else
     selected=("${sorted[@]:0:$cpus_per_numa}")
   fi
-  IFS=$'\n' selected_sorted=($(printf '%s\n' "${selected[@]}" | sort -n))
-  unset IFS
+  mapfile -t selected_sorted < <(printf '%s\n' "${selected[@]}" | sort -n)
   for cpu in "${selected_sorted[@]}"; do out="${out}${cpu},"; done
 done
 

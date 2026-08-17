@@ -1,11 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 check_cluster_state() {
     echo "Checking the state of the Kubernetes cluster..."
-    ansible-playbook -i inventory/mycluster/hosts.yaml --become --become-user=root upgrade-cluster.yml --check
     # Check the exit status of the Ansible playbook command
-    if [ $? -eq 0 ]; then
+    if ansible-playbook -i inventory/mycluster/hosts.yaml --become --become-user=root upgrade-cluster.yml --check; then
         echo "Kubernetes cluster state check completed successfully."
     else
         echo "Kubernetes cluster state check indicates potential issues."

@@ -1,9 +1,12 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -e
 #sudo apt-get install gettext-base
 # Get the absolute path of the ui directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export BUILD_CONTEXT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BUILD_CONTEXT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+export BUILD_CONTEXT
 export REGISTRY_URL="${REGISTRY_URL:-registry.kube-system.svc.cluster.local:5000}"
 
 echo "Building with context: $BUILD_CONTEXT"
@@ -36,7 +39,7 @@ echo "Monitor with: kubectl logs -f job/buildkit-frontend -n ${NAMESPACE:-finetu
 
 # Wait for pod to start
 echo "Waiting for BuildKit pod to start..."
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   POD_NAME=$(kubectl get pods -n "${NAMESPACE:-finetuning-ui}" -l job-name=buildkit-frontend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   if [ -n "$POD_NAME" ]; then
     echo "Pod started: $POD_NAME"

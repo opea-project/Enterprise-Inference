@@ -18,7 +18,7 @@ set -e
 
 # Get Keycloak URL from kubectl
 KEYCLOAK_SERVICE=$(kubectl get svc -n default -l app.kubernetes.io/name=keycloak -o jsonpath='{.items[0].metadata.name}')
-KEYCLOAK_PORT=$(kubectl get svc -n default ${KEYCLOAK_SERVICE} -o jsonpath='{.spec.ports[?(@.name=="http")].port}')
+KEYCLOAK_PORT=$(kubectl get svc -n default "${KEYCLOAK_SERVICE}" -o jsonpath='{.spec.ports[?(@.name=="http")].port}')
 KEYCLOAK_URL="http://${KEYCLOAK_SERVICE}.default.svc.cluster.local:${KEYCLOAK_PORT}"
 
 # Get admin credentials from inference config

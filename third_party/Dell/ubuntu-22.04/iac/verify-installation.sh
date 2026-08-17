@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 # Script to verify Ubuntu installation completion
 #
 # Environment variables:
@@ -29,7 +31,8 @@ if [ -z "$IDRAC_PASS" ]; then
     exit 1
 fi
 
-EXPECTED_HOSTNAME="ubuntu-server"  # From terraform.tfvars
+# shellcheck disable=SC2034  # reference value from terraform.tfvars, reported in the summary below
+EXPECTED_HOSTNAME="ubuntu-server"
 
 echo "=========================================="
 echo "Ubuntu Installation Verification"

@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 from copy import deepcopy
 from pathlib import Path
@@ -16,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 
-# Add parent directory to sys.path for shared modules (error_hints)
+# Add parent directory to sys.path for shared modules (error_hints, safe_math)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from airline_data_model import (
@@ -35,6 +36,7 @@ from airline_data_model import (
     User,
 )
 from error_hints import analyze_execution_error
+from safe_math import calculate_expression
 
 
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
@@ -43,6 +45,9 @@ TAU2_BENCH_URL = (
     "https://raw.githubusercontent.com/sierra-research/tau2-bench/"
     "main/data/tau2/domains/airline/db.json"
 )
+
+
+DOWNLOAD_TIMEOUT_SEC = 60
 
 
 def ensure_db(db_path: str) -> None:
@@ -54,7 +59,11 @@ def ensure_db(db_path: str) -> None:
     print(f"   Downloading from tau2-bench …")
     p.parent.mkdir(parents=True, exist_ok=True)
     try:
-        urllib.request.urlretrieve(TAU2_BENCH_URL, str(p))
+        if urllib.parse.urlsplit(TAU2_BENCH_URL).scheme != "https":
+            raise ValueError("Only https:// downloads are permitted")
+        # nosec B310: the scheme is restricted to https immediately above.
+        with urllib.request.urlopen(TAU2_BENCH_URL, timeout=DOWNLOAD_TIMEOUT_SEC) as response:  # nosec B310
+            p.write_bytes(response.read())
         print(f"   ✅ Downloaded ({p.stat().st_size / 1_048_576:.1f} MB)")
     except Exception as exc:
         print(f"   ❌ Download failed: {exc}")
@@ -383,9 +392,7 @@ def calculate(expression: str, session_id: str = "") -> str:
     Raises:
         ValueError: If the expression is invalid.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 2))
+    return calculate_expression(expression, 2)
 
 
 @mcp.tool()

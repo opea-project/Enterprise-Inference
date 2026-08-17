@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 read_config_file() {
     local config_file="$HOMEDIR/inventory/inference-config.cfg"
     if [ -f "$config_file" ]; then
@@ -20,7 +26,8 @@ read_config_file() {
         done < "$config_file"        
         
         # Load the environment variables from the temporary file
-        source temp_env_vars        
+        # shellcheck source=/dev/null  # generated at runtime
+        source temp_env_vars
         rm temp_env_vars    
         local metadata_config_file="$HOMEDIR/inventory/metadata/inference-metadata.cfg"
         if [ -f "$metadata_config_file" ]; then
@@ -31,6 +38,7 @@ read_config_file() {
                 value=$(echo "$value" | xargs)                
                 printf "%s=%s\n" "$key" "$value" >> temp_env_vars_metadata
             done < "$metadata_config_file"            
+            # shellcheck source=/dev/null  # generated at runtime
             source temp_env_vars_metadata
             rm temp_env_vars_metadata
         else

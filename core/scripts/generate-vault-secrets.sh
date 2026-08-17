@@ -1,16 +1,18 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Function to generate secure passwords
 generate_password() {
     local length=${1:-16}
-    openssl rand -base64 $((length * 3 / 4)) | tr -d "=+/" | cut -c1-$length
+    openssl rand -base64 "$((length * 3 / 4))" | tr -d "=+/" | cut -c"1-$length"
 }
 
 # Function to generate hex keys
 generate_hex_key() {
     local length=${1:-32}
-    openssl rand -hex $length
+    openssl rand -hex "$length"
 }
 
 echo "🔧 Generating secure credentials..."
@@ -41,10 +43,6 @@ FINETUNE_API_POSTGRES_PASSWORD=$(generate_password 20)
 FINETUNE_API_REDIS_PASSWORD=$(generate_password 20)
 DATAPREP_POSTGRES_PASSWORD=$(generate_password 20)
 DATAPREP_REDIS_PASSWORD=$(generate_password 20)
-
-# Generate connection strings
-DATABASE_URL="postgresql://admin:${POSTGRESQL_PASSWORD}@genai-gateway-postgresql:5432/litellm"
-CLICKHOUSE_REDIS_URL="redis://default:${CLICKHOUSE_PASSWORD}@genai-gateway-trace-valkey-primary:6379/0"
 
 echo "Generated secure credentials!"
 echo ""

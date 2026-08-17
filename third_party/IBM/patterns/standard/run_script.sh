@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 
 expand_path() {
   local path="$1"
@@ -27,6 +29,7 @@ else
   shift  # Remove 'multi-node' from arguments
   reserved_ip=$1  # First control plane node IP
   cluster_url=$2
+  # shellcheck disable=SC2034  # retained to document the positional argument order
   models=$3
   cert_path=$(expand_path "$4")
   key_path=$(expand_path "$5")
@@ -70,7 +73,7 @@ fi
 # Model deploy code
 if [[ "$1" == "model-deploy" ]]; then
   echo "[$(date)] Phase 2: Deploying models with PVC support"
-  cd /home/ubuntu/Enterprise-Inference/core
+  cd /home/ubuntu/Enterprise-Inference/core || exit 1
   echo -e '3\n2\n1\nyes\ny\n' | bash inference-stack-deploy.sh --models "$2"
   kubectl delete pods -l app.kubernetes.io/component=device-plugin,app.kubernetes.io/name=habana-ai -n habana-ai-operator --ignore-not-found=true
   
@@ -108,7 +111,9 @@ sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock || true
 sudo dpkg --configure -a || true
 
 # Configure needrestart to automatically restart services without prompting
+# shellcheck disable=SC2016  # $nrconf is needrestart config syntax, not a shell variable
 echo '$nrconf{restart} = "a";' | sudo tee /etc/needrestart/conf.d/50local.conf
+# shellcheck disable=SC2016  # $nrconf is needrestart config syntax, not a shell variable
 echo '$nrconf{kernelhints} = 0;' | sudo tee -a /etc/needrestart/conf.d/50local.conf
 
 echo "[$(date)] Updating package lists and installing dependencies..."
@@ -153,10 +158,10 @@ else
     chmod 600 "$key_path"
 fi
 
-cd ~
+cd ~ || exit 1
 rm -rf /home/ubuntu/Enterprise-Inference
 git clone -b release-1.3.1 --single-branch https://github.com/opea-project/Enterprise-Inference.git /home/ubuntu/Enterprise-Inference
-cd /home/ubuntu/Enterprise-Inference
+cd /home/ubuntu/Enterprise-Inference || exit 1
 
 # Copy appropriate hosts.yaml based on deployment mode
 if [[ "$deployment_mode" == "single-node" ]]; then
@@ -168,7 +173,7 @@ fi
 cp -f /home/ubuntu/inference-config.cfg core/inventory/inference-config.cfg
 echo "[$(date)] Vault secrets generated successfully"
 chmod +x core/inference-stack-deploy.sh
-cd core
+cd core || exit 1
 
 # Deploys infrastructure only (no models)
 echo "[$(date)] Phase 1: Deploying entire infrastructure stack without models"

@@ -1,11 +1,14 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 
 # Get the absolute path of the dataprep directory
 # kaniko/data-prep is 3 levels deep from data-prep-backend root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export BUILD_CONTEXT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BUILD_CONTEXT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+export BUILD_CONTEXT
 export REGISTRY_URL="${REGISTRY_URL:-registry.kube-system.svc.cluster.local:5000}"
 
 echo "Building with context: $BUILD_CONTEXT"
@@ -25,7 +28,7 @@ export DB_HOST=postgres.dataprep.svc.cluster.local
 export DB_PORT=5432
 export DB_NAME=dataprep
 export DB_USER=postgres
-export DB_PASSWORD=postgres
+export DB_PASSWORD="${DB_PASSWORD:-postgres}"
 export DB_POOL_SIZE=5
 export DB_MAX_OVERFLOW=10
 

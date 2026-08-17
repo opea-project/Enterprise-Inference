@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 #
 # Combined Enterprise Inference Stack Deployment Script
 # This script combines genai-system-setup.sh, genai-owner-setup.sh, and post-os-setup.sh
@@ -40,7 +42,7 @@ DEPLOYMENT_MODE="keycloak"
 DEPLOY_OBSERVABILITY="off"
 KEYCLOAK_CLIENT_ID="my-client-id"
 KEYCLOAK_ADMIN_USER="your-keycloak-admin-user"
-KEYCLOAK_ADMIN_PASSWORD="changeme"
+KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-changeme}"
 FIRMWARE_VERSION="1.22.1"
 STATE_FILE="/tmp/ei-deploy.state"
 BRANCH="release-1.4.0"
@@ -168,7 +170,7 @@ check_hf_token_access() {
 
 update_inference_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
-        local hf_token_escaped models_escaped gpu_type_escaped
+        local hf_token_escaped gpu_type_escaped
         local keycloak_client_id_escaped keycloak_admin_user_escaped keycloak_admin_password_escaped
         local deploy_keycloak_apisix_escaped deploy_genai_gateway_escaped deploy_observability_escaped
 
@@ -379,6 +381,7 @@ log_info "Deployment user validated: $USERNAME"
 if [[ -f "$STATE_FILE" ]] || [[ "$RESUME" == true ]]; then
     if [[ -f "$STATE_FILE" ]]; then
         log_info "State file found. Resuming from checkpoint..."
+        # shellcheck source=/dev/null  # state file written by this script at runtime
         source "$STATE_FILE"
         RESUME=true
         set_deployment_variables
@@ -577,6 +580,7 @@ main() {
             log_info "CPU-only mode detected — disabling NRI and CPU balloons"
 
             # Normalize file: always end with newline
+            # shellcheck disable=SC1003  # '$a\' is the sed idiom for appending a trailing newline
             sed -i -e '$a\' "$CONFIG_FILE"
 
             # Update if keys exist
@@ -623,9 +627,11 @@ main() {
             if [[ "$KERNEL" == 6.8.* ]]; then
                 log_info "Kernel version 6.8 detected. Adding IOMMU configuration..."
                 if ! grep -q "iommu=pt intel_iommu=on" /etc/default/grub; then
-                    echo "" >> /etc/default/grub
-                    echo "# Gaudi3 requires this option for kernel version 6.8" >> /etc/default/grub
-                    echo 'GRUB_CMDLINE_LINUX_DEFAULT="iommu=pt intel_iommu=on"' >> /etc/default/grub
+                    {
+                        echo ""
+                        echo "# Gaudi3 requires this option for kernel version 6.8"
+                        echo 'GRUB_CMDLINE_LINUX_DEFAULT="iommu=pt intel_iommu=on"'
+                    } >> /etc/default/grub
                     log_warn "IOMMU configuration added. System restart required after deployment."
                 else
                     log_info "IOMMU configuration already present"

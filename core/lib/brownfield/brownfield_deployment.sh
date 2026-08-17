@@ -1,3 +1,12 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 manage_kubeconfig() {
     local max_attempts=3
     local attempt=1
@@ -6,7 +15,7 @@ manage_kubeconfig() {
         # Prompt for kubeconfig file path
         if [ -z "$kubeconfig_file" ] || [ $attempt -gt 1 ]; then
             echo "Attempt $attempt of $max_attempts:"
-            read -p "Enter the full path to the kubeconfig file to provision brownfield deployment: " kubeconfig_file
+            read -r -p "Enter the full path to the kubeconfig file to provision brownfield deployment: " kubeconfig_file
         else
             echo "Using provided kubeconfig file: $kubeconfig_file"
         fi
@@ -61,7 +70,7 @@ prompt_kubernetes_platform() {
     echo "4) Azure AKS"
     echo "5) Vanilla Kubernetes"
     echo "==================================================="
-    read -p "Enter your choice (1-5): " platform_choice
+    read -r -p "Enter your choice (1-5): " platform_choice
     
     case "$platform_choice" in
         1)
@@ -104,7 +113,8 @@ detect_kubernetes_platform() {
         return 1
     fi
     
-    local platform=$(kubectl version --request-timeout=5s -o json 2>/dev/null | {
+    local platform
+    platform=$(kubectl version --request-timeout=5s -o json 2>/dev/null | {
         if kubectl api-resources --api-group=route.openshift.io --request-timeout=5s 2>/dev/null | grep -q '^routes'; then
             echo "openshift"
         elif kubectl version --request-timeout=5s -o json 2>/dev/null | grep -qi "eks"; then
@@ -182,7 +192,7 @@ brownfield_deployment() {
     echo "| 2) Manage Models                               |"
     echo "|------------------------------------------------|"
     echo "Please choose an option (1 or 2):"
-    read -p "> " brownfield_choice
+    read -r -p "> " brownfield_choice
     case $brownfield_choice in
         1)
             brownfield_deployment="yes"

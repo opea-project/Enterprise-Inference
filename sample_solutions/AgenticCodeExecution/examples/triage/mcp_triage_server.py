@@ -20,10 +20,11 @@ from typing import Any, Dict, List
 
 from fastmcp import FastMCP
 
-# Add parent directory to sys.path for shared modules (error_hints)
+# Add parent directory to sys.path for shared modules (error_hints, safe_math)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from error_hints import analyze_execution_error
+from safe_math import calculate_expression
 
 
 mcp = FastMCP(
@@ -39,6 +40,8 @@ Always gather evidence first, then summarize impact, likely cause, and next step
 )
 
 
+_PERMITTED_URL_SCHEMES = ("http", "https")
+
 _STATUS_APIS = {
     "github": "https://www.githubstatus.com/api/v2/status.json",
     "openai": "https://status.openai.com/api/v2/status.json",
@@ -51,15 +54,27 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _validate_url(url: str) -> str:
+    """Reject URL schemes other than http/https, such as file: or custom handlers.
+
+    Raises:
+        ValueError: If the scheme is not permitted.
+    """
+    if urllib.parse.urlsplit(url).scheme.lower() not in _PERMITTED_URL_SCHEMES:
+        raise ValueError("Only http:// and https:// URLs are supported")
+    return url
+
+
 def _http_get_json(url: str, timeout_sec: int = 8) -> Dict[str, Any]:
     request = urllib.request.Request(
-        url,
+        _validate_url(url),
         headers={
             "User-Agent": "mcp-triage-server/1.0",
             "Accept": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+    # nosec B310: _validate_url restricts the scheme to http/https.
+    with urllib.request.urlopen(request, timeout=timeout_sec) as response:  # nosec B310
         body = response.read().decode("utf-8", errors="replace")
         return json.loads(body)
 
@@ -113,7 +128,9 @@ def check_http_endpoint(url: str, timeout_sec: int = 8, session_id: str = "") ->
     }
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+        _validate_url(url)
+        # nosec B310: _validate_url restricts the scheme to http/https.
+        with urllib.request.urlopen(request, timeout=timeout_sec) as response:  # nosec B310
             elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
             body = response.read(400).decode("utf-8", errors="replace")
             result.update(
@@ -488,9 +505,7 @@ def draft_customer_update(
 def calculate(expression: str, session_id: str = "") -> str:
     """Calculate the result of a mathematical expression."""
     _ = session_id
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 6))
+    return calculate_expression(expression, 6)
 
 
 @mcp.tool()

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 
 # Hybrid Search RAG - Setup Verification Script
 # This script verifies that the project structure is complete

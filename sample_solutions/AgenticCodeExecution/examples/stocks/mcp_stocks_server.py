@@ -16,10 +16,11 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 
-# Add parent directory to sys.path for shared modules (error_hints)
+# Add parent directory to sys.path for shared modules (error_hints, safe_math)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from error_hints import analyze_execution_error
+from safe_math import calculate_expression
 from stocks_data_model import StocksDB
 
 
@@ -471,9 +472,7 @@ def calculate(expression: str, session_id: str = "") -> str:
     Returns:
         The calculated result as a string.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 6))
+    return calculate_expression(expression, 6)
 
 
 @mcp.tool()

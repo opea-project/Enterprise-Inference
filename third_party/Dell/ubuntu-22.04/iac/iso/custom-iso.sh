@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
 ISO_URL="https://releases.ubuntu.com/jammy/ubuntu-22.04.5-live-server-amd64.iso"
@@ -9,7 +11,7 @@ VOLID="Ubuntu-Server-22.04.5-AI"
 
 HOSTNAME=""
 USERNAME=""
-PASSWORD_HASH='$6$Sl0xydNgA3rBk1Uo$Pj7oVVI7smkdBh20V8EyLivWpKDHFueUhvrfwxundGp/DQrAuTHjIxnrCZIMVJ1zcTIJ7VgIWKu0mUZmiRsqv0'
+PASSWORD_HASH=""
 SSH_PUBLIC_KEY=""
 TIMEZONE="America/Chicago"
 LOCALE="en_US.UTF-8"

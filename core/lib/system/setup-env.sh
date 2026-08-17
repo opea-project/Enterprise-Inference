@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 setup_initial_env() {
     echo "Setting up the Initial Environment..."
     
@@ -20,8 +26,7 @@ setup_initial_env() {
         git config --global https.proxy "$https_proxy"
     fi
     if [ ! -d "$KUBESPRAYDIR" ]; then
-        git clone https://github.com/kubernetes-sigs/kubespray.git $KUBESPRAYDIR
-        if [ $? -ne 0 ] || [ ! -d "$KUBESPRAYDIR/.git" ]; then
+        if ! git clone https://github.com/kubernetes-sigs/kubespray.git "$KUBESPRAYDIR" || [ ! -d "$KUBESPRAYDIR/.git" ]; then
             echo -e "${RED}----------------------------------------------------------------------------${NC}"
             echo -e "${RED}|  NOTICE: Failed to clone Kubespray Repository.                           |${NC}"        
             echo -e "${RED}|  Unable to proceed with Inference Stack Deployment                        |${NC}"        
@@ -29,11 +34,11 @@ setup_initial_env() {
             echo -e "${RED}----------------------------------------------------------------------------${NC}"            
             exit 1
         fi
-        cd $KUBESPRAYDIR        
+        cd "$KUBESPRAYDIR" || exit 1
         git checkout "$kubespray_version"
     else
         echo "Kubespray directory already exists, skipping clone."
-        cd $KUBESPRAYDIR
+        cd "$KUBESPRAYDIR" || exit 1
     fi
     if [[ -n "$https_proxy" ]]; then
         git config --global --unset http.proxy
@@ -46,9 +51,9 @@ setup_initial_env() {
         echo "Installing python3-venv package..."
         if command -v apt &> /dev/null; then            
             python_version=$($python3_interpreter -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")            
-            sudo apt install -y python${python_version}-venv || sudo apt install -y python3-venv        
+            sudo apt install -y "python${python_version}-venv" || sudo apt install -y python3-venv        
         fi                
-        if $python3_interpreter -m venv $VENVDIR; then
+        if $python3_interpreter -m venv "$VENVDIR"; then
             echo "Virtual environment created within Kubespray directory."
         else
             echo -e "${RED}Failed to create virtual environment.${NC}"
@@ -57,7 +62,8 @@ setup_initial_env() {
     else
         echo "Virtual environment already exists within Kubespray directory, skipping creation."
     fi
-    source $VENVDIR/bin/activate
+    # shellcheck source=/dev/null  # created at runtime by python -m venv
+    source "$VENVDIR/bin/activate"
     echo "Attempting to activate the virtual environment..."    
     if [ -z "$VIRTUAL_ENV" ]; then        
         rm -rf "$KUBESPRAYDIR"
@@ -72,11 +78,11 @@ setup_initial_env() {
     fi                 
         
     export PIP_BREAK_SYSTEM_PACKAGES=1
-    $VENVDIR/bin/python3 -m pip install --upgrade pip
-    $VENVDIR/bin/python3 -m pip install -U -r requirements.txt    
+    "$VENVDIR"/bin/python3 -m pip install --upgrade pip
+    "$VENVDIR"/bin/python3 -m pip install -U -r requirements.txt    
     
     echo "Verifying Ansible Installation..."
-    if $VENVDIR/bin/python3 -c "import ansible" &> /dev/null; then
+    if "$VENVDIR"/bin/python3 -c "import ansible" &> /dev/null; then
         echo -e "${GREEN} Ansible installed successfully${NC}"
     else
         echo -e "${RED}----------------------------------------------------------------------------${NC}"
@@ -90,18 +96,18 @@ setup_initial_env() {
     echo -e "${GREEN} Enterprise Inference requirements installed.${NC}"
     cp -r "$HOMEDIR"/helm-charts "$HOMEDIR"/scripts "$KUBESPRAYDIR"/
     cp -r "$KUBESPRAYDIR"/inventory/sample/ "$KUBESPRAYDIR"/inventory/mycluster
-    cp  "$HOMEDIR"/inventory/hosts.yaml $KUBESPRAYDIR/inventory/mycluster/
-    cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml    
+    cp  "$HOMEDIR"/inventory/hosts.yaml "$KUBESPRAYDIR"/inventory/mycluster/
+    cp "$HOMEDIR"/inventory/metadata/addons.yml "$KUBESPRAYDIR"/inventory/mycluster/group_vars/k8s_cluster/addons.yml    
     cp "$HOMEDIR"/playbooks/* "$KUBESPRAYDIR"/playbooks/    
     gaudi2_values_file_path="$REMOTEDIR/vllm/gaudi-values.yaml"
     gaudi3_values_file_path="$REMOTEDIR/vllm/gaudi3-values.yaml"
     xeon_values_file_path="$REMOTEDIR/vllm/xeon-values.yaml"
-    cp "$HOMEDIR"/inventory/metadata/addons.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/k8s_cluster/addons.yml
-    cp "$HOMEDIR"/inventory/metadata/all.yml $KUBESPRAYDIR/inventory/mycluster/group_vars/all/all.yml
-    cp -r "$HOMEDIR"/roles/* $KUBESPRAYDIR/roles/        
+    cp "$HOMEDIR"/inventory/metadata/addons.yml "$KUBESPRAYDIR"/inventory/mycluster/group_vars/k8s_cluster/addons.yml
+    cp "$HOMEDIR"/inventory/metadata/all.yml "$KUBESPRAYDIR"/inventory/mycluster/group_vars/all/all.yml
+    cp -r "$HOMEDIR"/roles/* "$KUBESPRAYDIR"/roles/        
 
     mkdir -p "$KUBESPRAYDIR/config"        
-    chmod +x $HOMEDIR/scripts/generate-vault-secrets.sh
+    chmod +x "$HOMEDIR"/scripts/generate-vault-secrets.sh
 
     # Only generate vault secrets if vault.yml doesn't exist or is incomplete
     vault_file="$HOMEDIR/inventory/metadata/vault.yml"
@@ -109,7 +115,7 @@ setup_initial_env() {
 
     if [ ! -f "$vault_file" ]; then
         echo "vault.yml not found at $vault_file, generating vault secrets..."
-        bash $HOMEDIR/scripts/generate-vault-secrets.sh
+        bash "$HOMEDIR"/scripts/generate-vault-secrets.sh
     else
         echo "Checking vault.yml for mandatory keys..."
         missing_keys=()
@@ -122,7 +128,7 @@ setup_initial_env() {
         if [ ${#missing_keys[@]} -gt 0 ]; then
             echo -e "${YELLOW}vault.yml exists but is missing mandatory keys: ${missing_keys[*]}${NC}"
             echo "Regenerating vault.yml with all mandatory keys..."
-            bash $HOMEDIR/scripts/generate-vault-secrets.sh
+            bash "$HOMEDIR"/scripts/generate-vault-secrets.sh
         else
             echo -e "${GREEN}vault.yml exists and contains all mandatory keys. Skipping generation...${NC}"
         fi
@@ -140,9 +146,9 @@ setup_initial_env() {
             fi      
         fi          
     fi    
-    cp "$HOMEDIR"/inventory/metadata/vault.yml $KUBESPRAYDIR/config/vault.yml            
+    cp "$HOMEDIR"/inventory/metadata/vault.yml "$KUBESPRAYDIR"/config/vault.yml            
     mkdir -p "$KUBESPRAYDIR/config/vars" 
-    cp -r "$HOMEDIR"/inventory/metadata/vars/* $KUBESPRAYDIR/config/vars/    
+    cp -r "$HOMEDIR"/inventory/metadata/vars/* "$KUBESPRAYDIR"/config/vars/    
     cp "$HOMEDIR"/playbooks/* "$KUBESPRAYDIR"/playbooks/
     echo "Additional files and directories copied to Kubespray directory."
         
@@ -163,7 +169,7 @@ setup_initial_env() {
 
 
 invoke_prereq_workflows() {
-    if [ $prereq_executed -eq 0 ]; then
+    if [ "$prereq_executed" -eq 0 ]; then
         read_config_file "$@"
         if [ -z "$cluster_url" ] || [ -z "$cert_file" ] || [ -z "$key_file" ] || [ -z "$keycloak_client_id" ] || [ -z "$keycloak_admin_user" ] || [ -z "$keycloak_admin_password" ]; then
             echo "Some required arguments are missing. Prompting for input..."

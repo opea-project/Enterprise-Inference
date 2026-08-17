@@ -3,7 +3,6 @@
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
 YELLOW=$(tput setaf 3)
-BLUE=$(tput setaf 4)
 NC=$(tput sgr0)  # Reset color
 
 # Copyright (C) 2025-2026 Intel Corporation
@@ -65,23 +64,20 @@ update_drivers() {
         # Download the base Gaudi installer
         echo -e "${YELLOW}Downloading Gaudi installer...${NC}"
         echo -e "${YELLOW}Unloading Gaudi drivers...${NC}"
-        wget -nv https://vault.habana.ai/artifactory/gaudi-installer/1.18.0/habanalabs-installer.sh
-        if [ $? -ne 0 ]; then
+        if ! wget -nv https://vault.habana.ai/artifactory/gaudi-installer/1.18.0/habanalabs-installer.sh; then
             echo -e "${RED}Failed to download Gaudi installer.${NC}"
             exit 1
         fi
         echo -e "${GREEN}Gaudi installer downloaded successfully.${NC}"
         echo -e "${YELLOW}Installing Gaudi base components...${NC}"
         chmod +x habanalabs-installer.sh
-        ./habanalabs-installer.sh install --type base -y
-        if [ $? -ne 0 ]; then
+        if ! ./habanalabs-installer.sh install --type base -y; then
             echo -e "${RED}Failed to install Gaudi base components.${NC}"
             exit 1
         fi
         echo -e "${GREEN}Gaudi base components installed successfully.${NC}"
         echo -e "${YELLOW}Installing Gaudi container runtime...${NC}"
-        sudo apt install -y habanalabs-container-runtime=1.18.0-524
-        if [ $? -ne 0 ]; then
+        if ! sudo apt install -y habanalabs-container-runtime=1.18.0-524; then
             echo -e "${RED}Failed to install Gaudi container runtime.${NC}"
             #exit 1
         fi
