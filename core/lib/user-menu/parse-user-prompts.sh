@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 parse_arguments() {
     while [[ "$#" -gt 0 ]]; do
         case $1 in
@@ -25,61 +31,61 @@ parse_arguments() {
 
 prompt_for_input() {   
     if [ -z "$deploy_kubernetes_fresh" ]; then
-        read -p "Do you want to proceed with deploying fresh Kubernetes cluster setup? (yes/no): " deploy_kubernetes_fresh
+        read -r -p "Do you want to proceed with deploying fresh Kubernetes cluster setup? (yes/no): " deploy_kubernetes_fresh
     else
         echo "Proceeding with the setup of Fresh Kubernetes cluster: $deploy_kubernetes_fresh"
     fi
     if [ -z "$deploy_habana_ai_operator" ]; then
-        read -p "Do you want to proceed with deploying Habana AI Operator? (yes/no): " deploy_habana_ai_operator
+        read -r -p "Do you want to proceed with deploying Habana AI Operator? (yes/no): " deploy_habana_ai_operator
     else
         echo "Proceeding with the setup of Habana AI Operator: $deploy_habana_ai_operator"
     fi
     if [ -z "$deploy_ingress_controller" ]; then
-        read -p "Do you want to proceed with deploying Ingress NGINX Controller? (yes/no): " deploy_ingress_controller
+        read -r -p "Do you want to proceed with deploying Ingress NGINX Controller? (yes/no): " deploy_ingress_controller
     else
         echo "Proceeding with the setup of Ingress Controller: $deploy_ingress_controller"
     fi
     if [ -z "$deploy_keycloak" ]; then
-        read -p "Do you want to proceed with deploying Keycloak & APISIX? (yes/no): " deploy_keycloak
+        read -r -p "Do you want to proceed with deploying Keycloak & APISIX? (yes/no): " deploy_keycloak
         
     else
         echo "Proceeding with the setup of Keycloak : $deploy_keycloak"
     fi
     if [ -z "$deploy_apisix" ]; then
-        read -p "Do you want to proceed with deploying Keycloak & APISIX? (yes/no): " deploy_apisix
+        read -r -p "Do you want to proceed with deploying Keycloak & APISIX? (yes/no): " deploy_apisix
         
     else
         echo "Proceeding with the setup of Apisix: $deploy_apisix"
     fi
 
     if [ -z "$deploy_genai_gateway" ]; then
-        read -p "Do you want to proceed with deploying GenAI Gateway? (yes/no): " deploy_genai_gateway
+        read -r -p "Do you want to proceed with deploying GenAI Gateway? (yes/no): " deploy_genai_gateway
     else
         echo "Proceeding with the setup of GenAI Gateway: $deploy_genai_gateway"
     fi
     
     if [ -z "$deploy_observability" ]; then
-        read -p "Do you want to proceed with deploying Observability? (yes/no): " deploy_observability
+        read -r -p "Do you want to proceed with deploying Observability? (yes/no): " deploy_observability
     else
         echo "Proceeding with the setup of Observability: $deploy_observability"
     fi
 
     if [ -z "$deploy_ceph" ]; then
-        read -p "Do you want to proceed with deploying Ceph cluster setup? (yes/no): " deploy_ceph
+        read -r -p "Do you want to proceed with deploying Ceph cluster setup? (yes/no): " deploy_ceph
     else
         echo "Proceeding with the setup of Ceph cluster: $deploy_ceph"
     fi
     
     if [ "$deploy_kubernetes_fresh" == "no" ]; then
         if [ -z "$uninstall_ceph" ]; then
-            read -p "Do you want to proceed with uninstalling Ceph cluster? (yes/no): " uninstall_ceph
+            read -r -p "Do you want to proceed with uninstalling Ceph cluster? (yes/no): " uninstall_ceph
         else
             echo "Proceeding with Ceph cluster uninstallation: $uninstall_ceph"
         fi
     fi
            
     if [ -z "$deploy_istio" ]; then
-        read -p "Do you want to proceed with deploying Istio? (yes/no): " deploy_istio
+        read -r -p "Do you want to proceed with deploying Istio? (yes/no): " deploy_istio
     else
         echo "Proceeding with the setup of Istio: $deploy_istio"
     fi
@@ -102,33 +108,33 @@ prompt_for_input() {
     model_selection "$@"    
     echo "----- Input -----"
     if [ -z "$cluster_url" ]; then
-        read -p "Enter the CLUSTER URL (FQDN): " cluster_url
+        read -r -p "Enter the CLUSTER URL (FQDN): " cluster_url
     else
         echo "Using provided CLUSTER URL: $cluster_url"
     fi
     if [ -z "$cert_file" ]; then
-        read -p "Enter the full path to the certificate file: " cert_file
+        read -r -p "Enter the full path to the certificate file: " cert_file
     else
         echo "Using provided certificate file: $cert_file"
     fi    
     if [ -z "$key_file" ]; then
-        read -p "Enter the full path to the key file: " key_file
+        read -r -p "Enter the full path to the key file: " key_file
     else
         echo "Using provided key file: $key_file"
     fi
-    if [ $deploy_keycloak == "yes" ]; then
+    if [ "$deploy_keycloak" == "yes" ]; then
         if [ -z "$keycloak_client_id" ]; then
-            read -p "Enter the keycloak client id: " keycloak_client_id
+            read -r -p "Enter the keycloak client id: " keycloak_client_id
         else
             echo "Using provided keycloak client id: $keycloak_client_id"
         fi
         if [ -z "$keycloak_admin_user" ]; then
-            read -p "Enter the Keycloak admin username: " keycloak_admin_user
+            read -r -p "Enter the Keycloak admin username: " keycloak_admin_user
         else
             echo "Using provided Keycloak admin username: $keycloak_admin_user"
         fi
         if [ -z "$keycloak_admin_password" ]; then
-            read -sp "Enter the Keycloak admin password: " keycloak_admin_password
+            read -r -sp "Enter the Keycloak admin password: " keycloak_admin_password
             echo
         else
             echo "Using provided Keycloak admin password"
@@ -136,7 +142,7 @@ prompt_for_input() {
     fi        
     
     if [[ -z "$cpu_or_gpu" ]]; then
-        read -p "Do you want to run on CPU or GPU? (c/g): " cpu_or_gpu
+        read -r -p "Do you want to run on CPU or GPU? (c/g): " cpu_or_gpu
         case "$cpu_or_gpu" in
             c|C)
                 cpu_or_gpu="c"

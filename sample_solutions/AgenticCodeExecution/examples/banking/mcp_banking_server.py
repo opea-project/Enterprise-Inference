@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, cast
 
 from fastmcp import FastMCP
 
-# Add parent directory to sys.path for shared modules (error_hints)
+# Add parent directory to sys.path for shared modules (error_hints, safe_math)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from banking_data_model import (
@@ -30,6 +30,7 @@ from banking_data_model import (
     CustomerName,
 )
 from error_hints import analyze_execution_error
+from safe_math import calculate_expression
 
 
 DEFAULT_DB_PATH = str(Path(__file__).resolve().parent / "data" / "db.json")
@@ -337,9 +338,7 @@ def calculate(expression: str, session_id: str = "") -> str:
     Returns:
         The calculated result as a string.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 6))
+    return calculate_expression(expression, 6)
 
 
 @mcp.tool()

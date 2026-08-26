@@ -76,13 +76,13 @@ CLIENT_RESPONSE=$(curl -s -X POST "$KEYCLOAK_URL/admin/realms/master/clients" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -d '{
-        "clientId": "'$CLIENT_ID'",
+        "clientId": "'"$CLIENT_ID"'",
         "protocol": "openid-connect",
         "publicClient": false,
         "serviceAccountsEnabled": true
     }')
 
-if echo "$CLIENT_RESPONSE" | grep -q '"errorMessage":"Client '$CLIENT_ID' already exists"'; then
+if echo "$CLIENT_RESPONSE" | grep -q '"errorMessage":"Client '"$CLIENT_ID"' already exists"'; then
     echo "Client $CLIENT_ID already exists, skipping creation"
 else
     if [ -z "$CLIENT_RESPONSE" ]; then
@@ -149,6 +149,9 @@ if [ -f "$SA_DIR/token" ] && [ -n "$KUBERNETES_SERVICE_HOST" ]; then
     K8S_NAMESPACE=$(cat "$SA_DIR/namespace")
     K8S_CACERT="$SA_DIR/ca.crt"
     K8S_API="https://$KUBERNETES_SERVICE_HOST:${KUBERNETES_SERVICE_PORT_HTTPS:-443}"
+    # The in-cluster API server must be reached directly. curl ignores CIDR entries in
+    # no_proxy (e.g. 10.233.0.0/16), so on proxied hosts the request would otherwise be
+    # sent to the external proxy and fail; --noproxy takes the exact host and bypasses it.
     SECRET_B64=$(printf '%s' "$CLIENT_SECRET" | base64 | tr -d '\n')
 
     SECRET_PAYLOAD=$(jq -nc \
@@ -157,18 +160,18 @@ if [ -f "$SA_DIR/token" ] && [ -n "$KUBERNETES_SERVICE_HOST" ]; then
         --arg data "$SECRET_B64" \
         '{apiVersion:"v1",kind:"Secret",metadata:{name:$name,namespace:$ns},type:"Opaque",data:{"client-secret":$data}}')
 
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --cacert "$K8S_CACERT" \
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --noproxy "$KUBERNETES_SERVICE_HOST" --cacert "$K8S_CACERT" \
         -X GET "$K8S_API/api/v1/namespaces/$K8S_NAMESPACE/secrets/$CLIENT_SECRET_K8S_SECRET" \
         -H "Authorization: Bearer $K8S_TOKEN")
 
     if [ "$HTTP_CODE" = "200" ]; then
-        RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --cacert "$K8S_CACERT" \
+        RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --noproxy "$KUBERNETES_SERVICE_HOST" --cacert "$K8S_CACERT" \
             -X PUT "$K8S_API/api/v1/namespaces/$K8S_NAMESPACE/secrets/$CLIENT_SECRET_K8S_SECRET" \
             -H "Authorization: Bearer $K8S_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$SECRET_PAYLOAD")
     else
-        RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --cacert "$K8S_CACERT" \
+        RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --noproxy "$KUBERNETES_SERVICE_HOST" --cacert "$K8S_CACERT" \
             -X POST "$K8S_API/api/v1/namespaces/$K8S_NAMESPACE/secrets" \
             -H "Authorization: Bearer $K8S_TOKEN" \
             -H "Content-Type: application/json" \

@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 uninstall_ceph_cluster() {
     echo "Uninstalling Ceph Cluster..."
     echo "WARNING: This will PERMANENTLY DELETE ALL CEPH DATA!"

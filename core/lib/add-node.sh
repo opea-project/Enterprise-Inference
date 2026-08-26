@@ -2,10 +2,16 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 
 add_inference_nodes_playbook() {    
     echo "Add Inference LLM Nodes playbook..."        
-    read -p "Enter the name of the worker node to be added (as defined in hosts.yml): " worker_node_name    
+    read -r -p "Enter the name of the worker node to be added (as defined in hosts.yml): " worker_node_name    
     if [ -z "$worker_node_name" ]; then
         echo "Error: No worker node names provided."
         return 1

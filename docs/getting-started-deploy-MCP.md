@@ -275,12 +275,14 @@ source core/scripts/generate-token.sh
 
 **Prerequisites:**
 
-Before running the script, update the following environment variables in `core/scripts/generate-token.sh` according to your cluster configuration:
+Before running the script, export the following environment variables according to your
+cluster configuration. `KEYCLOAK_PASSWORD` has no default and must always be provided;
+the others fall back to the placeholder defaults shown below.
 
 ```bash
 export BASE_URL="api.example.com"                               # Base URL of Keycloak server (without https://)
 export KEYCLOAK_ADMIN_USERNAME="your-keycloak-admin-user"       # Keycloak admin username
-export KEYCLOAK_PASSWORD="changeme"                             # Keycloak admin password
+export KEYCLOAK_PASSWORD="<your-keycloak-admin-password>"       # Keycloak admin password (required)
 export KEYCLOAK_CLIENT_ID="my-client-id"                        # Client ID to be created in Keycloak
 ```
 

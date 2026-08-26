@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 
 remove_model_deployed_via_huggingface(){
     echo "-------------------------------------------------"
@@ -22,7 +28,7 @@ remove_model_deployed_via_huggingface(){
         exit 1
     fi        
     
-    read -p "Enter the deployment name of the model you wish to deprovision: " hugging_face_model_remove_name    
+    read -r -p "Enter the deployment name of the model you wish to deprovision: " hugging_face_model_remove_name    
     if [ "$cpu_or_gpu" == "c" ]; then
         hugging_face_model_remove_name="${hugging_face_model_remove_name}-cpu"
     fi

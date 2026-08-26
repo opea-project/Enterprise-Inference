@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 deploy_inference_llm_models_playbook() {
     echo "Deploying Inference LLM Models playbook..."    
     install_true="true"
@@ -72,7 +78,7 @@ deploy_inference_llm_models_playbook() {
     if [[ "$brownfield_deployment" == "yes" ]]; then
         echo "Brownfield deployment setup is selected..."
         INVENTORY_PATH=$brownfield_deployment_host_file
-        echo $INVENTORY_PATH
+        echo "$INVENTORY_PATH"
         echo "Brownfield deployment setup was selected..."
     fi
         

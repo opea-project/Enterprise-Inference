@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 install_kubernetes() {
     echo "Starting Kubernetes installation..."
     execute_and_check "Checking if the K8 is installed ..." run_fresh_install_playbook \

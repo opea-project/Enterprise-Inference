@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2034,SC2154
+
 remove_inference_llm_models_playbook() {
     echo "Removing Inference LLM Models playbook..."        
     echo "Uninstalling the models..."      

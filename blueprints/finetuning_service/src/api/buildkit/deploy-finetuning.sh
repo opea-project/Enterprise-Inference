@@ -1,11 +1,14 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 
 # Get the absolute path of the finetuning-service root directory
 # buildkit is 1 level deep from root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export BUILD_CONTEXT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BUILD_CONTEXT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export BUILD_CONTEXT
 export REGISTRY_URL="${REGISTRY_URL:-registry.kube-system.svc.cluster.local:5000}"
 export IMAGE_TAG="${IMAGE_TAG:-latest}"
 export NAMESPACE="${NAMESPACE:-finetuning}"
@@ -49,7 +52,7 @@ sleep 3
 
 # Show logs
 POD_NAME=""
-for i in {1..30}; do
+for _ in {1..30}; do
   POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l job-name=buildkit-finetuning-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   if [ -n "$POD_NAME" ]; then
     break

@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 update_cluster() {          
     echo "-------------------------------------------------"
     echo "|             Update Existing Cluster            |"
@@ -10,7 +12,7 @@ update_cluster() {
     #echo "| 3) Update Driver and Firmware                  |"
     echo "|------------------------------------------------|"    
     echo "Please choose an option (1 or 2):"
-    read -p "> " update_choice
+    read -r -p "> " update_choice
     case $update_choice in
         1)
             manage_worker_nodes "$@"
@@ -23,7 +25,7 @@ update_cluster() {
         #     ;;
         *)
             echo "Invalid option. Please enter 1 or 2."
-            update_cluster
+            update_cluster "$@"
             ;;
     esac
 }

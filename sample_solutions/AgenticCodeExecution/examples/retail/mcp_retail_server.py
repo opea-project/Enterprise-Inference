@@ -9,13 +9,14 @@ import argparse
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 
-# Add parent directory to sys.path for shared modules (error_hints)
+# Add parent directory to sys.path for shared modules (error_hints, safe_math)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from retail_data_model import (
@@ -34,6 +35,7 @@ from retail_data_model import (
     UserAddress,
 )
 from error_hints import analyze_execution_error
+from safe_math import calculate_expression
 
 
 # Default DB path (sibling data/ directory)
@@ -45,6 +47,9 @@ TAU2_BENCH_URL = (
 )
 
 
+DOWNLOAD_TIMEOUT_SEC = 60
+
+
 def ensure_db(db_path: str) -> None:
     """Check that the retail database exists; auto-download from tau2-bench if missing."""
     p = Path(db_path)
@@ -54,7 +59,11 @@ def ensure_db(db_path: str) -> None:
     print(f"   Downloading from tau2-bench …")
     p.parent.mkdir(parents=True, exist_ok=True)
     try:
-        urllib.request.urlretrieve(TAU2_BENCH_URL, str(p))
+        if urllib.parse.urlsplit(TAU2_BENCH_URL).scheme != "https":
+            raise ValueError("Only https:// downloads are permitted")
+        # nosec B310: the scheme is restricted to https immediately above.
+        with urllib.request.urlopen(TAU2_BENCH_URL, timeout=DOWNLOAD_TIMEOUT_SEC) as response:  # nosec B310
+            p.write_bytes(response.read())
         print(f"   ✅ Downloaded ({p.stat().st_size / 1_048_576:.1f} MB)")
     except Exception as exc:
         print(f"   ❌ Download failed: {exc}")
@@ -473,9 +482,7 @@ def calculate(expression: str, session_id: str = "") -> str:
     Returns:
         The calculated result as a string.
     """
-    if not all(char in "0123456789+-*/(). " for char in expression):
-        raise ValueError("Invalid characters in expression")
-    return str(round(float(eval(expression, {"__builtins__": None}, {})), 2))
+    return calculate_expression(expression, 2)
 
 
 @mcp.tool()

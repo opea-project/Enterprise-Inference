@@ -140,7 +140,7 @@ install_docker() {
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1
 
     # Add current user to docker group to run docker without sudo
-    sudo usermod -aG docker $USER
+    sudo usermod -aG docker "$USER"
 
     # Start and enable Docker service
     sudo systemctl start docker
@@ -188,6 +188,7 @@ clone_vllm_repository() {
         # Check if it's a git repository and has the examples directory
         if sudo test -d "$vllm_path/.git" && sudo test -d "$vllm_path/examples"; then
             log "INFO" "Updating existing vLLM repository..."
+            # shellcheck disable=SC2024  # LOG_FILE is user-owned in /tmp; piping through tee would mask git's exit status
             if sudo git -C "$vllm_path" pull origin main >> "$LOG_FILE" 2>&1; then
                 log "SUCCESS" "vLLM repository updated successfully"
                 return 0
@@ -225,6 +226,7 @@ clone_vllm_repo_fresh() {
     sudo mkdir -p "$(dirname "$vllm_path")" 2>/dev/null || true
 
     # Clone the repository
+    # shellcheck disable=SC2024  # LOG_FILE is user-owned in /tmp; piping through tee would mask git's exit status
     if sudo git clone --depth 1 https://github.com/vllm-project/vllm.git "$vllm_path" >> "$LOG_FILE" 2>&1; then
         log "SUCCESS" "vLLM repository cloned successfully"
 
@@ -248,7 +250,7 @@ install_dependencies() {
     if ! sudo -n true 2>/dev/null; then
         log "WARN" "This script requires sudo privileges to install dependencies"
         log "INFO" "Please run: sudo -v"
-        read -p "Press Enter after running sudo -v to continue..."
+        read -r -p "Press Enter after running sudo -v to continue..."
     fi
 
     # Check and install curl first (needed for Docker installation)
@@ -286,7 +288,7 @@ install_dependencies() {
         else
             if [[ "$need_newgrp" == "false" ]]; then
                 log "INFO" "Adding user to docker group..."
-                sudo usermod -aG docker $USER
+                sudo usermod -aG docker "$USER"
                 need_rerun=true
             fi
         fi
@@ -341,7 +343,7 @@ validate_environment() {
 
     # Check Docker daemon
     check_docker_access
-    if ! ${USE_SUDO}docker info >/dev/null 2>&1; then
+    if ! "${DOCKER_SUDO[@]}" docker info >/dev/null 2>&1; then
         cleanup_and_exit 1 "Docker daemon is not running or not accessible."
     fi
 
@@ -351,13 +353,16 @@ validate_environment() {
 # Global variables for model data
 declare -a MODEL_KEYS
 declare -g USE_SUDO=""
+declare -ga DOCKER_SUDO=()
 
 # Helper function to determine if we need sudo for Docker
 check_docker_access() {
     if groups | grep -q docker; then
         USE_SUDO=""
+        DOCKER_SUDO=()
     else
         USE_SUDO="sudo "
+        DOCKER_SUDO=(sudo)
         log "WARN" "User not in docker group, using sudo for Docker commands"
     fi
 }
@@ -367,9 +372,12 @@ load_configuration() {
     log "INFO" "Loading configuration from $CONFIG_FILE"
 
     # Extract model list
-    local temp_keys
-    if ! temp_keys=($(jq -r '.models | keys[]' "$CONFIG_FILE" 2>/dev/null)); then
+    local temp_keys=() keys_output
+    if ! keys_output=$(jq -r '.models | keys[]' "$CONFIG_FILE" 2>/dev/null); then
         cleanup_and_exit 1 "Failed to parse model keys from configuration"
+    fi
+    if [[ -n "$keys_output" ]]; then
+        mapfile -t temp_keys <<< "$keys_output"
     fi
 
     if [[ ${#temp_keys[@]} -eq 0 ]]; then
@@ -434,7 +442,7 @@ compute_parallel_config() {
 
 # Display available models and get user selection
 select_model() {
-    printf "${YELLOW}Available Models:${NC}\n" >&2
+    printf '%bAvailable Models:%b\n' "$YELLOW" "$NC" >&2
     echo >&2
 
     for i in "${!MODEL_KEYS[@]}"; do
@@ -445,8 +453,8 @@ select_model() {
     done
 
     echo >&2
-    printf "${YELLOW}Enter the number of the model you want to start:${NC}\n" >&2
-    read -p "> " choice
+    printf '%bEnter the number of the model you want to start:%b\n' "$YELLOW" "$NC" >&2
+    read -r -p "> " choice
 
     # Validate user input
     if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#MODEL_KEYS[@]} )); then
@@ -511,27 +519,27 @@ stop_existing_container() {
 
     # Check for both running and stopped containers with the same name
     local existing_container
-    existing_container=$(${USE_SUDO}docker ps -aq --filter "name=$CONTAINER_NAME" 2>/dev/null)
+    existing_container=$("${DOCKER_SUDO[@]}" docker ps -aq --filter "name=$CONTAINER_NAME" 2>/dev/null)
 
     if [[ -n "$existing_container" ]]; then
         log "INFO" "Stopping existing container: $existing_container"
 
         # Stop the container if it's running
-        if ${USE_SUDO}docker ps -q --filter "name=$CONTAINER_NAME" | grep -q "$existing_container"; then
-            if ! ${USE_SUDO}docker stop "$existing_container" >> "$LOG_FILE" 2>&1; then
+        if "${DOCKER_SUDO[@]}" docker ps -q --filter "name=$CONTAINER_NAME" | grep -q "$existing_container"; then
+            if ! "${DOCKER_SUDO[@]}" docker stop "$existing_container" >> "$LOG_FILE" 2>&1; then
                 log "WARN" "Failed to stop container gracefully, forcing removal"
-                ${USE_SUDO}docker kill "$existing_container" >> "$LOG_FILE" 2>&1
+                "${DOCKER_SUDO[@]}" docker kill "$existing_container" >> "$LOG_FILE" 2>&1
             fi
         fi
 
         # Try to remove the container - it might already be gone if started with --rm
-        if ${USE_SUDO}docker inspect "$existing_container" >/dev/null 2>&1; then
+        if "${DOCKER_SUDO[@]}" docker inspect "$existing_container" >/dev/null 2>&1; then
             # Container still exists, try to remove it
             local retry_count=0
             local max_retries=5
             while [[ $retry_count -lt $max_retries ]]; do
                 local rm_output
-                rm_output=$(${USE_SUDO}docker rm "$existing_container" 2>&1)
+                rm_output=$("${DOCKER_SUDO[@]}" docker rm "$existing_container" 2>&1)
                 local rm_exit_code=$?
 
                 if [[ $rm_exit_code -eq 0 ]]; then
@@ -570,7 +578,7 @@ stop_existing_container() {
 # Check if Docker image exists locally
 check_docker_image_exists() {
     local docker_image="$1"
-    ${USE_SUDO}docker image inspect "$docker_image" >/dev/null 2>&1
+    "${DOCKER_SUDO[@]}" docker image inspect "$docker_image" >/dev/null 2>&1
 }
 
 # Pull Docker image if needed
@@ -588,7 +596,7 @@ pull_docker_image() {
     log "INFO" "Pulling Docker image (this may take several minutes on first run)..."
 
     # Show progress while pulling
-    if ! ${USE_SUDO}docker pull "$docker_image" >> "$LOG_FILE" 2>&1; then
+    if ! "${DOCKER_SUDO[@]}" docker pull "$docker_image" >> "$LOG_FILE" 2>&1; then
         log "ERROR" "Failed to pull Docker image: $docker_image"
         return 1
     fi
@@ -607,7 +615,7 @@ wait_for_container_running() {
     while [[ $attempt -le $max_attempts ]]; do
         # Check if container exists and get its status
         local container_status
-        container_status=$(${USE_SUDO}docker inspect --format='{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
+        container_status=$("${DOCKER_SUDO[@]}" docker inspect --format='{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
 
         case "$container_status" in
             "running")
@@ -619,7 +627,7 @@ wait_for_container_running() {
                 ;;
             "exited"|"dead")
                 log "ERROR" "Container exited unexpectedly. Check container logs:"
-                ${USE_SUDO}docker logs --tail=20 "$CONTAINER_NAME" >> "$LOG_FILE" 2>&1
+                "${DOCKER_SUDO[@]}" docker logs --tail=20 "$CONTAINER_NAME" >> "$LOG_FILE" 2>&1
                 return 1
                 ;;
             "")
@@ -723,7 +731,7 @@ perform_health_check() {
     while [[ $attempt -le $max_attempts ]]; do
         # Check container status first
         local container_status
-        container_status=$(${USE_SUDO}docker inspect --format='{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
+        container_status=$("${DOCKER_SUDO[@]}" docker inspect --format='{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
 
         if [[ "$container_status" != "$last_container_status" ]]; then
             case "$container_status" in
@@ -732,7 +740,7 @@ perform_health_check() {
                     ;;
                 "exited"|"dead")
                     log "ERROR" "Container has stopped unexpectedly. Checking logs..."
-                    ${USE_SUDO}docker logs --tail=20 "$CONTAINER_NAME" >> "$LOG_FILE" 2>&1
+                    "${DOCKER_SUDO[@]}" docker logs --tail=20 "$CONTAINER_NAME" >> "$LOG_FILE" 2>&1
                     return 1
                     ;;
                 "")
@@ -771,7 +779,7 @@ perform_health_check() {
     done
 
     log "ERROR" "Health check failed after $max_attempts attempts"
-    printf "${RED}❌ vLLM server failed to start or is not responding${NC}\n"
+    printf '%b❌ vLLM server failed to start or is not responding%b\n' "$RED" "$NC"
     printf "${YELLOW}The server may still be initializing. Check logs with: ${USE_SUDO}docker logs %s${NC}\n" "$CONTAINER_NAME"
     return 1
 }

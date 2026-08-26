@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 update_drivers_and_firmware() {    
     echo "-------------------------------------------------"
     echo "|        Update Drivers and Firmware             |"
@@ -10,7 +12,7 @@ update_drivers_and_firmware() {
     echo "| 3) Update Both Drivers and Firmware            |"
     echo "|------------------------------------------------|"
     echo "Please choose an option (1, 2, or 3):"
-    read -p "> " update_choice
+    read -r -p "> " update_choice
     case $update_choice in
         1)
             update_gaudi_drivers
@@ -38,7 +40,7 @@ manage_worker_nodes() {
     echo "| 2) Remove Worker Node                          |"
     echo "|------------------------------------------------|"
     echo "Please choose an option (1 or 2):"
-    read -p "> " worker_choice
+    read -r -p "> " worker_choice
     case $worker_choice in
         1)
             add_worker_node "$@"
@@ -48,7 +50,7 @@ manage_worker_nodes() {
             ;;
         *)
             echo "Invalid option. Please enter 1 or 2."
-            manage_worker_nodes
+            manage_worker_nodes "$@"
             ;;
     esac
 }
@@ -66,7 +68,7 @@ manage_models() {
     echo "| 5) Remove Model using deployment name          |"
     echo "|------------------------------------------------|"
     echo "Please choose an option (1, 2, 3, or 4):"
-    read -p "> " model_choice
+    read -r -p "> " model_choice
     case $model_choice in
         1)
             add_model "$@"
@@ -85,7 +87,7 @@ manage_models() {
             ;;
         *)
             echo "Invalid option. Please enter 1, 2, 3, or 4."
-            manage_models
+            manage_models "$@"
             ;;
     esac
 }

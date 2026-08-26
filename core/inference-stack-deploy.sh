@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 # Colors
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
@@ -186,7 +188,7 @@ main_menu() {
     echo "| ${CYAN}4)${NC} Brownfield Deployment of Enterprise Inference        |"
     echo "${BLUE}|---------------------------------------------------------|${NC}"
     echo "Please choose an option (${CYAN}1${NC}, ${CYAN}2${NC}, ${CYAN}3${NC} or ${CYAN}4${NC}):"
-    read -p "${CYAN}> ${NC}" user_choice
+    read -r -p "${CYAN}> ${NC}" user_choice
     case $user_choice in
         1)
             fresh_installation "$@"

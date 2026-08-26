@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Get the directory where this script is located and go to project root
@@ -25,6 +27,7 @@ if [ ! -f .env ]; then
 fi
 
 # Load environment variables
+# shellcheck source=/dev/null  # generated at runtime by setup.sh
 source .env
 
 # Set defaults
@@ -75,7 +78,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📦 Step 1: Creating namespace..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 echo "✓ Namespace ready"
 echo ""
 
@@ -86,7 +89,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 if kubectl get secret finetuning-backend-secret -n default >/dev/null 2>&1; then
   kubectl get secret finetuning-backend-secret -n default -o yaml \
     | sed "s/namespace: default/namespace: $NAMESPACE/" \
-    | kubectl apply -n $NAMESPACE -f -
+    | kubectl apply -n "$NAMESPACE" -f -
   echo "✓ OIDC secret copied from default namespace"
 else
   echo "⚠️  Warning: finetuning-backend-secret not found in default namespace"
@@ -142,9 +145,9 @@ else
         echo "Found key: $KEY_FILE"
 
         # Check if secret already exists
-        if kubectl get secret finetuning-api-tls -n $NAMESPACE >/dev/null 2>&1; then
+        if kubectl get secret finetuning-api-tls -n "$NAMESPACE" >/dev/null 2>&1; then
             echo "Updating existing TLS secret..."
-            kubectl delete secret finetuning-api-tls -n $NAMESPACE
+            kubectl delete secret finetuning-api-tls -n "$NAMESPACE"
         else
             echo "Creating new TLS secret..."
         fi
@@ -152,7 +155,7 @@ else
         kubectl create secret tls finetuning-api-tls \
             --cert="$CERT_FILE" \
             --key="$KEY_FILE" \
-            -n $NAMESPACE
+            -n "$NAMESPACE"
 
         echo "✓ TLS secret created successfully"
     fi
@@ -172,8 +175,7 @@ export REGISTRY_URL="${REGISTRY_URL:-registry.kube-system.svc.cluster.local:5000
 # Run kaniko build
 if [ -f ./kaniko/deploy-finetuning.sh ]; then
     echo "Building image: $REGISTRY_URL/finetuning-service:$IMAGE_TAG"
-    ./kaniko/deploy-finetuning.sh
-    if [ $? -ne 0 ]; then
+    if ! ./kaniko/deploy-finetuning.sh; then
         echo "❌ Build failed!"
         exit 1
     fi
@@ -189,7 +191,7 @@ echo "🚀 Step 3: Deploying PostgreSQL..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Check if PostgreSQL release exists
-if helm list -n $NAMESPACE | grep -q "^finetuning-service-postgresql\s"; then
+if helm list -n "$NAMESPACE" | grep -q "^finetuning-service-postgresql\s"; then
     echo "Upgrading existing PostgreSQL..."
     HELM_PG_CMD="upgrade"
 else
@@ -199,7 +201,7 @@ fi
 
 # Deploy PostgreSQL
 helm $HELM_PG_CMD finetuning-service-postgresql ./helm-charts/postgresql \
-  --namespace $NAMESPACE \
+  --namespace "$NAMESPACE" \
   --set auth.password="$POSTGRES_PASSWORD" \
   --wait --timeout 5m
 
@@ -211,7 +213,7 @@ echo "🚀 Step 4: Deploying Application..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Check if release exists
-if helm list -n $NAMESPACE | grep -q "^finetuning-service\s"; then
+if helm list -n "$NAMESPACE" | grep -q "^finetuning-service\s"; then
     echo "Upgrading existing deployment..."
     HELM_CMD="upgrade"
 else
@@ -221,7 +223,7 @@ fi
 
 # Deploy with Helm
 helm $HELM_CMD finetuning-service ./helm-charts/finetuning-api \
-  --namespace $NAMESPACE \
+  --namespace "$NAMESPACE" \
   --set secrets.databaseUrl="postgresql://finetuning:$POSTGRES_PASSWORD@finetuning-service-postgresql:5432/finetuning" \
   --set secrets.nvidiaApiKey="$NVIDIA_API_KEY" \
   --set app.config.nvidiaApiUrl="$NVIDIA_API_URL" \
@@ -241,18 +243,18 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Waiting for PostgreSQL..."
 kubectl wait --for=condition=ready pod \
   -l app=postgres \
-  -n $NAMESPACE \
+  -n "$NAMESPACE" \
   --timeout=300s || true
 
 # Check if database is initialized
-POD_NAME=$(kubectl get pods -n $NAMESPACE -l app=postgres -o jsonpath='{.items[0].metadata.name}')
+POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l app=postgres -o jsonpath='{.items[0].metadata.name}')
 if [ ! -z "$POD_NAME" ]; then
     echo "Checking database schema..."
-    TABLE_COUNT=$(kubectl exec -n $NAMESPACE $POD_NAME -- psql -U finetuning -d finetuning -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
+    TABLE_COUNT=$(kubectl exec -n "$NAMESPACE" "$POD_NAME" -- psql -U finetuning -d finetuning -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
 
     if [ "$TABLE_COUNT" = "0" ]; then
         echo "Initializing database schema..."
-        cat "$PROJECT_ROOT/init-db.sql" | kubectl exec -n $NAMESPACE -i $POD_NAME -- psql -U finetuning -d finetuning
+        cat "$PROJECT_ROOT/init-db.sql" | kubectl exec -n "$NAMESPACE" -i "$POD_NAME" -- psql -U finetuning -d finetuning
         echo "✓ Database initialized"
     else
         echo "✓ Database already initialized ($TABLE_COUNT tables found)"
@@ -266,7 +268,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "⏳ Step 6: Waiting for application to be ready..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-kubectl rollout status deployment/finetuning-service -n $NAMESPACE --timeout=5m
+kubectl rollout status deployment/finetuning-service -n "$NAMESPACE" --timeout=5m
 
 echo "✓ Application is ready"
 echo ""
@@ -276,9 +278,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📊 Deployment Status"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-kubectl get pods -n $NAMESPACE
+kubectl get pods -n "$NAMESPACE"
 echo ""
-kubectl get ingress -n $NAMESPACE
+kubectl get ingress -n "$NAMESPACE"
 echo ""
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

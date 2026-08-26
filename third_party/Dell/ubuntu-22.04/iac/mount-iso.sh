@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 # Script to mount/unmount Ubuntu ISO via iDRAC Redfish API
 # Usage:
 #   ./mount-iso.sh          - Mount the ISO

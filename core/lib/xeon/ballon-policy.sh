@@ -1,6 +1,12 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+# This file is a library fragment sourced by core/inference-stack-deploy.sh.
+# Configuration globals are defined in lib/system/config-vars.sh and populated by
+# lib/system/precheck/read-config-file.sh, and are shared across the sourced fragments.
+# shellcheck disable=SC2154
+
 deploy_nri_balloons_playbook() {
     if [ "$balloon_policy_cpu" = "enabled" ]; then
         echo "Deploying CPU Optimization (NRI Balloons & Topology Detection)..."    
@@ -14,10 +20,9 @@ deploy_nri_balloons_playbook() {
         
         if [ "$deploy_nri_balloon_policy" == "yes" ] || [ "$cpu_or_gpu" == "c" ]; then
             echo "${GREEN}Deploying CPU optimization with topology detection and NRI balloon policy${NC}"
-            ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cpu-optimization.yml \
+            if ansible-playbook -i "${INVENTORY_PATH}" playbooks/deploy-cpu-optimization.yml \
                 --extra-vars "cpu_playbook=true" \
-                --extra-vars "kubernetes_platform=${kubernetes_platform}"
-            if [ $? -eq 0 ]; then
+                --extra-vars "kubernetes_platform=${kubernetes_platform}"; then
                 echo "${GREEN}CPU optimization deployed successfully${NC}"
             else
                 echo "${RED}CPU optimization deployment failed${NC}"

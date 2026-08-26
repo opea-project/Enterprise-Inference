@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Get the directory where this script is located and go to project root
@@ -42,17 +44,17 @@ echo ""
 echo "🎯 Training Backend Configuration"
 echo "This is the URL of your training backend service (e.g., Nvidia GPU server)."
 echo ""
-read -p "Training Backend URL (e.g., https://training.example.com:8443): " NVIDIA_API_URL
+read -r -p "Training Backend URL (e.g., https://training.example.com:8443): " NVIDIA_API_URL
 while [ -z "$NVIDIA_API_URL" ]; do
     echo "❌ Training Backend URL is required!"
-    read -p "Training Backend URL: " NVIDIA_API_URL
+    read -r -p "Training Backend URL: " NVIDIA_API_URL
 done
 
 echo ""
-read -p "Training Backend API Key: " NVIDIA_API_KEY
+read -r -p "Training Backend API Key: " NVIDIA_API_KEY
 while [ -z "$NVIDIA_API_KEY" ]; do
     echo "❌ Training Backend API Key is required!"
-    read -p "Training Backend API Key: " NVIDIA_API_KEY
+    read -r -p "Training Backend API Key: " NVIDIA_API_KEY
 done
 
 # Domain Configuration
@@ -60,10 +62,10 @@ echo ""
 echo "🌐 Domain Configuration"
 echo "The API will be accessible at: https://YOUR_DOMAIN/enterprise-ai"
 echo ""
-read -p "Your domain name (e.g., example.com): " BASE_DOMAIN
+read -r -p "Your domain name (e.g., example.com): " BASE_DOMAIN
 while [ -z "$BASE_DOMAIN" ]; do
     echo "❌ Domain name is required!"
-    read -p "Your domain name: " BASE_DOMAIN
+    read -r -p "Your domain name: " BASE_DOMAIN
 done
 
 # TLS Certificates Path
@@ -72,7 +74,7 @@ echo "🔒 TLS Certificates Configuration"
 echo "Provide the path to directory containing your TLS certificates."
 echo "Expected files: tls.crt (or cert.pem) and tls.key (or key.pem)"
 echo ""
-read -p "Path to certs directory (default: ../certs): " CERTS_PATH
+read -r -p "Path to certs directory (default: ../certs): " CERTS_PATH
 CERTS_PATH=${CERTS_PATH:-../certs}
 
 # Validate certs path
@@ -83,14 +85,14 @@ fi
 
 # Namespace
 echo ""
-read -p "Kubernetes namespace (default: finetuning): " NAMESPACE
+read -r -p "Kubernetes namespace (default: finetuning): " NAMESPACE
 NAMESPACE=${NAMESPACE:-finetuning}
 
 # Optional: Dataprep API
 echo ""
 echo "🔧 Optional: Dataprep API"
 echo "If you have a separate dataprep service, provide the URL. Otherwise, leave empty."
-read -p "Dataprep API URL (optional, press Enter to skip): " DATAPREP_API_URL
+read -r -p "Dataprep API URL (optional, press Enter to skip): " DATAPREP_API_URL
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

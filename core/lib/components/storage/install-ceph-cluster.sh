@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 deploy_ceph_cluster() {
 
     echo "Deploying Ceph Cluster..."

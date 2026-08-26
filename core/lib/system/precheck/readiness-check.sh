@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 run_infrastructure_readiness_check() {
     echo "Running infrastructure readiness check..."
     echo "This will verify system compatibility and infrastructure requirements."

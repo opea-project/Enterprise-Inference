@@ -1,6 +1,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+# shellcheck shell=bash
+
 run_system_prerequisites_check() {
     echo "Running system prerequisites check..."
     echo "This will verify minimum system dependencies required for deployment."
