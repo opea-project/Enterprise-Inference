@@ -1,3 +1,10 @@
+> # 🏠 PROJECT MOVED
+>
+> This project has moved to [**Intel® AI for Enterprise Solutions →**](https://github.com/intel/enterprise-ai-solutions)
+>
+> ⚠️ **This repository is no longer actively maintained.**  
+> Future development, updates, and support are available in the new repository.
+
 # Intel® AI for Enterprise Inference
 
 Unleash the power of AI Inference on Intel Silicon
