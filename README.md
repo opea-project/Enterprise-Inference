@@ -1,6 +1,6 @@
 > # 🏠 PROJECT MOVED
 >
-> This project has moved to [**Intel® AI for Enterprise Solutions →**](https://github.com/intel/enterprise-ai-solutions)
+> This project has moved to [**Intel® AI for Enterprise Inference →**](https://github.com/intel/enterprise-inference )
 >
 > ⚠️ **This repository is no longer actively maintained.**  
 > Future development, updates, and support are available in the new repository.
