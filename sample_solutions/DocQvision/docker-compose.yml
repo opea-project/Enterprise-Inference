@@ -1,0 +1,109 @@
+# =============================================================================
+# DocQvision - Docker Compose Configuration
+# =============================================================================
+# This file orchestrates the DocQvision application stack consisting of:
+# - Backend API (FastAPI)
+# - Frontend UI (React + Nginx)
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Backend API Service
+  # ===========================================================================
+  backend:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: DocQvision-backend:latest
+    container_name: DocQvision-backend
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
+    env_file:
+      - ./api/.env
+    environment:
+      - DATABASE_URL=sqlite:////app/data/DocQvision.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persistent database storage
+      - db_data:/app/data
+    extra_hosts:
+      - "${LOCAL_URL_ENDPOINT}:host-gateway"
+    networks:
+      - DocQvision_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    labels:
+      - "com.DocQvision.service=backend"
+      - "com.DocQvision.version=1.0"
+
+  # ===========================================================================
+  # Frontend UI Service
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: DocQvision-frontend:latest
+    container_name: DocQvision-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - DocQvision_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    labels:
+      - "com.DocQvision.service=frontend"
+      - "com.DocQvision.version=1.0"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  DocQvision_network:
+    driver: bridge
+    name: DocQvision_network
+    labels:
+      - "com.DocQvision.network=main"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  db_data:
+    driver: local
+    name: DocQvision_db_data
+    labels:
+      - "com.DocQvision.volume=database"
