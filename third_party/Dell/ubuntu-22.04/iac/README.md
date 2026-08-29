@@ -66,6 +66,12 @@ You may also use any internally hosted ISO that is reachable by iDRAC.
 chmod +x mount-iso.sh
 ./mount-iso.sh
 ```
+### To Unmount ISO
+use this command, if you want to unmount ISO.
+```bash
+./mount-iso.sh -u
+```
+
 ---
 
 ## 2. Boot Ubuntu Installer (Terraform + Redfish)
