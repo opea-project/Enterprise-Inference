@@ -1,0 +1,47 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if .Values.apisixRoute.enabled }}
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: {{ include "sglang.fullname" . }}-apisixroute
+  namespace: {{ .Values.apisixRoute.namespace }}
+  labels:
+    {{- include "sglang.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.apisixRoute.ingressClassName }}
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName }}
+  {{- end }}
+  http:
+    - name: {{ .Values.modelName }}-route
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.host }}
+        paths:
+          - /{{ .Values.modelName }}-sglang/*
+      backends:
+        - serviceName: {{ include "sglang.fullname" . }}
+          servicePort: {{ .Values.service.port }}
+      plugins:
+        - name: proxy-rewrite
+          enable: true
+          config:
+            regex_uri:
+              - ^/{{ .Values.modelName }}-sglang/(.*)
+              - /$1
+            headers:
+              Content-Type: application/json
+        {{- if .Values.oidc.enabled }}
+        - name: openid-connect
+          enable: true
+          secretRef: {{ include "sglang.fullname" . }}-secret
+          config:
+            discovery: {{ .Values.oidc.discovery }}
+            scope: openid profile email
+            bearer_only: true
+            realm: {{ .Values.oidc.realm }}
+            introspection_endpoint: {{ .Values.oidc.introspectionEndpoint }}
+            introspection_endpoint_auth_method: client_secret_basic
+        {{- end }}
+{{- end }}

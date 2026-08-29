@@ -1,0 +1,17 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v2
+name: sglang
+description: A Helm chart for deploying SGLang inference server (Xeon CPU build)
+type: application
+version: 0.1.0
+appVersion: "v0.5.11-xeon"
+keywords:
+  - sglang
+  - xeon
+  - cpu
+  - llm
+  - inference
+  - gpt-oss
+  - openai-compatible

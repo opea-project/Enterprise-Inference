@@ -1,0 +1,192 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+{{- if not .Values.modelSource }}
+{{- fail "modelSource is required. Set --set modelSource=<huggingface/org/model> (e.g. openai/gpt-oss-20b) or use a model-specific values file (see third_party/Dell/model-deployment/<model-name>/values.yaml)." }}
+{{- end }}
+{{- if not .Values.modelName }}
+{{- fail "modelName is required. Set --set modelName=<release-friendly-name> (e.g. gpt-oss-20b)." }}
+{{- end }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sglang.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "sglang.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sglang.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "sglang.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "sglang.imagePullSecrets" . | nindent 6 }}
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "sglang.serviceAccountName" . }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sglang
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["/opt/.venv/bin/python3", "-m", "sglang.launch_server"]
+          args:
+            - "--model-path={{ .Values.modelSource }}"
+            - "--served-model-name={{ .Values.modelName }}"
+            - "--host={{ .Values.server.host }}"
+            - "--port={{ .Values.server.port }}"
+            - "--device={{ .Values.server.device }}"
+            - "--tp-size={{ .Values.server.tpSize }}"
+            {{- if .Values.server.dpSize }}
+            - "--dp-size={{ .Values.server.dpSize }}"
+            {{- end }}
+            {{- if .Values.server.dtype }}
+            - "--dtype={{ .Values.server.dtype }}"
+            {{- end }}
+            {{- if .Values.server.quantization }}
+            - "--quantization={{ .Values.server.quantization }}"
+            {{- end }}
+            {{- if .Values.server.trustRemoteCode }}
+            - "--trust-remote-code"
+            {{- end }}
+            {{- if .Values.server.disableOverlapSchedule }}
+            - "--disable-overlap-schedule"
+            {{- end }}
+            {{- if .Values.server.enableTorchCompile }}
+            - "--enable-torch-compile"
+            - "--torch-compile-max-bs={{ .Values.server.torchCompileMaxBs }}"
+            {{- end }}
+            {{- if .Values.server.contextLength }}
+            - "--context-length={{ .Values.server.contextLength }}"
+            {{- end }}
+            {{- if .Values.server.maxRunningRequests }}
+            - "--max-running-requests={{ .Values.server.maxRunningRequests }}"
+            {{- end }}
+            {{- if .Values.server.maxTotalTokens }}
+            - "--max-total-tokens={{ .Values.server.maxTotalTokens }}"
+            {{- end }}
+            {{- if .Values.server.memFractionStatic }}
+            - "--mem-fraction-static={{ .Values.server.memFractionStatic }}"
+            {{- end }}
+            {{- range .Values.server.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.server.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: HF_HOME
+              value: {{ .Values.hfCacheMountPath | quote }}
+            - name: HUGGINGFACE_HUB_CACHE
+              value: "{{ .Values.hfCacheMountPath }}/hub"
+            - name: TRANSFORMERS_CACHE
+              value: "{{ .Values.hfCacheMountPath }}/hub"
+            {{- if .Values.cpuEngine.enabled }}
+            - name: SGLANG_USE_CPU_ENGINE
+              value: "1"
+            {{- if .Values.cpuEngine.ldPreload }}
+            - name: LD_PRELOAD
+              value: {{ .Values.cpuEngine.ldPreload | quote }}
+            {{- end }}
+            {{- if .Values.cpuEngine.ompThreadsBind }}
+            - name: SGLANG_CPU_OMP_THREADS_BIND
+              value: {{ .Values.cpuEngine.ompThreadsBind | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.huggingface.token }}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.huggingface.secretName | default "hf-token-secret" }}
+                  key: {{ .Values.huggingface.secretKey | default "token" }}
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.huggingface.secretName | default "hf-token-secret" }}
+                  key: {{ .Values.huggingface.secretKey | default "token" }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: hf-cache
+              mountPath: {{ .Values.hfCacheMountPath }}
+            {{- if .Values.shm.enabled }}
+            - name: dshm
+              mountPath: /dev/shm
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.server.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.server.livenessProbe.httpGet.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.server.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.server.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.server.readinessProbe.httpGet.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.server.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.readinessProbe.failureThreshold }}
+          {{- end }}
+      volumes:
+        - name: hf-cache
+          {{- include "sglang.storageVolume" . | nindent 10 }}
+        {{- if .Values.shm.enabled }}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shm.sizeLimit }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
