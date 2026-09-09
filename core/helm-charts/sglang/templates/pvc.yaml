@@ -1,0 +1,15 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- if and .Values.pvc.enabled .Release.IsInstall }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "sglang.fullname" . }}-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Gi # Adjust this according to model storage size
+{{- end }}

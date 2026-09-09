@@ -1,0 +1,235 @@
+# Copyright (C) 2025-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+{{- $modelName := (default .Values.LLM_MODEL_ID .Values.SERVED_MODEL_NAME) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sglang.fullname" . }}
+  labels:
+    {{- include "sglang.labels" . | nindent 4 }}
+spec:
+  {{- if ne (int .Values.replicaCount) 1 }}
+  # remove if replica count should not be reset on pod update (e.g. with HPA)
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sglang.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        
+        {{- if and .Values.cpu_balloon_annotation (not .Values.finetune.enabled) }}
+        balloon.balloons.resource-policy.nri.io: {{ .Values.cpu_balloon_annotation | quote }}
+        {{- end }}
+        
+      labels:
+        {{- include "sglang.selectorLabels" . | nindent 8 }}
+        {{- if not .Values.finetune.enabled }}
+        name: sglang
+        {{- end }}
+    spec:
+      # {{- with .Values.imagePullSecrets }}
+      # imagePullSecrets:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+      # serviceAccountName: {{ include "sglang.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.finetune.enabled }}
+      initContainers:
+      - name: fetch-finetuned-model
+        image: "{{ .Values.finetune.images.minioMc.repository }}:{{ .Values.finetune.images.minioMc.tag }}"
+        imagePullPolicy: {{ .Values.finetune.images.minioMc.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            echo "[finetune-init] Starting model download for fileId: {{ .Values.finetune.fileId }}"
+
+            # Install minio client and tar (alpine doesn't have them by default)
+            apk add --no-cache curl tar
+            curl -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+            chmod +x /usr/local/bin/mc
+
+            # Configure MinIO client
+            mc alias set minio http://${MINIO_HOST}:${MINIO_PORT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
+
+            # Download model tarball
+            MODEL_PATH="dataprep/{{ .Values.finetune.fileId }}/{{ .Values.finetune.fileId }}.tar.gz"
+            echo "[finetune-init] Downloading from bucket: ${MODEL_PATH}"
+            mc cp "minio/${MODEL_PATH}" /tmp/model.tar.gz
+
+            # Validate tarball (check for malicious content)
+            echo "[finetune-init] Validating tarball contents..."
+            tar -tzf /tmp/model.tar.gz > /tmp/tar-contents.txt
+
+            # Block dangerous file types and path traversal
+            if grep -qE '\.(sh|py|exe|so|dylib)$|\.\.\/'' /tmp/tar-contents.txt; then
+              echo "[finetune-init] ERROR: Tarball contains prohibited file types or path traversal"
+              cat /tmp/tar-contents.txt
+              exit 1
+            fi
+
+            # Extract to /data (model-volume mount)
+            echo "[finetune-init] Extracting model to /data/{{ .Values.finetune.fileId }}"
+            mkdir -p /data/{{ .Values.finetune.fileId }}
+            tar -xzf /tmp/model.tar.gz -C /data/{{ .Values.finetune.fileId }}
+
+            # Verify model files exist (search in subdirectories)
+            CONFIG_FILE=$(find /data/{{ .Values.finetune.fileId }} -name "config.json" -type f | head -1)
+            if [ -z "$CONFIG_FILE" ]; then
+              echo "[finetune-init] ERROR: config.json not found after extraction"
+              ls -laR /data/{{ .Values.finetune.fileId }}
+              exit 1
+            fi
+
+            # Get the actual model directory
+            MODEL_DIR=$(dirname "$CONFIG_FILE")
+            echo "[finetune-init] Model successfully fetched and validated"
+            echo "[finetune-init] Model located at: $MODEL_DIR"
+            ls -lh "$MODEL_DIR"
+
+            # Print the final model path that should be used
+            echo "[finetune-init] sglang should use model path: $MODEL_DIR"
+        env:
+          - name: MC_CONFIG_DIR
+            value: "/tmp/.mc"
+        envFrom:
+          - secretRef:
+              name: {{ .Values.finetune.minioCredentialsSecret }}
+        volumeMounts:
+          - name: model-volume
+            mountPath: /data
+          - name: tmp
+            mountPath: /tmp
+        securityContext:
+          runAsUser: 0
+          readOnlyRootFilesystem: false
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "sglang.fullname" . }}-config
+            {{- if .Values.global.extraEnvConfig }}
+            - configMapRef:
+                name: {{ .Values.global.extraEnvConfig }}
+                optional: true
+            {{- end }}
+            - secretRef:
+                name: {{ include "sglang.fullname" . }}-secret
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- if .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
+          command:
+            - python
+            - -m
+            - sglang.launch_server
+          args:
+            {{- $modelConfig := (index .Values.modelConfigs $modelName | default dict) }}
+            {{- $modelArgs := $modelConfig.extraCmdArgs | default .Values.defaultModelConfigs.extraCmdArgs }}
+            {{- range $modelArgs }}
+            - {{ . | quote }}
+            {{- end }}
+            
+            # CPU deployment - add parallelism settings
+            - "--tensor-parallel-size"
+            - {{ .Values.tensor_parallel_size | default (index .Values.modelConfigs $modelName | default dict).tensor_parallel_size | default .Values.defaultModelConfigs.tensor_parallel_size | quote}}
+            - "--pipeline-parallel-size"
+            - {{ .Values.pipeline_parallel_size | default (index .Values.modelConfigs $modelName | default dict).pipeline_parallel_size | default .Values.defaultModelConfigs.pipeline_parallel_size | quote}}
+            
+            {{- if .Values.finetune.enabled }}
+            - "--trust-remote-code"
+            - "--disable-overlap-schedule"
+            - "slow"
+            {{- end }}
+            - "--model"
+            - {{ .Values.LLM_MODEL_ID | quote }}
+            - --served-model-name
+            - {{ $modelName | quote }}
+            - "--port"
+            - {{ .Values.port | quote }}
+          volumeMounts:
+            - mountPath: /data
+              name: model-volume
+            - mountPath: /dev/shm
+              name: shm
+            - mountPath: /tmp
+              name: tmp
+          ports:
+            - name: http
+              containerPort: {{ .Values.port }}
+              protocol: TCP
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.cpu .Values.memory }}
+          resources:
+            
+            {{- if or .Values.cpu .Values.memory }}
+            requests:
+              {{- if .Values.cpu }}
+              cpu: {{ .Values.cpu | quote }}
+              {{- end }}
+              {{- if .Values.memory }}
+              memory: {{ .Values.memory | quote }}
+              {{- end }}
+            {{- end }}
+            
+          {{- end }}
+            
+      volumes:
+        - name: model-volume
+          {{- if .Values.pvc.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "sglang.fullname" . }}-pvc
+          {{- else if .Values.global.modelUseHostPath }}
+          hostPath:
+            path: {{ .Values.global.modelUseHostPath }}
+            type: Directory
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.shmSize }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.evenly_distributed }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "sglang.selectorLabels" . | nindent 14 }}
+      {{- end }}
+      
+      # extra time to finish processing buffered requests on CPU before pod is forcibly terminated
+      terminationGracePeriodSeconds: 120
